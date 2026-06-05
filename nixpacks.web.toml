@@ -1,8 +1,11 @@
-# Servicio Web en Railway: en el servicio, variable NIXPACKS_CONFIG_FILE=nixpacks.web.toml
+# GiDi WEB → NIXPACKS_CONFIG_FILE=nixpacks.web.toml
+
+[phases.install]
+cmds = ["NODE_ENV=development pnpm install --frozen-lockfile"]
 
 [phases.build]
 dependsOn = ["install"]
-cmds = ["pnpm run build:web"]
+cmds = ["pnpm run build:web", "test -d apps/web/.next"]
 
 [start]
 cmd = "pnpm --filter web start"

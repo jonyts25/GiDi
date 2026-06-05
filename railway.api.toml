@@ -1,5 +1,5 @@
-# Solo servicio Gidi API: variable RAILWAY_CONFIG_FILE=railway.toml
-# (La web no debe usar este archivo — no tiene /health)
+# Solo servicio Gidi API → variable RAILWAY_CONFIG_FILE=railway.api.toml
+# No usar railway.toml en la raíz: Railway lo aplica a TODOS los servicios del repo.
 
 [build]
 builder = "NIXPACKS"
