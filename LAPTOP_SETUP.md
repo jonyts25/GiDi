@@ -31,11 +31,11 @@ Haz esto en [railway.app](https://railway.app) con el proyecto **GiDi2.0**:
 1. Mismo repo: **jonyts25/GiDi**
 2. Branch: **main**
 3. **Root Directory**: **vacío**
-4. Variables que deben seguir existiendo:
+4. Variables que deben existir:
    - `NEXT_PUBLIC_API_URL` = `https://gidi-api-production.up.railway.app`
+   - `RAILWAY_CONFIG_FILE` = `railway.web.toml` (evita que use `railway.toml` de la API)
    - `NIXPACKS_START_CMD` = `pnpm --filter web start`
    - `NIXPACKS_BUILD_CMD` = `NODE_ENV=development pnpm run build:web && test -d apps/web/.next`
-5. **No** pongas `RAILWAY_CONFIG_FILE` en web (evita healthcheck de API).
 
 ### Después de enlazar
 
