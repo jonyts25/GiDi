@@ -14,6 +14,8 @@
     "build:api": "pnpm --filter api run build",
     "build:web": "pnpm --filter web run build",
     "build:railway-api": "pnpm run build:bot && pnpm run build:api",
+    "start:api": "pnpm --filter api run start:railway",
+    "start:railway-api": "pnpm --filter api run start:railway",
     "railway:start:api": "pnpm --filter api run start:railway"
   },
   "pnpm": {
