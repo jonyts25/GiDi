@@ -1,0 +1,27 @@
+# API GiDi — monorepo pnpm (una sola etapa; evita problemas de hoisting en multi-stage)
+
+FROM node:22-bookworm-slim
+
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY apps/api/package.json apps/api/
+COPY apps/bot/package.json apps/bot/
+
+ENV NODE_ENV=development
+RUN pnpm install --frozen-lockfile
+
+COPY apps/bot apps/bot
+COPY apps/api apps/api
+
+RUN pnpm run build:railway-api && test -f /app/apps/api/dist/main.js
+
+WORKDIR /app/apps/api
+
+ENV NODE_ENV=production
+EXPOSE 3000
+
+CMD ["node", "scripts/start-prod.cjs"]

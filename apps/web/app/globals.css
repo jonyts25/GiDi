@@ -1,0 +1,560 @@
+@import "tailwindcss";
+
+/* Paleta clínica cálida: fondo claro, acentos suaves, alto contraste legible */
+@theme {
+  --color-primary: #2d8a8a;
+  --color-primary-hover: #247474;
+  --color-primary-muted: #e8f4f4;
+
+  --color-success: #3d8b5a;
+  --color-warning: #c4842c;
+  --color-danger: #c45c5c;
+  --color-info: #4a7ab5;
+
+  --color-surface: #f6f8fa;
+  --color-surface-elevated: #ffffff;
+  --color-card: #ffffff;
+  --color-ink: #1e2a32;
+  --color-subtle: #5c6b76;
+  --color-border: #d8e0e6;
+
+  /* Compatibilidad con utilidades existentes */
+  --color-accent-yellow: var(--color-warning);
+  --color-accent-blue: var(--color-info);
+  --color-accent-red: var(--color-danger);
+  --color-accent-green: var(--color-success);
+}
+
+:root {
+  --bg: var(--color-surface);
+  --card: var(--color-card);
+  --text: var(--color-ink);
+  --muted: var(--color-subtle);
+  --border: var(--color-border);
+  --accent: var(--color-primary);
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background:
+    radial-gradient(1000px 600px at 12% 0%, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 55%),
+    radial-gradient(800px 500px at 95% 8%, color-mix(in srgb, var(--color-info) 10%, transparent), transparent 50%),
+    var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 18px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.btn {
+  background: var(--color-primary-muted);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+  color: var(--color-primary);
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.btn:hover {
+  background: color-mix(in srgb, var(--color-primary) 18%, white);
+}
+.btn-primary {
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary-hover);
+  color: #fff;
+  font-weight: 600;
+}
+.btn-primary:hover {
+  background: var(--color-primary-hover);
+}
+.input,
+.select,
+.textarea {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 12px;
+  outline: none;
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.badge {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--color-surface);
+}
+.h1 {
+  font-size: 26px;
+  margin: 6px 0 0;
+}
+.sub {
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 860px) {
+  .grid2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ring-accent-yellow {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-warning) 50%, transparent);
+}
+.ring-accent-blue {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-info) 50%, transparent);
+}
+.ring-accent-red {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-danger) 50%, transparent);
+}
+.ring-accent-green {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-success) 50%, transparent);
+}
+
+/* ——— Expediente clínico (impresión / PDF) ——— */
+.gidi-report-root {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 8.5in;
+  z-index: -1;
+  pointer-events: none;
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #1e2a32;
+  background: #fff;
+  font-size: 10.5pt;
+  line-height: 1.45;
+}
+
+.gidi-report-avoid-break {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+.gidi-report-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 3px solid #2d8a8a;
+}
+
+.gidi-report-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gidi-report-logo {
+  display: flex;
+  align-items: baseline;
+  font-weight: 800;
+  font-size: 28pt;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.gidi-report-logo-g,
+.gidi-report-logo-d {
+  color: #2d8a8a;
+}
+.gidi-report-logo-i,
+.gidi-report-logo-i2 {
+  color: #1e2a32;
+}
+
+.gidi-report-brand-name {
+  margin: 0;
+  font-size: 14pt;
+  font-weight: 800;
+  color: #2d8a8a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.gidi-report-brand-tag {
+  margin: 2px 0 0;
+  font-size: 8.5pt;
+  color: #5c6b76;
+}
+
+.gidi-report-meta {
+  flex: 1;
+  min-width: 240px;
+}
+
+.gidi-report-title {
+  margin: 0 0 10px;
+  font-size: 13pt;
+  font-weight: 700;
+  color: #1e2a32;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gidi-report-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  margin: 0;
+}
+
+.gidi-report-meta-grid dt {
+  margin: 0;
+  font-size: 8pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #2d8a8a;
+}
+
+.gidi-report-meta-grid dd {
+  margin: 2px 0 0;
+  font-size: 10.5pt;
+  font-weight: 600;
+  color: #1e2a32;
+}
+
+.gidi-report-generated {
+  margin: 10px 0 0;
+  font-size: 8pt;
+  color: #5c6b76;
+}
+
+.gidi-report-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.gidi-report-kpi {
+  padding: 14px 16px;
+  border: 1px solid #d8e0e6;
+  border-top: 4px solid #2d8a8a;
+  background: #fff;
+  text-align: center;
+}
+
+.gidi-report-kpi-value {
+  display: block;
+  font-size: 22pt;
+  font-weight: 800;
+  color: #2d8a8a;
+  line-height: 1.1;
+}
+
+.gidi-report-kpi-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 9pt;
+  font-weight: 700;
+  color: #1e2a32;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.gidi-report-kpi-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 8pt;
+  color: #5c6b76;
+}
+
+.gidi-report-section {
+  margin-bottom: 20px;
+}
+
+.gidi-report-section-title {
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  font-size: 11pt;
+  font-weight: 700;
+  color: #2d8a8a;
+  border-bottom: 1px solid #d8e0e6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gidi-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+}
+
+.gidi-report-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 8pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  background: #2d8a8a;
+  border: 1px solid #247474;
+}
+
+.gidi-report-table td {
+  padding: 8px 10px;
+  vertical-align: top;
+  border: 1px solid #d8e0e6;
+  color: #1e2a32;
+  background: #fff;
+}
+
+.gidi-report-table tbody tr:nth-child(even) td {
+  background: #f6fafa;
+}
+
+.gidi-report-th-num,
+.gidi-report-td-num {
+  width: 36px;
+  text-align: center;
+  font-weight: 700;
+  color: #2d8a8a;
+}
+
+.gidi-report-th-progress {
+  width: 140px;
+}
+
+.gidi-report-td-notes {
+  font-size: 9pt;
+  color: #5c6b76;
+}
+
+.gidi-report-td-date {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.gidi-report-empty,
+.gidi-report-empty-block {
+  padding: 12px;
+  text-align: center;
+  color: #5c6b76;
+  font-style: italic;
+}
+
+.gidi-report-progress-track {
+  position: relative;
+  height: 18px;
+  background: #e8f4f4;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #d8e0e6;
+}
+
+.gidi-report-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #2d8a8a;
+  border-radius: 3px 0 0 3px;
+}
+
+.gidi-report-progress-label {
+  position: relative;
+  z-index: 1;
+  display: block;
+  text-align: center;
+  font-size: 8pt;
+  font-weight: 700;
+  line-height: 18px;
+  color: #1e2a32;
+}
+
+.gidi-report-cell-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 7.5pt;
+  color: #5c6b76;
+}
+
+.gidi-report-marks-list {
+  margin: 0;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+.gidi-report-marks-list li {
+  margin-bottom: 3px;
+}
+
+.gidi-report-mark-value {
+  font-weight: 700;
+  color: #2d8a8a;
+}
+
+.gidi-report-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 8pt;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid #d8e0e6;
+}
+
+.gidi-report-badge--present {
+  background: #e8f4f4;
+  color: #247474;
+  border-color: #2d8a8a;
+}
+.gidi-report-badge--absent {
+  background: #fef2f2;
+  color: #c45c5c;
+}
+.gidi-report-badge--excluded {
+  background: #f6f8fa;
+  color: #5c6b76;
+}
+
+.gidi-report-closure {
+  margin-top: 8px;
+}
+
+.gidi-report-text-block {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #d8e0e6;
+  border-left: 4px solid #2d8a8a;
+  background: #fff;
+}
+
+.gidi-report-text-block h3 {
+  margin: 0 0 8px;
+  font-size: 9pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #2d8a8a;
+}
+
+.gidi-report-text-block p {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 9.5pt;
+  color: #1e2a32;
+}
+
+.gidi-report-signature {
+  margin-top: 28px;
+  padding-top: 16px;
+  text-align: center;
+}
+
+.gidi-report-signature-line {
+  width: 280px;
+  height: 1px;
+  margin: 0 auto 8px;
+  background: #1e2a32;
+}
+
+.gidi-report-signature-name {
+  margin: 0;
+  font-size: 11pt;
+  font-weight: 700;
+  color: #1e2a32;
+}
+
+.gidi-report-signature-role {
+  margin: 4px 0 0;
+  font-size: 9pt;
+  color: #5c6b76;
+}
+
+.gidi-report-signature-legal {
+  margin: 16px auto 0;
+  max-width: 520px;
+  font-size: 7.5pt;
+  color: #5c6b76;
+  line-height: 1.4;
+}
+
+@media print {
+  @page {
+    size: letter portrait;
+    margin: 14mm 12mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #1e2a32 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #follow-up-report-print,
+  #follow-up-report-print * {
+    visibility: visible;
+  }
+
+  #follow-up-report-print {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background: #fff !important;
+  }
+
+  .gidi-screen-only {
+    display: none !important;
+  }
+}
+

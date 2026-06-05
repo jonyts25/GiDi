@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.git
+**/.env
+**/.env.*
+apps/bot/.wwebjs_auth
+apps/bot/.wwebjs_cache
+**/*.md
+.cursor

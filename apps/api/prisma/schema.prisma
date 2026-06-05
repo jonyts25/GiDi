@@ -1,0 +1,355 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  email              String     @unique
+  fullName           String
+  password           String
+  mustChangePassword Boolean    @default(false)
+  status             UserStatus @default(ACTIVE)
+
+  roles UserRole[]
+
+  followUpSessionsAsTherapist FollowUpSession[] @relation("FollowUpSessionTherapist")
+
+  parentAssignments    ParentPatient[]
+  therapistAssignments PatientTherapist[]
+  schoolAssignments    SchoolPatient[]
+
+  followUpsAsTherapist FollowUp[]
+
+  objectivesCreated ObjectiveBank[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Role {
+  id   String  @id @default(uuid()) @db.Uuid
+  key  RoleKey @unique
+  name String
+
+  users UserRole[]
+}
+
+model UserRole {
+  userId String @db.Uuid
+  roleId String @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum RoleKey {
+  SUPERADMIN
+  ADMIN
+  THERAPIST
+  PARENT
+  FINANCE
+  SCHOOL
+  SECRETARY
+}
+
+model Patient {
+  id        String    @id @default(uuid()) @db.Uuid
+  firstName String
+  lastName  String
+  birthDate DateTime?
+  notes     String?
+
+  parents     ParentPatient[]
+  assignments PatientTherapist[]
+  schools     SchoolPatient[]
+
+  followUps FollowUp[]
+
+  appointmentRequests AppointmentRequest[]
+
+  patientObjectives PatientObjective[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PatientTherapist {
+  id          String @id @default(uuid()) @db.Uuid
+  patientId   String @db.Uuid
+  therapistId String @db.Uuid
+
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist User    @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, therapistId])
+  @@index([patientId])
+  @@index([therapistId])
+}
+
+model ParentPatient {
+  id        String @id @default(uuid()) @db.Uuid
+  parentId  String @db.Uuid
+  patientId String @db.Uuid
+
+  relationship GuardianRelationship @default(OTHER)
+  isPrimary    Boolean              @default(false)
+  notes        String?
+
+  parent  User    @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, patientId])
+  @@index([patientId])
+  @@index([parentId])
+}
+
+enum GuardianRelationship {
+  MOTHER
+  FATHER
+  TUTOR
+  OTHER
+}
+
+model SchoolPatient {
+  id        String  @id @default(uuid()) @db.Uuid
+  schoolId  String  @db.Uuid
+  patientId String  @db.Uuid
+  notes     String?
+
+  school  User    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, patientId])
+  @@index([patientId])
+  @@index([schoolId])
+}
+
+enum AreaTrackingMode {
+  TEXT_ONLY
+  MONTHLY_GRID
+}
+
+model Area {
+  id        String  @id @default(uuid()) @db.Uuid
+  key       String  @unique
+  name      String
+  category  String?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  trackingMode AreaTrackingMode @default(MONTHLY_GRID)
+
+  followUps     FollowUp[]
+  objectiveBank ObjectiveBank[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ObjectiveBank {
+  id          String  @id @default(uuid()) @db.Uuid
+  description String
+  areaId      String  @db.Uuid
+  creatorId   String  @db.Uuid
+  isPublic    Boolean @default(false)
+
+  area    Area @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  creator User @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+
+  patientLinks PatientObjective[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([areaId])
+  @@index([creatorId])
+  @@index([isPublic])
+}
+
+model PatientObjective {
+  id              String @id @default(uuid()) @db.Uuid
+  patientId       String @db.Uuid
+  objectiveBankId String @db.Uuid
+
+  patient       Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  objectiveBank ObjectiveBank @relation(fields: [objectiveBankId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([patientId, objectiveBankId])
+  @@index([patientId])
+  @@index([objectiveBankId])
+}
+
+model FollowUp {
+  id          String @id @default(uuid()) @db.Uuid
+  patientId   String @db.Uuid
+  therapistId String @db.Uuid
+  areaId      String @db.Uuid
+
+  periodYear  Int
+  periodMonth Int
+
+  generalGoal  String?
+  generalNotes String?
+  homeWork     String?
+
+  status FollowUpStatus @default(DRAFT)
+
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist User    @relation(fields: [therapistId], references: [id], onDelete: Restrict)
+  area      Area    @relation(fields: [areaId], references: [id], onDelete: Restrict)
+
+  objectives  FollowUpObjective[]
+  sessions    FollowUpSession[]
+  attachments FollowUpAttachment[]
+  metrics     FollowUpMetric[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([patientId, therapistId, areaId, periodYear, periodMonth])
+  @@index([patientId])
+  @@index([therapistId])
+  @@index([areaId])
+  @@index([periodYear, periodMonth])
+}
+
+enum FollowUpStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+model FollowUpObjective {
+  id         String @id @default(uuid()) @db.Uuid
+  followUpId String @db.Uuid
+  idx        Int
+  text       String
+
+  monthlyNotes String?
+
+  followUp FollowUp       @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  marks    FollowUpMark[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([followUpId, idx])
+  @@index([followUpId])
+}
+
+/// Sesión real de asistencia dentro de un seguimiento mensual
+model FollowUpSession {
+  id          String   @id @default(uuid()) @db.Uuid
+  followUpId  String   @db.Uuid
+  therapistId String   @db.Uuid
+  sessionDate DateTime
+
+  followUp  FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  therapist User     @relation("FollowUpSessionTherapist", fields: [therapistId], references: [id], onDelete: Restrict)
+  marks     FollowUpMark[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([followUpId, sessionDate])
+  @@index([followUpId])
+  @@index([sessionDate])
+  @@index([therapistId])
+}
+
+enum FollowUpMarkCode {
+  A
+  V
+  E
+  F
+  R
+  X
+  OK
+}
+
+model FollowUpMark {
+  id                String @id @default(uuid()) @db.Uuid
+  followUpSessionId String @db.Uuid
+  objectiveId       String @db.Uuid
+  code              FollowUpMarkCode?
+  progressScale     Int?
+  note              String?
+
+  session   FollowUpSession   @relation(fields: [followUpSessionId], references: [id], onDelete: Cascade)
+  objective FollowUpObjective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([followUpSessionId, objectiveId])
+  @@index([objectiveId])
+  @@index([followUpSessionId])
+}
+
+model FollowUpAttachment {
+  id         String  @id @default(uuid()) @db.Uuid
+  followUpId String  @db.Uuid
+  fileName   String
+  mimeType   String
+  url        String
+  notes      String?
+
+  followUp FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([followUpId])
+}
+
+model FollowUpMetric {
+  id         String   @id @default(uuid()) @db.Uuid
+  followUpId String   @db.Uuid
+  name       String
+  value      Float
+  unit       String?
+  measuredAt DateTime @default(now())
+  notes      String?
+
+  followUp FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+
+  @@index([followUpId])
+  @@index([name])
+  @@index([measuredAt])
+}
+
+model AppointmentRequest {
+  id            String    @id @default(uuid()) @db.Uuid
+  parentPhone   String
+  patientId     String?   @db.Uuid
+  requestedDate DateTime?
+  status        String?   @default("pending")
+  rawMessage    String?
+  createdAt     DateTime  @default(now())
+
+  patient Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model WhatsAppContactState {
+  id               String   @id @default(uuid()) @db.Uuid
+  waId             String   @unique
+  welcomeMenuShown Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

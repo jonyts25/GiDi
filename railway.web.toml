@@ -1,0 +1,10 @@
+# Servicio GiDi WEB — variable RAILWAY_CONFIG_FILE=railway.web.toml
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "pnpm --filter web start"
+healthcheckPath = "/"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

@@ -1,0 +1,351 @@
+table_schema,table_name,column_name,data_type,is_nullable
+auth,audit_log_entries,instance_id,uuid,YES
+auth,audit_log_entries,id,uuid,NO
+auth,audit_log_entries,payload,json,YES
+auth,audit_log_entries,created_at,timestamp with time zone,YES
+auth,audit_log_entries,ip_address,character varying,NO
+auth,custom_oauth_providers,id,uuid,NO
+auth,custom_oauth_providers,provider_type,text,NO
+auth,custom_oauth_providers,identifier,text,NO
+auth,custom_oauth_providers,name,text,NO
+auth,custom_oauth_providers,client_id,text,NO
+auth,custom_oauth_providers,client_secret,text,NO
+auth,custom_oauth_providers,acceptable_client_ids,ARRAY,NO
+auth,custom_oauth_providers,scopes,ARRAY,NO
+auth,custom_oauth_providers,pkce_enabled,boolean,NO
+auth,custom_oauth_providers,attribute_mapping,jsonb,NO
+auth,custom_oauth_providers,authorization_params,jsonb,NO
+auth,custom_oauth_providers,enabled,boolean,NO
+auth,custom_oauth_providers,email_optional,boolean,NO
+auth,custom_oauth_providers,issuer,text,YES
+auth,custom_oauth_providers,discovery_url,text,YES
+auth,custom_oauth_providers,skip_nonce_check,boolean,NO
+auth,custom_oauth_providers,cached_discovery,jsonb,YES
+auth,custom_oauth_providers,discovery_cached_at,timestamp with time zone,YES
+auth,custom_oauth_providers,authorization_url,text,YES
+auth,custom_oauth_providers,token_url,text,YES
+auth,custom_oauth_providers,userinfo_url,text,YES
+auth,custom_oauth_providers,jwks_uri,text,YES
+auth,custom_oauth_providers,created_at,timestamp with time zone,NO
+auth,custom_oauth_providers,updated_at,timestamp with time zone,NO
+auth,flow_state,id,uuid,NO
+auth,flow_state,user_id,uuid,YES
+auth,flow_state,auth_code,text,YES
+auth,flow_state,code_challenge_method,USER-DEFINED,YES
+auth,flow_state,code_challenge,text,YES
+auth,flow_state,provider_type,text,NO
+auth,flow_state,provider_access_token,text,YES
+auth,flow_state,provider_refresh_token,text,YES
+auth,flow_state,created_at,timestamp with time zone,YES
+auth,flow_state,updated_at,timestamp with time zone,YES
+auth,flow_state,authentication_method,text,NO
+auth,flow_state,auth_code_issued_at,timestamp with time zone,YES
+auth,flow_state,invite_token,text,YES
+auth,flow_state,referrer,text,YES
+auth,flow_state,oauth_client_state_id,uuid,YES
+auth,flow_state,linking_target_id,uuid,YES
+auth,flow_state,email_optional,boolean,NO
+auth,identities,provider_id,text,NO
+auth,identities,user_id,uuid,NO
+auth,identities,identity_data,jsonb,NO
+auth,identities,provider,text,NO
+auth,identities,last_sign_in_at,timestamp with time zone,YES
+auth,identities,created_at,timestamp with time zone,YES
+auth,identities,updated_at,timestamp with time zone,YES
+auth,identities,email,text,YES
+auth,identities,id,uuid,NO
+auth,instances,id,uuid,NO
+auth,instances,uuid,uuid,YES
+auth,instances,raw_base_config,text,YES
+auth,instances,created_at,timestamp with time zone,YES
+auth,instances,updated_at,timestamp with time zone,YES
+auth,mfa_amr_claims,session_id,uuid,NO
+auth,mfa_amr_claims,created_at,timestamp with time zone,NO
+auth,mfa_amr_claims,updated_at,timestamp with time zone,NO
+auth,mfa_amr_claims,authentication_method,text,NO
+auth,mfa_amr_claims,id,uuid,NO
+auth,mfa_challenges,id,uuid,NO
+auth,mfa_challenges,factor_id,uuid,NO
+auth,mfa_challenges,created_at,timestamp with time zone,NO
+auth,mfa_challenges,verified_at,timestamp with time zone,YES
+auth,mfa_challenges,ip_address,inet,NO
+auth,mfa_challenges,otp_code,text,YES
+auth,mfa_challenges,web_authn_session_data,jsonb,YES
+auth,mfa_factors,id,uuid,NO
+auth,mfa_factors,user_id,uuid,NO
+auth,mfa_factors,friendly_name,text,YES
+auth,mfa_factors,factor_type,USER-DEFINED,NO
+auth,mfa_factors,status,USER-DEFINED,NO
+auth,mfa_factors,created_at,timestamp with time zone,NO
+auth,mfa_factors,updated_at,timestamp with time zone,NO
+auth,mfa_factors,secret,text,YES
+auth,mfa_factors,phone,text,YES
+auth,mfa_factors,last_challenged_at,timestamp with time zone,YES
+auth,mfa_factors,web_authn_credential,jsonb,YES
+auth,mfa_factors,web_authn_aaguid,uuid,YES
+auth,mfa_factors,last_webauthn_challenge_data,jsonb,YES
+auth,oauth_authorizations,id,uuid,NO
+auth,oauth_authorizations,authorization_id,text,NO
+auth,oauth_authorizations,client_id,uuid,NO
+auth,oauth_authorizations,user_id,uuid,YES
+auth,oauth_authorizations,redirect_uri,text,NO
+auth,oauth_authorizations,scope,text,NO
+auth,oauth_authorizations,state,text,YES
+auth,oauth_authorizations,resource,text,YES
+auth,oauth_authorizations,code_challenge,text,YES
+auth,oauth_authorizations,code_challenge_method,USER-DEFINED,YES
+auth,oauth_authorizations,response_type,USER-DEFINED,NO
+auth,oauth_authorizations,status,USER-DEFINED,NO
+auth,oauth_authorizations,authorization_code,text,YES
+auth,oauth_authorizations,created_at,timestamp with time zone,NO
+auth,oauth_authorizations,expires_at,timestamp with time zone,NO
+auth,oauth_authorizations,approved_at,timestamp with time zone,YES
+auth,oauth_authorizations,nonce,text,YES
+auth,oauth_client_states,id,uuid,NO
+auth,oauth_client_states,provider_type,text,NO
+auth,oauth_client_states,code_verifier,text,YES
+auth,oauth_client_states,created_at,timestamp with time zone,NO
+auth,oauth_clients,id,uuid,NO
+auth,oauth_clients,client_secret_hash,text,YES
+auth,oauth_clients,registration_type,USER-DEFINED,NO
+auth,oauth_clients,redirect_uris,text,NO
+auth,oauth_clients,grant_types,text,NO
+auth,oauth_clients,client_name,text,YES
+auth,oauth_clients,client_uri,text,YES
+auth,oauth_clients,logo_uri,text,YES
+auth,oauth_clients,created_at,timestamp with time zone,NO
+auth,oauth_clients,updated_at,timestamp with time zone,NO
+auth,oauth_clients,deleted_at,timestamp with time zone,YES
+auth,oauth_clients,client_type,USER-DEFINED,NO
+auth,oauth_clients,token_endpoint_auth_method,text,NO
+auth,oauth_consents,id,uuid,NO
+auth,oauth_consents,user_id,uuid,NO
+auth,oauth_consents,client_id,uuid,NO
+auth,oauth_consents,scopes,text,NO
+auth,oauth_consents,granted_at,timestamp with time zone,NO
+auth,oauth_consents,revoked_at,timestamp with time zone,YES
+auth,one_time_tokens,id,uuid,NO
+auth,one_time_tokens,user_id,uuid,NO
+auth,one_time_tokens,token_type,USER-DEFINED,NO
+auth,one_time_tokens,token_hash,text,NO
+auth,one_time_tokens,relates_to,text,NO
+auth,one_time_tokens,created_at,timestamp without time zone,NO
+auth,one_time_tokens,updated_at,timestamp without time zone,NO
+auth,refresh_tokens,instance_id,uuid,YES
+auth,refresh_tokens,id,bigint,NO
+auth,refresh_tokens,token,character varying,YES
+auth,refresh_tokens,user_id,character varying,YES
+auth,refresh_tokens,revoked,boolean,YES
+auth,refresh_tokens,created_at,timestamp with time zone,YES
+auth,refresh_tokens,updated_at,timestamp with time zone,YES
+auth,refresh_tokens,parent,character varying,YES
+auth,refresh_tokens,session_id,uuid,YES
+auth,saml_providers,id,uuid,NO
+auth,saml_providers,sso_provider_id,uuid,NO
+auth,saml_providers,entity_id,text,NO
+auth,saml_providers,metadata_xml,text,NO
+auth,saml_providers,metadata_url,text,YES
+auth,saml_providers,attribute_mapping,jsonb,YES
+auth,saml_providers,created_at,timestamp with time zone,YES
+auth,saml_providers,updated_at,timestamp with time zone,YES
+auth,saml_providers,name_id_format,text,YES
+auth,saml_relay_states,id,uuid,NO
+auth,saml_relay_states,sso_provider_id,uuid,NO
+auth,saml_relay_states,request_id,text,NO
+auth,saml_relay_states,for_email,text,YES
+auth,saml_relay_states,redirect_to,text,YES
+auth,saml_relay_states,created_at,timestamp with time zone,YES
+auth,saml_relay_states,updated_at,timestamp with time zone,YES
+auth,saml_relay_states,flow_state_id,uuid,YES
+auth,schema_migrations,version,character varying,NO
+auth,sessions,id,uuid,NO
+auth,sessions,user_id,uuid,NO
+auth,sessions,created_at,timestamp with time zone,YES
+auth,sessions,updated_at,timestamp with time zone,YES
+auth,sessions,factor_id,uuid,YES
+auth,sessions,aal,USER-DEFINED,YES
+auth,sessions,not_after,timestamp with time zone,YES
+auth,sessions,refreshed_at,timestamp without time zone,YES
+auth,sessions,user_agent,text,YES
+auth,sessions,ip,inet,YES
+auth,sessions,tag,text,YES
+auth,sessions,oauth_client_id,uuid,YES
+auth,sessions,refresh_token_hmac_key,text,YES
+auth,sessions,refresh_token_counter,bigint,YES
+auth,sessions,scopes,text,YES
+auth,sso_domains,id,uuid,NO
+auth,sso_domains,sso_provider_id,uuid,NO
+auth,sso_domains,domain,text,NO
+auth,sso_domains,created_at,timestamp with time zone,YES
+auth,sso_domains,updated_at,timestamp with time zone,YES
+auth,sso_providers,id,uuid,NO
+auth,sso_providers,resource_id,text,YES
+auth,sso_providers,created_at,timestamp with time zone,YES
+auth,sso_providers,updated_at,timestamp with time zone,YES
+auth,sso_providers,disabled,boolean,YES
+auth,users,instance_id,uuid,YES
+auth,users,id,uuid,NO
+auth,users,aud,character varying,YES
+auth,users,role,character varying,YES
+auth,users,email,character varying,YES
+auth,users,encrypted_password,character varying,YES
+auth,users,email_confirmed_at,timestamp with time zone,YES
+auth,users,invited_at,timestamp with time zone,YES
+auth,users,confirmation_token,character varying,YES
+auth,users,confirmation_sent_at,timestamp with time zone,YES
+auth,users,recovery_token,character varying,YES
+auth,users,recovery_sent_at,timestamp with time zone,YES
+auth,users,email_change_token_new,character varying,YES
+auth,users,email_change,character varying,YES
+auth,users,email_change_sent_at,timestamp with time zone,YES
+auth,users,last_sign_in_at,timestamp with time zone,YES
+auth,users,raw_app_meta_data,jsonb,YES
+auth,users,raw_user_meta_data,jsonb,YES
+auth,users,is_super_admin,boolean,YES
+auth,users,created_at,timestamp with time zone,YES
+auth,users,updated_at,timestamp with time zone,YES
+auth,users,phone,text,YES
+auth,users,phone_confirmed_at,timestamp with time zone,YES
+auth,users,phone_change,text,YES
+auth,users,phone_change_token,character varying,YES
+auth,users,phone_change_sent_at,timestamp with time zone,YES
+auth,users,confirmed_at,timestamp with time zone,YES
+auth,users,email_change_token_current,character varying,YES
+auth,users,email_change_confirm_status,smallint,YES
+auth,users,banned_until,timestamp with time zone,YES
+auth,users,reauthentication_token,character varying,YES
+auth,users,reauthentication_sent_at,timestamp with time zone,YES
+auth,users,is_sso_user,boolean,NO
+auth,users,deleted_at,timestamp with time zone,YES
+auth,users,is_anonymous,boolean,NO
+auth,webauthn_challenges,id,uuid,NO
+auth,webauthn_challenges,user_id,uuid,YES
+auth,webauthn_challenges,challenge_type,text,NO
+auth,webauthn_challenges,session_data,jsonb,NO
+auth,webauthn_challenges,created_at,timestamp with time zone,NO
+auth,webauthn_challenges,expires_at,timestamp with time zone,NO
+auth,webauthn_credentials,id,uuid,NO
+auth,webauthn_credentials,user_id,uuid,NO
+auth,webauthn_credentials,credential_id,bytea,NO
+auth,webauthn_credentials,public_key,bytea,NO
+auth,webauthn_credentials,attestation_type,text,NO
+auth,webauthn_credentials,aaguid,uuid,YES
+auth,webauthn_credentials,sign_count,bigint,NO
+auth,webauthn_credentials,transports,jsonb,NO
+auth,webauthn_credentials,backup_eligible,boolean,NO
+auth,webauthn_credentials,backed_up,boolean,NO
+auth,webauthn_credentials,friendly_name,text,NO
+auth,webauthn_credentials,created_at,timestamp with time zone,NO
+auth,webauthn_credentials,updated_at,timestamp with time zone,NO
+auth,webauthn_credentials,last_used_at,timestamp with time zone,YES
+public,AppointmentRequest,id,uuid,NO
+public,AppointmentRequest,parentPhone,text,NO
+public,AppointmentRequest,patientId,uuid,YES
+public,AppointmentRequest,requestedDate,timestamp with time zone,YES
+public,AppointmentRequest,status,text,YES
+public,AppointmentRequest,rawMessage,text,YES
+public,AppointmentRequest,createdAt,timestamp with time zone,YES
+public,Area,id,uuid,NO
+public,Area,key,text,NO
+public,Area,name,text,NO
+public,Area,category,text,YES
+public,Area,sortOrder,integer,YES
+public,Area,isActive,boolean,YES
+public,Area,createdAt,timestamp with time zone,YES
+public,FollowUp,id,uuid,NO
+public,FollowUp,patientId,uuid,YES
+public,FollowUp,therapistId,uuid,YES
+public,FollowUp,areaId,uuid,YES
+public,FollowUp,periodYear,integer,NO
+public,FollowUp,periodMonth,integer,NO
+public,FollowUp,status,USER-DEFINED,YES
+public,FollowUp,generalGoal,text,YES
+public,FollowUp,generalNotes,text,YES
+public,FollowUp,homeWork,text,YES
+public,FollowUp,createdAt,timestamp with time zone,YES
+public,FollowUp,updatedAt,timestamp with time zone,YES
+public,ParentPatient,id,uuid,NO
+public,ParentPatient,parentId,uuid,YES
+public,ParentPatient,patientId,uuid,YES
+public,ParentPatient,relationship,USER-DEFINED,YES
+public,ParentPatient,isPrimary,boolean,YES
+public,ParentPatient,notes,text,YES
+public,Patient,id,uuid,NO
+public,Patient,firstName,text,NO
+public,Patient,lastName,text,NO
+public,Patient,birthDate,timestamp with time zone,YES
+public,Patient,notes,text,YES
+public,Patient,createdAt,timestamp with time zone,YES
+public,Patient,updatedAt,timestamp with time zone,YES
+public,PatientTherapist,id,uuid,NO
+public,PatientTherapist,patientId,uuid,YES
+public,PatientTherapist,therapistId,uuid,YES
+public,Role,id,uuid,NO
+public,Role,key,USER-DEFINED,NO
+public,Role,name,text,NO
+public,SchoolPatient,id,uuid,NO
+public,SchoolPatient,schoolId,uuid,YES
+public,SchoolPatient,patientId,uuid,YES
+public,SchoolPatient,notes,text,YES
+public,Session,id,uuid,NO
+public,Session,patientId,uuid,YES
+public,Session,therapistId,uuid,YES
+public,Session,startedAt,timestamp with time zone,YES
+public,Session,endedAt,timestamp with time zone,YES
+public,Session,durationMinutes,integer,YES
+public,Session,status,USER-DEFINED,YES
+public,Session,notes,text,YES
+public,Session,noShowReason,text,YES
+public,Session,isMakeUp,boolean,YES
+public,Session,rescheduledTo,timestamp with time zone,YES
+public,Session,capturedAt,timestamp with time zone,YES
+public,Session,confirmedAt,timestamp with time zone,YES
+public,Session,validatedAt,timestamp with time zone,YES
+public,Session,confirmedById,uuid,YES
+public,Session,validatedById,uuid,YES
+public,Session,createdAt,timestamp with time zone,YES
+public,Session,updatedAt,timestamp with time zone,YES
+public,User,id,uuid,NO
+public,User,email,text,NO
+public,User,fullName,text,NO
+public,User,password,text,NO
+public,User,mustChangePassword,boolean,YES
+public,User,status,USER-DEFINED,YES
+public,User,createdAt,timestamp with time zone,YES
+public,User,updatedAt,timestamp with time zone,YES
+public,UserRole,userId,uuid,NO
+public,UserRole,roleId,uuid,NO
+public,FollowUpObjective,id,text,NO
+public,FollowUpObjective,followUpId,text,NO
+public,FollowUpObjective,idx,integer,NO
+public,FollowUpObjective,text,text,NO
+public,FollowUpObjective,createdAt,timestamp with time zone,NO
+public,FollowUpObjective,updatedAt,timestamp with time zone,NO
+public,FollowUpEntry,id,text,NO
+public,FollowUpEntry,followUpId,text,NO
+public,FollowUpEntry,date,timestamp with time zone,NO
+public,FollowUpEntry,entryStatus,USER-DEFINED,NO
+public,FollowUpEntry,generalNote,text,YES
+public,FollowUpEntry,createdAt,timestamp with time zone,NO
+public,FollowUpEntry,updatedAt,timestamp with time zone,NO
+public,FollowUpMark,id,text,NO
+public,FollowUpMark,entryId,text,NO
+public,FollowUpMark,objectiveId,text,NO
+public,FollowUpMark,code,USER-DEFINED,NO
+public,FollowUpMark,note,text,YES
+public,FollowUpMark,createdAt,timestamp with time zone,NO
+public,FollowUpMark,updatedAt,timestamp with time zone,NO
+public,FollowUpAttachment,id,text,NO
+public,FollowUpAttachment,followUpId,text,NO
+public,FollowUpAttachment,fileName,text,NO
+public,FollowUpAttachment,mimeType,text,NO
+public,FollowUpAttachment,url,text,NO
+public,FollowUpAttachment,notes,text,YES
+public,FollowUpAttachment,createdAt,timestamp with time zone,NO
+public,FollowUpMetric,id,text,NO
+public,FollowUpMetric,followUpId,text,NO
+public,FollowUpMetric,name,text,NO
+public,FollowUpMetric,value,double precision,NO
+public,FollowUpMetric,unit,text,YES
+public,FollowUpMetric,measuredAt,timestamp with time zone,NO
+public,FollowUpMetric,notes,text,YES

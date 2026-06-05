@@ -1,0 +1,8 @@
+# Servicio Web en Railway: en el servicio, variable NIXPACKS_CONFIG_FILE=nixpacks.web.toml
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["pnpm run build:web"]
+
+[start]
+cmd = "pnpm --filter web start"

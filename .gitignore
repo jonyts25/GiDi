@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# Env / secrets (usar .env.example como plantilla)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Prisma / test
+coverage/
+.nyc_output/
+
+# WhatsApp bot session (local)
+apps/bot/.wwebjs_auth/
+apps/bot/.wwebjs_cache/
+
+# Misc
+.vercel
+.turbo
+*.pem

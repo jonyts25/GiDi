@@ -1,0 +1,28 @@
+{
+  "name": "gidi",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "build": "pnpm run build:all",
+    "build:all": "pnpm run build:bot && pnpm run build:web && pnpm run build:api",
+    "build:bot": "pnpm --filter @gidi/bot run build",
+    "build:api": "pnpm --filter api run build",
+    "build:web": "pnpm --filter web run build",
+    "build:railway-api": "pnpm run build:bot && pnpm run build:api",
+    "railway:start:api": "pnpm --filter api run start:railway"
+  },
+  "pnpm": {
+    "overrides": {
+      "prisma": "6.19.3",
+      "@prisma/client": "6.19.3"
+    }
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

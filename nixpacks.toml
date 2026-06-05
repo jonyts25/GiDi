@@ -1,0 +1,11 @@
+# Fallback si Railway no usa Dockerfile.api
+
+[phases.install]
+cmds = ["NODE_ENV=development pnpm install --frozen-lockfile"]
+
+[phases.build]
+dependsOn = ["install"]
+cmds = ["pnpm run build:railway-api", "test -f apps/api/dist/main.js"]
+
+[start]
+cmd = "pnpm --filter api run start:railway"
