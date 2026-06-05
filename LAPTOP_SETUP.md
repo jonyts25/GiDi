@@ -115,6 +115,11 @@ npx @railway/cli variable list --service "Gidi API" --kv
 
 ---
 
+## Deploy automático (GitHub → Railway)
+
+Tras enlazar el repo, cada `git push` a `main` debe crear un deploy **SUCCESS** en API y Web.
+Última verificación automática: 2026-06-05.
+
 ## Checklist “todo listo”
 
 - [ ] GitHub: [github.com/jonyts25/GiDi](https://github.com/jonyts25/GiDi)
