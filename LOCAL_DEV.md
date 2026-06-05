@@ -13,6 +13,8 @@ cd d:\apps\GiDi2.0
 pnpm install
 ```
 
+**Laptop nueva / sin .env:** ver [LAPTOP_SETUP.md](./LAPTOP_SETUP.md) — genera `.env` desde Railway con `.\scripts\setup-laptop.ps1` (sin USB).
+
 ## 3. Base de datos (API)
 
 ```powershell
