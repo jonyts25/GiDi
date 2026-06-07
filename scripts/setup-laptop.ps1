@@ -2,7 +2,7 @@
 #
 # Requisitos: Node 22+, pnpm install hecho, railway CLI logueado y proyecto enlazado.
 #
-# Uso (después de git clone):
+# Uso (despues de git clone):
 #   cd GiDi
 #   pnpm install
 #   railway login
@@ -14,20 +14,24 @@ $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 
 function Invoke-Railway {
-    param([string[]]$Args)
-    $railway = Get-Command railway -ErrorAction SilentlyContinue
-    if ($railway) {
-        & railway @Args
-    } else {
-        # Sin npm warn en stdout (rompe el parseo JSON)
+    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
+
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    try {
+        if (Get-Command railway -ErrorAction SilentlyContinue) {
+            return & railway @Args 2>$null
+        }
         $env:npm_config_loglevel = "error"
-        & npx --yes @railway/cli@latest @Args
+        return & npx --yes @railway/cli @Args 2>$null
+    } finally {
+        $ErrorActionPreference = $prevEap
     }
 }
 
 function Get-RailwayVar {
     param([string]$Service, [string]$Key)
-    $json = Invoke-Railway @("variable", "list", "--service", $Service, "--json") | Out-String
+    $json = Invoke-Railway variable list --service $Service --json | Out-String
     try {
         $vars = $json | ConvertFrom-Json
     } catch {
@@ -66,19 +70,32 @@ $apiPath = Join-Path $root "apps\api\.env"
 [System.IO.File]::WriteAllText($apiPath, $apiEnv.TrimEnd() + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
 Write-Host "OK: $apiPath"
 
-$webExample = Join-Path $root "apps\web\.env.example"
+$webEnv = @"
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
+"@
+
 $webLocal = Join-Path $root "apps\web\.env.local"
-if (Test-Path $webExample) {
-    Copy-Item $webExample $webLocal -Force
-    Write-Host "OK: $webLocal (API local en http://localhost:3001)"
-}
+[System.IO.File]::WriteAllText($webLocal, $webEnv.TrimEnd() + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))
+Write-Host "OK: $webLocal (API local en http://localhost:3001)"
 
 Write-Host ""
-Write-Host "Listo. Arranca local (dos terminales):"
-Write-Host "  cd apps\api; pnpm run start:dev"
-Write-Host "  cd apps\web; pnpm run dev"
+Write-Host "Generando Prisma client y compilando @gidi/bot..."
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+Push-Location (Join-Path $root "apps\api")
+pnpm exec prisma generate | Out-Host
+Pop-Location
+pnpm --filter @gidi/bot run build | Out-Host
+$ErrorActionPreference = $prevEap
+Write-Host "OK: dependencias de desarrollo listas"
+
 Write-Host ""
-Write-Host "Verifica alineacion con GitHub:"
+Write-Host "Listo. Arranca local (desde la raiz del repo):"
+Write-Host '  pnpm --filter api run start:dev'
+Write-Host '  pnpm --filter web run dev'
+Write-Host ""
+Write-Host "Verifica alineacion con GitHub (ver GIT_ALINEACION.md):"
 Write-Host "  git fetch origin"
 Write-Host "  git status"
 Write-Host "  git log -1 --oneline"
