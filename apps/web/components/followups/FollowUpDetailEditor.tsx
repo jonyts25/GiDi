@@ -87,7 +87,13 @@ export function FollowUpDetailEditor(props: {
     setGeneralGoal(data.generalGoal ?? "");
     setGeneralNotes(data.generalNotes ?? "");
     setHomeWork(data.homeWork ?? "");
-    setObjectivesText((data.objectives ?? []).map((o) => o.text).join("\n"));
+    setObjectivesText(
+      (data.objectives ?? [])
+        .filter((o) => o.idx < 1000)
+        .sort((a, b) => a.idx - b.idx)
+        .map((o) => o.text)
+        .join("\n"),
+    );
   }, [followUpId]);
 
   useEffect(() => {

@@ -15,6 +15,9 @@ import {
   sessionAttendanceFromMarks,
 } from "./followup-metrics";
 
+/** Objetivos archivados (con datos en cuadrícula pero fuera de la lista activa). */
+const ARCHIVED_OBJECTIVE_IDX = 1000;
+
 const followUpInclude = {
   patient: { select: { id: true, firstName: true, lastName: true } },
   therapist: { select: { id: true, fullName: true, email: true, status: true } },
@@ -247,14 +250,19 @@ export class FollowUpsService {
   async createOrGet(user: AuthUser, dto: CreateFollowUpDto) {
     await this.access.assertCanEditPatientFollowUps(user, dto.patientId);
 
-    if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user) && dto.therapistId !== user.sub) {
+    const therapistId =
+      user.roles.includes("THERAPIST") && !this.access.isAdmin(user) ? user.sub : dto.therapistId;
+
+    if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user) && therapistId !== user.sub) {
       throw new ForbiddenException("Debe crear el seguimiento a su nombre");
     }
+
+    await this.ensureSingleTherapistAssignment(dto.patientId, therapistId);
 
     const existing = await this.prisma.followUp.findFirst({
       where: {
         patientId: dto.patientId,
-        therapistId: dto.therapistId,
+        therapistId,
         areaId: dto.areaId,
         periodYear: dto.periodYear,
         periodMonth: dto.periodMonth,
@@ -268,18 +276,21 @@ export class FollowUpsService {
     const prevFu = await this.prisma.followUp.findFirst({
       where: {
         patientId: dto.patientId,
-        therapistId: dto.therapistId,
+        therapistId,
         areaId: dto.areaId,
         periodYear: prevYear,
         periodMonth: prevMonth,
       },
-      include: { objectives: { orderBy: { idx: "asc" } } },
+      include: {
+        objectives: { orderBy: { idx: "asc" } },
+        sessions: { include: { marks: true } },
+      },
     });
 
     const created = await this.prisma.followUp.create({
       data: {
         patientId: dto.patientId,
-        therapistId: dto.therapistId,
+        therapistId,
         areaId: dto.areaId,
         periodYear: dto.periodYear,
         periodMonth: dto.periodMonth,
@@ -290,11 +301,12 @@ export class FollowUpsService {
       select: { id: true },
     });
 
-    if (prevFu?.objectives?.length) {
+    const objectivesToCopy = prevFu ? objectivesEligibleForCarry(prevFu) : [];
+    if (objectivesToCopy.length) {
       await this.prisma.followUpObjective.createMany({
-        data: prevFu.objectives.map((o) => ({
+        data: objectivesToCopy.map((o, i) => ({
           followUpId: created.id,
-          idx: o.idx,
+          idx: i + 1,
           text: o.text,
         })),
       });
@@ -319,16 +331,52 @@ export class FollowUpsService {
 
   async replaceObjectives(user: AuthUser, id: string, dto: ReplaceObjectivesDto) {
     await this.access.assertCanEditFollowUp(user, id);
-    await this.prisma.followUpObjective.deleteMany({ where: { followUpId: id } });
 
-    if (dto.objectives.length) {
-      await this.prisma.followUpObjective.createMany({
-        data: dto.objectives.map((text, i) => ({
-          followUpId: id,
-          idx: i + 1,
-          text,
-        })),
-      });
+    const fu = await this.prisma.followUp.findUnique({
+      where: { id },
+      include: {
+        objectives: {
+          include: { _count: { select: { marks: true } } },
+        },
+      },
+    });
+    if (!fu) throw new NotFoundException("FollowUp not found");
+
+    const newTexts = dto.objectives.map((t) => t.trim()).filter(Boolean);
+    const usedIds = new Set<string>();
+
+    for (let i = 0; i < newTexts.length; i++) {
+      const text = newTexts[i];
+      const idx = i + 1;
+      const match =
+        fu.objectives.find((o) => !usedIds.has(o.id) && o.text === text && o.idx < ARCHIVED_OBJECTIVE_IDX) ??
+        fu.objectives.find((o) => !usedIds.has(o.id) && o.idx === idx && o.idx < ARCHIVED_OBJECTIVE_IDX);
+
+      if (match) {
+        await this.prisma.followUpObjective.update({
+          where: { id: match.id },
+          data: { text, idx },
+        });
+        usedIds.add(match.id);
+      } else {
+        const created = await this.prisma.followUpObjective.create({
+          data: { followUpId: id, idx, text },
+        });
+        usedIds.add(created.id);
+      }
+    }
+
+    let archiveIdx = ARCHIVED_OBJECTIVE_IDX;
+    for (const obj of fu.objectives) {
+      if (usedIds.has(obj.id)) continue;
+      if (obj._count.marks > 0) {
+        await this.prisma.followUpObjective.update({
+          where: { id: obj.id },
+          data: { idx: archiveIdx++ },
+        });
+      } else {
+        await this.prisma.followUpObjective.delete({ where: { id: obj.id } });
+      }
     }
 
     return this.get(user, id);
@@ -348,7 +396,7 @@ export class FollowUpsService {
   async createSession(user: AuthUser, followUpId: string, dto: CreateFollowUpSessionDto) {
     await this.access.assertCanEditFollowUp(user, followUpId);
     const fu = await this.get(user, followUpId);
-    const therapistId = dto.therapistId ?? user.sub ?? fu.therapistId;
+    const therapistId = dto.therapistId ?? fu.therapistId ?? user.sub;
 
     if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user) && therapistId !== user.sub) {
       throw new ForbiddenException("Solo puede registrar sesiones a su nombre");
@@ -418,6 +466,20 @@ export class FollowUpsService {
 
     return this.get(user, followUpId);
   }
+
+  private async ensureSingleTherapistAssignment(patientId: string, therapistId: string) {
+    const existing = await this.prisma.patientTherapist.findMany({
+      where: { patientId },
+      select: { therapistId: true },
+    });
+
+    if (existing.some((a) => a.therapistId === therapistId)) return;
+
+    await this.prisma.patientTherapist.deleteMany({ where: { patientId } });
+    await this.prisma.patientTherapist.create({
+      data: { patientId, therapistId },
+    });
+  }
 }
 
 function previousCalendarMonth(year: number, month: number): { prevYear: number; prevMonth: number } {
@@ -428,4 +490,28 @@ function previousCalendarMonth(year: number, month: number): { prevYear: number;
 function normalizeUtcDate(iso: string): Date {
   const d = new Date(iso);
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+}
+
+function maxProgressScaleForObjective(
+  objectiveId: string,
+  sessions: { marks: { objectiveId: string; progressScale: number | null }[] }[],
+): number | null {
+  let max: number | null = null;
+  for (const session of sessions) {
+    for (const mark of session.marks) {
+      if (mark.objectiveId !== objectiveId || mark.progressScale == null) continue;
+      if (max == null || mark.progressScale > max) max = mark.progressScale;
+    }
+  }
+  return max;
+}
+
+function objectivesEligibleForCarry(prevFu: {
+  objectives: { id: string; idx: number; text: string }[];
+  sessions: { marks: { objectiveId: string; progressScale: number | null }[] }[];
+}) {
+  return prevFu.objectives
+    .filter((o) => o.idx < ARCHIVED_OBJECTIVE_IDX)
+    .filter((o) => maxProgressScaleForObjective(o.id, prevFu.sessions) !== 4)
+    .sort((a, b) => a.idx - b.idx);
 }

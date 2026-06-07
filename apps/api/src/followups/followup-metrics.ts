@@ -19,11 +19,15 @@ export type SessionAttendance = "present" | "absent" | "excluded" | "unknown";
 
 export function sessionAttendanceFromMarks(marks: SessionMarkInput[]): SessionAttendance {
   const codes = marks.map((m) => m.code).filter((c): c is string => c != null && c !== "");
-  if (codes.length === 0) return "unknown";
+  const hasProgressScale = marks.some(
+    (m) => m.progressScale != null && m.progressScale >= 0 && m.progressScale <= 4,
+  );
 
   if (codes.some((c) => EXCLUDED_ATTENDANCE_CODES.has(c))) return "excluded";
   if (codes.some((c) => ABSENT_CODES.has(c))) return "absent";
   if (codes.some((c) => PRESENT_CODES.has(c))) return "present";
+  if (hasProgressScale) return "present";
+  if (codes.length === 0) return "unknown";
   return "unknown";
 }
 

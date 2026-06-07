@@ -302,14 +302,10 @@ export class AdminPatientsService {
     await this.ensurePatient(patientId);
     await this.ensureUserExists(therapistId);
 
-    try {
-      await this.prisma.patientTherapist.create({
-        data: { patientId, therapistId },
-      });
-    } catch (e: any) {
-      if (e?.code === "P2002") return { ok: true }; // ya estaba asignado
-      throw e;
-    }
+    await this.prisma.patientTherapist.deleteMany({ where: { patientId } });
+    await this.prisma.patientTherapist.create({
+      data: { patientId, therapistId },
+    });
     return { ok: true };
   }
 

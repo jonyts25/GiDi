@@ -40,17 +40,16 @@ export class PatientsService {
 
   async create(dto: CreatePatientBody) {
     return this.prisma.$transaction(async (tx) => {
+      const therapistId = dto.therapistIds?.[0];
       const patient = await tx.patient.create({
         data: {
           firstName: dto.firstName,
           lastName: dto.lastName,
           birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
           notes: dto.notes,
-          assignments: dto.therapistIds
+          assignments: therapistId
             ? {
-                create: dto.therapistIds.map((id) => ({
-                  therapistId: id,
-                })),
+                create: { therapistId },
               }
             : undefined,
         },

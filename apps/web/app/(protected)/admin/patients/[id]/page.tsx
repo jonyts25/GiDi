@@ -322,10 +322,13 @@ export default function AdminPatientDetail() {
 
       {/* -------- terapeutas -------- */}
       <section style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 18 }}>
-        <h2>Terapeutas asignados</h2>
+        <h2>Terapeuta asignado</h2>
+        <p className="sub" style={{ marginTop: 4 }}>
+          Solo un terapeuta por paciente. Asignar uno nuevo reemplaza al anterior.
+        </p>
 
         <ul style={{ paddingLeft: 18 }}>
-          {data.therapists.length === 0 && <li>No hay terapeutas asignados</li>}
+          {data.therapists.length === 0 && <li>No hay terapeuta asignado</li>}
           {data.therapists.map((t) => (
             <li key={t.therapistId} style={{ marginBottom: 6 }}>
               {t.fullName} ({t.email}){" "}
@@ -336,14 +339,16 @@ export default function AdminPatientDetail() {
 
         <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10 }}>
           <select value={pickedTherapist} onChange={(e) => setPickedTherapist(e.target.value)}>
-            <option value="">— Asignar terapeuta —</option>
+            <option value="">{data.therapists.length ? "— Cambiar terapeuta —" : "— Asignar terapeuta —"}</option>
             {allTherapists.map((t) => (
               <option key={t.id} value={t.id} disabled={assignedTherapistIds.has(t.id)}>
                 {t.fullName} ({t.email})
               </option>
             ))}
           </select>
-          <button onClick={onAssignTherapist} disabled={!pickedTherapist}>Asignar</button>
+          <button onClick={onAssignTherapist} disabled={!pickedTherapist}>
+            {data.therapists.length ? "Cambiar" : "Asignar"}
+          </button>
         </div>
       </section>
 

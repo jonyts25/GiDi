@@ -46,14 +46,20 @@ export default function AdminPatientFollowUpsPage() {
 
     (async () => {
       try {
-        const [a, t] = await Promise.all([apiFetch("/areas"), apiFetch("/users/therapists")]);
+        const [a, t, patient] = await Promise.all([
+          apiFetch("/areas"),
+          apiFetch("/users/therapists"),
+          apiFetch(`/admin/patients/${patientId}`),
+        ]);
         setAreas(a);
         setTherapists(t);
+        const assignedId = patient?.therapists?.[0]?.therapistId ?? patient?.therapists?.[0]?.id ?? "";
+        if (assignedId) setPickedTherapistId(assignedId);
       } catch (e: any) {
         setMsg(e.message);
       }
     })();
-  }, [router]);
+  }, [router, patientId]);
 
   async function load() {
     setMsg("");
@@ -118,6 +124,9 @@ export default function AdminPatientFollowUpsPage() {
         <hr />
 
         <div className="h2">Crear follow-up del mes</div>
+        <p className="sub" style={{ marginBottom: 8 }}>
+          El terapeuta se preselecciona del paciente. Al crear el seguimiento se asigna automáticamente si aún no lo estaba.
+        </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10 }}>
           <select className="input" value={pickedAreaId} onChange={(e) => setPickedAreaId(e.target.value)}>
             <option value="">— Área —</option>
