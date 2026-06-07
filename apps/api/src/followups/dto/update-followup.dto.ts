@@ -15,6 +15,14 @@ export class UpdateFollowUpDto {
   homeWork?: string;
 
   @IsOptional()
+  @IsString()
+  parentComments?: string;
+
+  @IsOptional()
+  @IsString()
+  observationsAuthor?: string;
+
+  @IsOptional()
   @IsEnum(FollowUpStatus)
   status?: FollowUpStatus;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { FollowUpReport } from "@/lib/followup-report.types";
+import { resolveTrackingMode } from "@/lib/followup-area";
 
 function formatPeriod(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" });
@@ -52,6 +53,7 @@ export function FollowUpReportPrint({ report }: { report: FollowUpReport }) {
   const { followUp, summary, sessions } = report;
   const patientName = `${followUp.patient.firstName} ${followUp.patient.lastName}`;
   const periodLabel = formatPeriod(followUp.periodYear, followUp.periodMonth);
+  const isTextOnly = resolveTrackingMode(followUp.area) === "TEXT_ONLY";
 
   const objectivesRows = summary.objectiveProgress.length
     ? summary.objectiveProgress
@@ -104,6 +106,25 @@ export function FollowUpReportPrint({ report }: { report: FollowUpReport }) {
         </div>
       </header>
 
+      {isTextOnly ? (
+        <>
+          <section className="gidi-report-section gidi-report-avoid-break">
+            <h2 className="gidi-report-section-title">Observaciones</h2>
+            <div className="gidi-report-text-block">
+              <p>{followUp.generalNotes?.trim() || followUp.generalGoal?.trim() || "Sin observaciones registradas."}</p>
+            </div>
+            <p className="gidi-report-cell-note">
+              Registrado por: {followUp.observationsAuthor?.trim() || followUp.therapist.fullName}
+            </p>
+          </section>
+          <footer className="gidi-report-signature gidi-report-avoid-break">
+            <div className="gidi-report-signature-line" />
+            <p className="gidi-report-signature-name">{followUp.therapist.fullName}</p>
+            <p className="gidi-report-signature-role">Terapeuta titular · {followUp.area.name}</p>
+          </footer>
+        </>
+      ) : (
+        <>
       <section className="gidi-report-kpis gidi-report-avoid-break">
         <div className="gidi-report-kpi">
           <span className="gidi-report-kpi-value">
@@ -222,6 +243,10 @@ export function FollowUpReportPrint({ report }: { report: FollowUpReport }) {
           <h3>Trabajo en casa</h3>
           <p>{followUp.homeWork?.trim() || "Sin tareas registradas."}</p>
         </div>
+        <div className="gidi-report-text-block">
+          <h3>Comentarios que hizo el papá</h3>
+          <p>{followUp.parentComments?.trim() || "Sin comentarios registrados."}</p>
+        </div>
       </section>
 
       <footer className="gidi-report-signature gidi-report-avoid-break">
@@ -233,6 +258,8 @@ export function FollowUpReportPrint({ report }: { report: FollowUpReport }) {
           aplicable en protección de datos de salud.
         </p>
       </footer>
+        </>
+      )}
     </div>
   );
 }

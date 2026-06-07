@@ -3,8 +3,9 @@
  * Seed GiDi — ejecutar con: `pnpm exec prisma db seed` (cwd: apps/api).
  */
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { PrismaClient, RoleKey, AreaTrackingMode } = require("@prisma/client");
+const { PrismaClient, RoleKey } = require("@prisma/client");
 import * as bcrypt from "bcryptjs";
+import { AREA_CATALOG } from "../src/areas/area-catalog";
 
 const prisma = new PrismaClient();
 
@@ -53,17 +54,7 @@ async function ensureRoles() {
 }
 
 async function seedAreas() {
-  const rows = [
-    { key: "ADMINISTRATIVO", name: "Administrativo", category: "Gestión", sortOrder: 0, trackingMode: AreaTrackingMode.TEXT_ONLY },
-    { key: "FAMILIAR", name: "Familiar", category: "Gestión", sortOrder: 1, trackingMode: AreaTrackingMode.TEXT_ONLY },
-    { key: "LECTURA", name: "Lectura", category: "Tratamiento", sortOrder: 10, trackingMode: AreaTrackingMode.MONTHLY_GRID },
-    { key: "VISUALES", name: "Visuales", category: "Tratamiento", sortOrder: 11, trackingMode: AreaTrackingMode.MONTHLY_GRID },
-    { key: "AUDITIVAS", name: "Auditivas", category: "Tratamiento", sortOrder: 12, trackingMode: AreaTrackingMode.MONTHLY_GRID },
-    { key: "PSICOLOGIA", name: "Psicología", category: "Clínica", sortOrder: 20, trackingMode: AreaTrackingMode.MONTHLY_GRID },
-    { key: "LENGUAJE", name: "Lenguaje", category: "Clínica", sortOrder: 21, trackingMode: AreaTrackingMode.MONTHLY_GRID },
-    { key: "TERAPIA_FISICA", name: "Terapia Física", category: "Clínica", sortOrder: 22, trackingMode: AreaTrackingMode.MONTHLY_GRID },
-  ];
-  for (const a of rows) {
+  for (const a of AREA_CATALOG) {
     await prisma.area.create({
       data: {
         key: a.key,

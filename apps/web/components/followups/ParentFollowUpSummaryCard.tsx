@@ -26,6 +26,7 @@ export type ParentFollowUpCardData = {
   objectives: ObjectiveSummary[];
   generalNotes: string | null;
   homeWork: string | null;
+  observationsAuthor: string | null;
   sessionCount: number;
 };
 
@@ -93,7 +94,18 @@ export function ParentFollowUpSummaryCard({ data }: { data: ParentFollowUpCardDa
       </header>
 
       {isTextOnly ? (
-        <p className="py-4 text-sm text-subtle">Seguimiento en formato texto. Consulte con su terapeuta para más detalle.</p>
+        <div className="space-y-3 py-4 text-sm">
+          <p className="leading-relaxed text-subtle">
+            <span className="font-semibold text-ink">Observaciones: </span>
+            {data.generalNotes?.trim() || "Sin observaciones registradas este mes."}
+          </p>
+          {data.observationsAuthor ? (
+            <p className="text-subtle">
+              <span className="font-semibold text-ink">Registrado por: </span>
+              {data.observationsAuthor}
+            </p>
+          ) : null}
+        </div>
       ) : (
         <div className="space-y-4 pt-4">
           <h3 className="text-sm font-semibold text-ink">Objetivos activos</h3>
@@ -132,7 +144,7 @@ export function ParentFollowUpSummaryCard({ data }: { data: ParentFollowUpCardDa
         </div>
       )}
 
-      {(data.homeWork || data.generalNotes) && (
+      {!isTextOnly && (data.homeWork || data.generalNotes) && (
         <footer className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
           {data.generalNotes ? (
             <p>

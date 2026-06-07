@@ -149,6 +149,8 @@ export class FollowUpsService {
     periodMonth: number;
     generalNotes: string | null;
     homeWork: string | null;
+    parentComments: string | null;
+    observationsAuthor: string | null;
     area: { id: string; key: string; name: string; trackingMode: string };
     therapist: { id: string; fullName: string };
     objectives: { id: string; idx: number; text: string; monthlyNotes: string | null }[];
@@ -181,6 +183,8 @@ export class FollowUpsService {
       objectives,
       generalNotes: fu.generalNotes,
       homeWork: fu.homeWork,
+      parentComments: fu.parentComments,
+      observationsAuthor: fu.observationsAuthor,
       sessionCount: fu.sessions.length,
     };
   }
@@ -207,6 +211,8 @@ export class FollowUpsService {
         generalGoal: fu.generalGoal,
         generalNotes: fu.generalNotes,
         homeWork: fu.homeWork,
+        parentComments: fu.parentComments,
+        observationsAuthor: fu.observationsAuthor,
         patient: fu.patient,
         therapist: fu.therapist,
         area: fu.area,
@@ -323,6 +329,8 @@ export class FollowUpsService {
         generalGoal: dto.generalGoal ?? undefined,
         generalNotes: dto.generalNotes ?? undefined,
         homeWork: dto.homeWork ?? undefined,
+        parentComments: dto.parentComments ?? undefined,
+        observationsAuthor: dto.observationsAuthor ?? undefined,
         status: dto.status ?? undefined,
       },
     });

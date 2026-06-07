@@ -208,6 +208,8 @@ model FollowUp {
   generalGoal  String?
   generalNotes String?
   homeWork     String?
+  parentComments String?
+  observationsAuthor String?
 
   status FollowUpStatus @default(DRAFT)
 

@@ -27,6 +27,8 @@ export type FollowUpDetail = {
   generalGoal: string | null;
   generalNotes: string | null;
   homeWork: string | null;
+  parentComments: string | null;
+  observationsAuthor: string | null;
   status: string;
   area: Area;
   patient?: { id: string; firstName: string; lastName: string };
@@ -67,6 +69,8 @@ export function FollowUpDetailEditor(props: {
   const [generalGoal, setGeneralGoal] = useState("");
   const [generalNotes, setGeneralNotes] = useState("");
   const [homeWork, setHomeWork] = useState("");
+  const [parentComments, setParentComments] = useState("");
+  const [observationsAuthor, setObservationsAuthor] = useState("");
   const [objectivesText, setObjectivesText] = useState("");
 
   const objectives = useMemo(
@@ -85,8 +89,12 @@ export function FollowUpDetailEditor(props: {
     const data = (await apiFetch(`/followups/${followUpId}`)) as FollowUpDetail;
     setFu(data);
     setGeneralGoal(data.generalGoal ?? "");
-    setGeneralNotes(data.generalNotes ?? "");
     setHomeWork(data.homeWork ?? "");
+    setParentComments(data.parentComments ?? "");
+    setObservationsAuthor(
+      data.observationsAuthor ?? readLoggedUser()?.fullName ?? "",
+    );
+    setGeneralNotes(data.generalNotes ?? data.generalGoal ?? "");
     setObjectivesText(
       (data.objectives ?? [])
         .filter((o) => o.idx < 1000)
@@ -120,13 +128,27 @@ export function FollowUpDetailEditor(props: {
     })();
   }, [followUpId, loadTherapists, reload]);
 
+  async function onSaveTextOnly() {
+    setMsg("");
+    try {
+      await apiFetch(`/followups/${followUpId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          generalNotes,
+          observationsAuthor: observationsAuthor.trim() || loggedUser?.fullName || null,
+        }),
+      });
+      await reload();
+      setMsg("✅ Guardado");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error");
+    }
+  }
+
   async function onSaveHeader() {
     setMsg("");
     try {
-      const body =
-        tracking === "TEXT_ONLY"
-          ? { generalGoal, generalNotes, homeWork }
-          : { generalNotes, homeWork };
+      const body = { generalNotes, homeWork, parentComments };
       await apiFetch(`/followups/${followUpId}`, { method: "PATCH", body: JSON.stringify(body) });
       await reload();
       setMsg("✅ Guardado");
@@ -225,16 +247,28 @@ export function FollowUpDetailEditor(props: {
       {msg ? <p className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-subtle">{msg}</p> : null}
 
       {tracking === "TEXT_ONLY" ? (
-        <section className="card space-y-3 border-l-4 border-l-info">
-          <h2 className="text-lg font-semibold">Registro del mes</h2>
-          <textarea
-            className="textarea min-h-[220px]"
-            value={generalGoal}
-            onChange={(e) => setGeneralGoal(e.target.value)}
-            placeholder="Escriba aquí el seguimiento del mes…"
-          />
-          <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onSaveHeader}>
-            Guardar registro
+        <section className="card space-y-4 border-l-4 border-l-info">
+          <h2 className="text-lg font-semibold">Observaciones</h2>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium text-subtle">Observaciones del mes</span>
+            <textarea
+              className="textarea min-h-[220px]"
+              value={generalNotes}
+              onChange={(e) => setGeneralNotes(e.target.value)}
+              placeholder="Escriba aquí las observaciones del mes…"
+            />
+          </label>
+          <label className="grid max-w-md gap-1 text-sm">
+            <span className="font-medium text-subtle">Registrado por</span>
+            <input
+              className="input"
+              value={observationsAuthor}
+              onChange={(e) => setObservationsAuthor(e.target.value)}
+              placeholder="Nombre de quien llenó este registro"
+            />
+          </label>
+          <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onSaveTextOnly}>
+            Guardar observaciones
           </button>
         </section>
       ) : (
@@ -297,6 +331,7 @@ export function FollowUpDetailEditor(props: {
         </>
       )}
 
+      {tracking !== "TEXT_ONLY" ? (
       <section className="card space-y-4 border-l-4 border-l-primary">
         <h2 className="text-lg font-semibold">Cierre de mes</h2>
         <label className="grid gap-1 text-sm">
@@ -307,10 +342,15 @@ export function FollowUpDetailEditor(props: {
           <span className="font-medium text-subtle">Trabajo en casa</span>
           <textarea className="textarea min-h-[120px]" value={homeWork} onChange={(e) => setHomeWork(e.target.value)} />
         </label>
+        <label className="grid gap-1 text-sm">
+          <span className="font-medium text-subtle">Comentarios que hizo el papá</span>
+          <textarea className="textarea min-h-[120px]" value={parentComments} onChange={(e) => setParentComments(e.target.value)} />
+        </label>
         <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onSaveHeader}>
           Guardar cierre de mes
         </button>
       </section>
+      ) : null}
     </div>
     </>
   );

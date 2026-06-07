@@ -9,6 +9,8 @@ export type FollowUpReport = {
     generalGoal: string | null;
     generalNotes: string | null;
     homeWork: string | null;
+    parentComments: string | null;
+    observationsAuthor: string | null;
     patient: { id: string; firstName: string; lastName: string };
     therapist: { id: string; fullName: string; email?: string };
     area: { id: string; key: string; name: string; category?: string | null; trackingMode?: string };
