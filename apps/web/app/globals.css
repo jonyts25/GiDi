@@ -511,6 +511,43 @@ a {
   color: #5c6b76;
 }
 
+.gidi-dossier-month-title {
+  margin: 24px 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--color-primary);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-ink);
+  text-transform: capitalize;
+}
+
+.gidi-dossier-month-break {
+  break-before: page;
+  page-break-before: always;
+}
+
+.gidi-dossier-area-block {
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.gidi-dossier-area-header {
+  margin-bottom: 12px;
+}
+
+.gidi-dossier-area-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.gidi-dossier-area-header p {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #5a6b75;
+}
+
 .gidi-report-signature-legal {
   margin: 16px auto 0;
   max-width: 520px;
@@ -538,11 +575,14 @@ a {
   }
 
   #follow-up-report-print,
-  #follow-up-report-print * {
+  #follow-up-report-print *,
+  #patient-dossier-print,
+  #patient-dossier-print * {
     visibility: visible;
   }
 
-  #follow-up-report-print {
+  #follow-up-report-print,
+  #patient-dossier-print {
     display: block !important;
     position: absolute;
     left: 0;

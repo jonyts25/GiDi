@@ -31,6 +31,11 @@ export class AdminPatientsController {
   }
 
   // ✅ FULL patient view
+  @Get(":id/dossier")
+  getDossier(@Param("id") id: string) {
+    return this.svc.getPatientDossier(id);
+  }
+
   @Get(":id")
   getFull(@Param("id") id: string) {
     return this.svc.getFull(id);

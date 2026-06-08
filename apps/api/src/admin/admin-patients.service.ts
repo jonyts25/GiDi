@@ -11,6 +11,7 @@ import { AddGuardianDto } from "./dto/add-guardian.dto";
 import { SetGuardianMetaDto } from "./dto/set-guardian-meta.dto";
 import { UpdatePatientDto } from "./dto/update-patient.dto";
 import { CreatePatientDto } from "./dto/create-patient.dto";
+import { FollowUpsService } from "../followups/followups.service";
 
 function randomPassword(len = 12) {
   const chars =
@@ -24,7 +25,10 @@ type MiniUser = { id: string; email: string; fullName: string; status: UserStatu
 
 @Injectable()
 export class AdminPatientsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private followUps: FollowUpsService,
+  ) {}
 
   // ✅ Vista completa: Patient + Padres + Terapeutas + Escuela (1 activa)
   async getFull(patientId: string) {
@@ -112,6 +116,24 @@ export class AdminPatientsService {
             notes: activeSchool.notes,
           }
         : null,
+    };
+  }
+
+  async getPatientDossier(patientId: string) {
+    await this.ensurePatient(patientId);
+    const [context, dossier] = await Promise.all([
+      this.getFull(patientId),
+      this.followUps.buildPatientDossier(patientId),
+    ]);
+    return {
+      generatedAt: dossier.generatedAt,
+      patient: context.patient,
+      guardians: context.guardians,
+      therapists: context.therapists,
+      school: context.school,
+      months: dossier.months,
+      totalFollowUps: dossier.totalFollowUps,
+      totalMonths: dossier.totalMonths,
     };
   }
 

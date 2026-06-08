@@ -293,6 +293,7 @@ export default function AdminPatientDetail() {
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
         <button onClick={() => router.back()}>← Volver</button>
         <Link className="btn" href={`/admin/patients/${id}/followups`}>Seguimientos mensuales →</Link>
+        <Link className="btn" href={`/admin/patients/${id}/dossier`}>Expediente integral →</Link>
 
       </div>
 

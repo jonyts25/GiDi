@@ -59,3 +59,43 @@ export type FollowUpReport = {
     }[];
   }[];
 };
+
+/** Respuesta de GET /admin/patients/:id/dossier */
+export type PatientDossierReport = {
+  generatedAt: string;
+  patient: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    birthDate: string | null;
+    notes: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+  guardians: {
+    parentId: string;
+    fullName: string;
+    email: string;
+    relationship: string;
+    isPrimary: boolean;
+    notes: string | null;
+  }[];
+  therapists: {
+    therapistId: string;
+    fullName: string;
+    email: string;
+  }[];
+  school: {
+    schoolId: string;
+    fullName: string;
+    email: string;
+    notes: string | null;
+  } | null;
+  months: {
+    periodYear: number;
+    periodMonth: number;
+    followUpReports: FollowUpReport[];
+  }[];
+  totalFollowUps: number;
+  totalMonths: number;
+};

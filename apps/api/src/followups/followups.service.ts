@@ -191,7 +191,59 @@ export class FollowUpsService {
 
   async getReport(user: AuthUser, id: string) {
     const fu = await this.get(user, id);
+    return this.buildFollowUpReport(fu);
+  }
 
+  /** Expediente consolidado por mes (solo invocar desde rutas admin). */
+  async buildPatientDossier(patientId: string) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { id: true, firstName: true, lastName: true, birthDate: true, notes: true },
+    });
+    if (!patient) throw new NotFoundException("Paciente no encontrado");
+
+    const followUps = await this.prisma.followUp.findMany({
+      where: { patientId },
+      orderBy: [
+        { periodYear: "desc" },
+        { periodMonth: "desc" },
+        { area: { sortOrder: "asc" } },
+        { createdAt: "desc" },
+      ],
+      include: followUpInclude,
+    });
+
+    const reports = followUps.map((fu) => this.buildFollowUpReport(fu));
+
+    const monthBuckets = new Map<string, typeof reports>();
+    for (const report of reports) {
+      const key = `${report.followUp.periodYear}-${String(report.followUp.periodMonth).padStart(2, "0")}`;
+      const list = monthBuckets.get(key) ?? [];
+      list.push(report);
+      monthBuckets.set(key, list);
+    }
+
+    const months = [...monthBuckets.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, followUpReports]) => {
+        const [yearStr, monthStr] = key.split("-");
+        return {
+          periodYear: Number(yearStr),
+          periodMonth: Number(monthStr),
+          followUpReports,
+        };
+      });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      patient,
+      months,
+      totalFollowUps: followUps.length,
+      totalMonths: months.length,
+    };
+  }
+
+  private buildFollowUpReport(fu: Awaited<ReturnType<FollowUpsService["get"]>>) {
     const attendance = computeAttendancePercent(
       fu.sessions.map((s) => ({
         sessionDate: s.sessionDate,
