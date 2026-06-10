@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { apiFetch } from "../../../../../../lib/api";
+import { apiFetch } from "@/lib/api";
+import { filterAreasForUserRoles } from "@/lib/area-permissions";
 
-type Area = { id: string; key: string; name: string };
+type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type Therapist = { id: string; fullName: string; email: string };
 type FollowUpRow = {
   id: string;
@@ -51,7 +52,7 @@ export default function AdminPatientFollowUpsPage() {
           apiFetch("/users/therapists"),
           apiFetch(`/admin/patients/${patientId}`),
         ]);
-        setAreas(a);
+        setAreas(filterAreasForUserRoles(roles, a as Area[]));
         setTherapists(t);
         const assignedId = patient?.therapists?.[0]?.therapistId ?? patient?.therapists?.[0]?.id ?? "";
         if (assignedId) setPickedTherapistId(assignedId);

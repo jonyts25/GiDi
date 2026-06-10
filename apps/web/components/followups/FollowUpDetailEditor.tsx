@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { resolveTrackingMode, areaSupportsObjectiveSuggestions } from "@/lib/followup-area";
 import { suggestionsForArea } from "@/lib/followup-suggestions";
 import { MonthlyFollowUpGrid } from "@/components/followups/MonthlyFollowUpGrid";
 import { NewFollowUpSessionForm } from "@/components/followups/NewFollowUpSessionForm";
 import { FollowUpReportPrint } from "@/components/followups/FollowUpReportPrint";
+import { SaveBanner } from "@/components/ui/SaveBanner";
+import { formatCalendarDate } from "@/lib/date-utils";
 import type { FollowUpReport } from "@/lib/followup-report.types";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
@@ -37,13 +40,13 @@ export type FollowUpDetail = {
   sessions: Session[];
 };
 
-function readLoggedUser(): { id: string; fullName: string } | null {
+function readLoggedUser(): { id: string; fullName: string; roles: string[] } | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem("gidi_user");
   if (!raw) return null;
   try {
-    const u = JSON.parse(raw) as { id?: string; fullName?: string };
-    return u.id ? { id: u.id, fullName: u.fullName ?? "Usuario actual" } : null;
+    const u = JSON.parse(raw) as { id?: string; fullName?: string; roles?: string[] };
+    return u.id ? { id: u.id, fullName: u.fullName ?? "Usuario actual", roles: u.roles ?? [] } : null;
   } catch {
     return null;
   }
@@ -58,10 +61,12 @@ export function FollowUpDetailEditor(props: {
   showReportExport?: boolean;
 }) {
   const { followUpId, backHref, patientFollowUpsPrefix, loadTherapists = false, showReportExport = false } = props;
+  const router = useRouter();
 
   const [fu, setFu] = useState<FollowUpDetail | null>(null);
   const [msg, setMsg] = useState("");
-  const [loggedUser, setLoggedUser] = useState<{ id: string; fullName: string } | null>(null);
+  const [msgType, setMsgType] = useState<"success" | "error">("success");
+  const [loggedUser, setLoggedUser] = useState<{ id: string; fullName: string; roles: string[] } | null>(null);
   const [therapists, setTherapists] = useState<{ id: string; fullName: string }[]>([]);
   const [reportForPrint, setReportForPrint] = useState<FollowUpReport | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -84,6 +89,22 @@ export function FollowUpDetailEditor(props: {
 
   const tracking = useMemo(() => (fu?.area ? resolveTrackingMode(fu.area) : "MONTHLY_GRID"), [fu?.area]);
   const showSuggestions = useMemo(() => (fu?.area ? areaSupportsObjectiveSuggestions(fu.area) : false), [fu?.area]);
+  const isAdmin = useMemo(
+    () => loggedUser?.roles.some((r) => r === "ADMIN" || r === "SUPERADMIN") ?? false,
+    [loggedUser],
+  );
+  const isLocked = fu?.status === "CLOSED" && !isAdmin;
+  const isTextOnly = tracking === "TEXT_ONLY";
+  const submitterLabel = isTextOnly
+    ? fu?.observationsAuthor?.trim() || fu?.therapist?.fullName || "—"
+    : fu?.therapist?.fullName ?? "—";
+
+  const resolvedBackHref = useMemo(() => {
+    if (fu?.patient?.id && patientFollowUpsPrefix) {
+      return `${patientFollowUpsPrefix}/patients/${fu.patient.id}/followups`;
+    }
+    return backHref;
+  }, [fu?.patient?.id, patientFollowUpsPrefix, backHref]);
 
   const reload = useCallback(async () => {
     const data = (await apiFetch(`/followups/${followUpId}`)) as FollowUpDetail;
@@ -128,7 +149,7 @@ export function FollowUpDetailEditor(props: {
     })();
   }, [followUpId, loadTherapists, reload]);
 
-  async function onSaveTextOnly() {
+  async function onSaveTextOnly(publish = false) {
     setMsg("");
     try {
       await apiFetch(`/followups/${followUpId}`, {
@@ -136,23 +157,59 @@ export function FollowUpDetailEditor(props: {
         body: JSON.stringify({
           generalNotes,
           observationsAuthor: observationsAuthor.trim() || loggedUser?.fullName || null,
+          ...(publish ? { status: "CLOSED" } : { status: "DRAFT" }),
         }),
       });
+      if (publish) {
+        router.push(resolvedBackHref);
+        return;
+      }
       await reload();
-      setMsg("✅ Guardado");
+      setMsgType("success");
+      setMsg("✅ Borrador guardado correctamente");
     } catch (e: unknown) {
+      setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");
     }
   }
 
-  async function onSaveHeader() {
+  async function onSaveHeader(publish = false) {
     setMsg("");
     try {
-      const body = { generalNotes, homeWork, parentComments };
+      const body = {
+        generalNotes,
+        homeWork,
+        parentComments,
+        ...(publish ? { status: "CLOSED" } : { status: "DRAFT" }),
+      };
       await apiFetch(`/followups/${followUpId}`, { method: "PATCH", body: JSON.stringify(body) });
+      if (publish) {
+        router.push(resolvedBackHref);
+        return;
+      }
       await reload();
-      setMsg("✅ Guardado");
+      setMsgType("success");
+      setMsg("✅ Borrador guardado correctamente");
     } catch (e: unknown) {
+      setMsgType("error");
+      setMsg(e instanceof Error ? e.message : "Error");
+    }
+  }
+
+  async function onPublish() {
+    if (!confirm("¿Publicar este seguimiento? Ya no podrá modificarse (solo un administrador puede revertirlo).")) return;
+    if (isTextOnly) await onSaveTextOnly(true);
+    else await onSaveHeader(true);
+  }
+
+  async function onDeleteFollowUp() {
+    if (!confirm("¿Eliminar este seguimiento completo? Esta acción no se puede deshacer.")) return;
+    setMsg("");
+    try {
+      await apiFetch(`/followups/${followUpId}`, { method: "DELETE" });
+      router.push(resolvedBackHref);
+    } catch (e: unknown) {
+      setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");
     }
   }
@@ -206,10 +263,6 @@ export function FollowUpDetailEditor(props: {
   if (!fu) return <p className="py-10 text-subtle">Cargando seguimiento…</p>;
 
   const defaultTherapistId = fu.therapist?.id ?? loggedUser?.id ?? "";
-  const resolvedBackHref =
-    fu.patient?.id && patientFollowUpsPrefix
-      ? `${patientFollowUpsPrefix}/patients/${fu.patient.id}/followups`
-      : backHref;
 
   return (
     <>
@@ -224,7 +277,12 @@ export function FollowUpDetailEditor(props: {
             Seguimiento · {fu.area?.name} · {fu.periodYear}/{String(fu.periodMonth).padStart(2, "0")}
           </h1>
           <p className="mt-1 text-sm text-subtle">
-            {fu.patient?.firstName} {fu.patient?.lastName} — {fu.therapist?.fullName}
+            {fu.patient?.firstName} {fu.patient?.lastName} —{" "}
+            {isTextOnly ? `Registrado por: ${submitterLabel}` : `Terapeuta: ${submitterLabel}`}
+          </p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+            Estado: {fu.status === "CLOSED" ? "Publicado" : "Borrador"}
+            {isLocked ? " · Solo lectura" : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -238,13 +296,24 @@ export function FollowUpDetailEditor(props: {
               {exporting ? "Preparando expediente…" : "Exportar expediente"}
             </button>
           ) : null}
+          {isAdmin ? (
+            <button type="button" className="btn rounded-xl px-3 py-2 text-sm text-danger" onClick={() => void onDeleteFollowUp()}>
+              Eliminar seguimiento
+            </button>
+          ) : null}
           <Link className="btn rounded-xl px-3 py-2 text-sm" href={resolvedBackHref}>
             ← Volver
           </Link>
         </div>
       </div>
 
-      {msg ? <p className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-subtle">{msg}</p> : null}
+      <SaveBanner message={msg} type={msgType} />
+
+      {isLocked ? (
+        <p className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+          Este seguimiento ya fue publicado y no se puede modificar.
+        </p>
+      ) : null}
 
       {tracking === "TEXT_ONLY" ? (
         <section className="card space-y-4 border-l-4 border-l-info">
@@ -256,6 +325,7 @@ export function FollowUpDetailEditor(props: {
               value={generalNotes}
               onChange={(e) => setGeneralNotes(e.target.value)}
               placeholder="Escriba aquí las observaciones del mes…"
+              disabled={isLocked}
             />
           </label>
           <label className="grid max-w-md gap-1 text-sm">
@@ -265,11 +335,19 @@ export function FollowUpDetailEditor(props: {
               value={observationsAuthor}
               onChange={(e) => setObservationsAuthor(e.target.value)}
               placeholder="Nombre de quien llenó este registro"
+              disabled={isLocked}
             />
           </label>
-          <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onSaveTextOnly}>
-            Guardar observaciones
-          </button>
+          {!isLocked ? (
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onSaveTextOnly(false)}>
+                Guardar borrador
+              </button>
+              <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onPublish()}>
+                Publicar seguimiento
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : (
         <>
@@ -283,16 +361,24 @@ export function FollowUpDetailEditor(props: {
                     type="button"
                     className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium hover:bg-primary/20"
                     onClick={() => appendSuggestion(t)}
+                    disabled={isLocked}
                   >
                     Sugerencia {i + 1}
                   </button>
                 ))}
               </div>
             ) : null}
-            <textarea className="textarea min-h-[140px]" value={objectivesText} onChange={(e) => setObjectivesText(e.target.value)} />
-            <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onSaveObjectives}>
-              Guardar objetivos
-            </button>
+            <textarea
+              className="textarea min-h-[140px]"
+              value={objectivesText}
+              onChange={(e) => setObjectivesText(e.target.value)}
+              disabled={isLocked}
+            />
+            {!isLocked ? (
+              <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onSaveObjectives()}>
+                Guardar objetivos
+              </button>
+            ) : null}
           </section>
 
           <section className="card space-y-4 border-l-4 border-l-primary">
@@ -303,17 +389,20 @@ export function FollowUpDetailEditor(props: {
                 defaultTherapistId={defaultTherapistId}
                 therapists={therapists.length ? therapists : [{ id: defaultTherapistId, fullName: fu.therapist?.fullName ?? "Terapeuta" }]}
                 onCreated={reload}
+                disabled={isLocked}
               />
             ) : null}
             {fu.sessions?.length ? (
               <ul className="flex flex-wrap gap-2 text-sm">
                 {fu.sessions.map((s) => (
                   <li key={s.id} className="flex items-center gap-2 rounded-lg border border-border bg-surface-elevated/60 px-3 py-1.5">
-                    <span>{new Date(s.sessionDate).toLocaleDateString("es-MX")}</span>
+                    <span>{formatCalendarDate(s.sessionDate)}</span>
                     <span className="text-subtle">· {s.therapist?.fullName}</span>
-                    <button type="button" className="text-xs text-danger hover:underline" onClick={() => void onDeleteSession(s.id)}>
-                      Eliminar
-                    </button>
+                    {!isLocked ? (
+                      <button type="button" className="text-xs text-danger hover:underline" onClick={() => void onDeleteSession(s.id)}>
+                        Eliminar
+                      </button>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -323,7 +412,13 @@ export function FollowUpDetailEditor(props: {
           <section className="card space-y-3 border-l-4 border-l-warning">
             <h2 className="text-lg font-semibold">Cuadrícula</h2>
             {fu.objectives?.length ? (
-              <MonthlyFollowUpGrid followUpId={fu.id} objectives={fu.objectives} sessions={fu.sessions ?? []} onSaved={reload} />
+              <MonthlyFollowUpGrid
+                followUpId={fu.id}
+                objectives={fu.objectives}
+                sessions={fu.sessions ?? []}
+                onSaved={reload}
+                readOnly={isLocked}
+              />
             ) : (
               <p className="text-sm text-subtle">Defina objetivos para habilitar la cuadrícula.</p>
             )}
@@ -336,19 +431,26 @@ export function FollowUpDetailEditor(props: {
         <h2 className="text-lg font-semibold">Cierre de mes</h2>
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-subtle">Observaciones generales</span>
-          <textarea className="textarea min-h-[120px]" value={generalNotes} onChange={(e) => setGeneralNotes(e.target.value)} />
+          <textarea className="textarea min-h-[120px]" value={generalNotes} onChange={(e) => setGeneralNotes(e.target.value)} disabled={isLocked} />
         </label>
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-subtle">Trabajo en casa</span>
-          <textarea className="textarea min-h-[120px]" value={homeWork} onChange={(e) => setHomeWork(e.target.value)} />
+          <textarea className="textarea min-h-[120px]" value={homeWork} onChange={(e) => setHomeWork(e.target.value)} disabled={isLocked} />
         </label>
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-subtle">Comentarios que hizo el papá</span>
-          <textarea className="textarea min-h-[120px]" value={parentComments} onChange={(e) => setParentComments(e.target.value)} />
+          <textarea className="textarea min-h-[120px]" value={parentComments} onChange={(e) => setParentComments(e.target.value)} disabled={isLocked} />
         </label>
-        <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onSaveHeader}>
-          Guardar cierre de mes
-        </button>
+        {!isLocked ? (
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onSaveHeader(false)}>
+              Guardar borrador
+            </button>
+            <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onPublish()}>
+              Publicar seguimiento
+            </button>
+          </div>
+        ) : null}
       </section>
       ) : null}
     </div>

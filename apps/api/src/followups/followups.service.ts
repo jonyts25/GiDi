@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { FollowUpStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { CreateFollowUpDto } from "./dto/create-followup.dto";
 import { UpdateFollowUpDto } from "./dto/update-followup.dto";
@@ -116,11 +117,11 @@ export class FollowUpsService {
     const periodMonth = month ?? now.getMonth() + 1;
 
     const followUps = await this.prisma.followUp.findMany({
-      where: { patientId, periodYear, periodMonth },
+      where: { patientId, periodYear, periodMonth, status: FollowUpStatus.CLOSED },
       include: {
         area: { select: { id: true, key: true, name: true, trackingMode: true } },
         therapist: { select: { id: true, fullName: true } },
-        objectives: { orderBy: { idx: "asc" } },
+        objectives: { where: { idx: { lt: ARCHIVED_OBJECTIVE_IDX } }, orderBy: { idx: "asc" } },
         sessions: {
           orderBy: { sessionDate: "asc" },
           include: { marks: true },
@@ -306,16 +307,32 @@ export class FollowUpsService {
   }
 
   async createOrGet(user: AuthUser, dto: CreateFollowUpDto) {
-    await this.access.assertCanEditPatientFollowUps(user, dto.patientId);
+    const area = await this.prisma.area.findUnique({ where: { id: dto.areaId } });
+    if (!area) throw new NotFoundException("Área no encontrada");
 
-    const therapistId =
-      user.roles.includes("THERAPIST") && !this.access.isAdmin(user) ? user.sub : dto.therapistId;
+    await this.access.assertCanEditPatientFollowUps(user, dto.patientId, area.key);
+    this.access.assertRoleCanUseArea(user, area.key, area.trackingMode);
+
+    let therapistId: string;
+    if (this.access.isAdmin(user)) {
+      therapistId = dto.therapistId ?? user.sub;
+    } else if (user.roles.includes("PARENT") || user.roles.includes("SECRETARY")) {
+      therapistId = user.sub;
+    } else if (user.roles.includes("THERAPIST")) {
+      therapistId = user.sub;
+    } else {
+      therapistId = dto.therapistId ?? user.sub;
+    }
+
+    if (!therapistId) throw new BadRequestException("Terapeuta / responsable requerido");
 
     if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user) && therapistId !== user.sub) {
       throw new ForbiddenException("Debe crear el seguimiento a su nombre");
     }
 
-    await this.ensureSingleTherapistAssignment(dto.patientId, therapistId);
+    if (area.trackingMode === "MONTHLY_GRID") {
+      await this.ensureSingleTherapistAssignment(dto.patientId, therapistId);
+    }
 
     const existing = await this.prisma.followUp.findFirst({
       where: {
@@ -374,7 +391,18 @@ export class FollowUpsService {
   }
 
   async update(user: AuthUser, id: string, dto: UpdateFollowUpDto) {
-    await this.access.assertCanEditFollowUp(user, id);
+    const fu = await this.access.getFollowUpForAccess(id);
+
+    if (dto.status === FollowUpStatus.CLOSED) {
+      await this.access.assertCanEditFollowUp(user, id);
+    } else if (dto.status && dto.status !== fu.status) {
+      if (!this.access.isAdmin(user)) {
+        throw new ForbiddenException("Solo administradores pueden reabrir seguimientos");
+      }
+    } else {
+      await this.access.assertCanEditFollowUp(user, id);
+    }
+
     await this.prisma.followUp.update({
       where: { id },
       data: {
@@ -387,6 +415,15 @@ export class FollowUpsService {
       },
     });
     return this.get(user, id);
+  }
+
+  async deleteFollowUp(user: AuthUser, id: string) {
+    if (!this.access.isAdmin(user)) {
+      throw new ForbiddenException("Solo administradores pueden eliminar seguimientos");
+    }
+    await this.access.getFollowUpForAccess(id);
+    await this.prisma.followUp.delete({ where: { id } });
+    return { ok: true };
   }
 
   async replaceObjectives(user: AuthUser, id: string, dto: ReplaceObjectivesDto) {

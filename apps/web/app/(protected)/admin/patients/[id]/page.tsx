@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../../../../lib/api";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { PatientDocumentsPanel } from "@/components/patients/PatientDocumentsPanel";
+import { SaveBanner } from "@/components/ui/SaveBanner";
 
 type MiniUser = { id: string; fullName: string; email: string; status: "ACTIVE" | "INACTIVE" };
 
@@ -14,6 +16,7 @@ type FullPatient = {
     lastName: string;
     birthDate?: string | null;
     notes?: string | null;
+    center?: "SAN_AGUSTIN" | "VALLARTA";
   };
   guardians: {
     parentId: string;
@@ -60,6 +63,7 @@ export default function AdminPatientDetail() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [notes, setNotes] = useState("");
+  const [center, setCenter] = useState<"SAN_AGUSTIN" | "VALLARTA">("SAN_AGUSTIN");
 
   // add guardian form
   const [guardianMode, setGuardianMode] = useState<"existing" | "new">("existing");
@@ -102,6 +106,7 @@ export default function AdminPatientDetail() {
         setFirstName(full.patient.firstName ?? "");
         setLastName(full.patient.lastName ?? "");
         setNotes(full.patient.notes ?? "");
+        setCenter(full.patient.center ?? "SAN_AGUSTIN");
 
         setAllTherapists(therapists);
         setAllSchools(schools);
@@ -130,7 +135,7 @@ export default function AdminPatientDetail() {
     try {
       await apiFetch(`/admin/patients/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ firstName, lastName, notes }),
+        body: JSON.stringify({ firstName, lastName, notes, center }),
       });
       await reload();
       setMsg("✅ Paciente guardado");
@@ -301,25 +306,37 @@ export default function AdminPatientDetail() {
         {data.patient.firstName} {data.patient.lastName}
       </h1>
 
-      {msg && <p style={{ marginTop: 10 }}>{msg}</p>}
+      <section className="card mt-6 space-y-4 border-l-4 border-l-primary">
+        <h2 className="text-lg font-semibold">Datos del paciente</h2>
+        <p className="text-sm text-subtle">Edite los campos y pulse Guardar para aplicar los cambios.</p>
 
-      {/* -------- paciente base -------- */}
-      <section style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 18 }}>
-        <h2>Datos del paciente</h2>
-
-        <form onSubmit={onSavePatient} style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-          <label>Nombre</label>
-          <input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-
-          <label>Apellido</label>
-          <input value={lastName} onChange={(e) => setLastName(e.target.value)} />
-
-          <label>Notas</label>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
-
-          <button type="submit">Guardar paciente</button>
+        <form onSubmit={onSavePatient} className="grid max-w-lg gap-4">
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Nombre</span>
+            <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Apellido</span>
+            <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Centro GiDi</span>
+            <select className="select" value={center} onChange={(e) => setCenter(e.target.value as "SAN_AGUSTIN" | "VALLARTA")}>
+              <option value="SAN_AGUSTIN">San Agustín</option>
+              <option value="VALLARTA">Vallarta</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Notas</span>
+            <textarea className="textarea" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+          </label>
+          <button type="submit" className="btn-primary w-fit rounded-xl px-5 py-2.5 text-sm font-semibold">
+            Guardar paciente
+          </button>
         </form>
       </section>
+
+      <SaveBanner message={msg} type={msg.includes("✅") ? "success" : "error"} />
 
       {/* -------- terapeutas -------- */}
       <section style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 18 }}>
@@ -509,6 +526,8 @@ export default function AdminPatientDetail() {
           </form>
         )}
       </section>
+
+      <PatientDocumentsPanel patientId={id} />
     </main>
   );
 }

@@ -18,7 +18,10 @@ export class RolesGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest();
     const user = req.user; // viene del JwtGuard
     const userRoles: string[] = user?.roles ?? [];
+    const effectiveRoles = userRoles.includes("SUPERADMIN")
+      ? [...userRoles, "ADMIN"]
+      : userRoles;
 
-    return requiredRoles.some((r) => userRoles.includes(r));
+    return requiredRoles.some((r) => effectiveRoles.includes(r));
   }
 }

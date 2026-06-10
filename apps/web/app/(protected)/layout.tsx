@@ -23,7 +23,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       ? "THERAPIST"
       : roles.includes("PARENT")
         ? "PARENT"
-        : "USER";
+        : roles.includes("SCHOOL")
+          ? "SCHOOL"
+          : "USER";
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -59,7 +61,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         ]
       : roles.includes("PARENT")
         ? [{ href: "/parent/patients", label: "Mis hijos" }]
-        : [{ href: "/dashboard", label: "Dashboard" }];
+        : roles.includes("SCHOOL")
+          ? [{ href: "/school/patients", label: "Pacientes" }]
+          : [{ href: "/dashboard", label: "Dashboard" }];
 
   if (!ready)
     return (

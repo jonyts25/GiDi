@@ -10,10 +10,13 @@ export type SessionInput = {
   marks: SessionMarkInput[];
 };
 
-/** Vacaciones y enfermedad no entran al cálculo de asistencia. */
+/** Vacaciones, enfermedad y reposición no entran al cálculo de asistencia. */
 const EXCLUDED_ATTENDANCE_CODES = new Set<string>(["V", "E", "R"]);
 const PRESENT_CODES = new Set<string>(["A", "OK"]);
-const ABSENT_CODES = new Set<string>(["F", "X"]);
+/** Falta del niño (inasistencia). X = no se trabajó el objetivo, NO es falta. */
+const ABSENT_CODES = new Set<string>(["F"]);
+/** X indica objetivo no trabajado pero el niño asistió. */
+const OBJECTIVE_NOT_WORKED = "X";
 
 export type SessionAttendance = "present" | "absent" | "excluded" | "unknown";
 
@@ -25,8 +28,9 @@ export function sessionAttendanceFromMarks(marks: SessionMarkInput[]): SessionAt
 
   if (codes.some((c) => EXCLUDED_ATTENDANCE_CODES.has(c))) return "excluded";
   if (codes.some((c) => ABSENT_CODES.has(c))) return "absent";
-  if (codes.some((c) => PRESENT_CODES.has(c))) return "present";
   if (hasProgressScale) return "present";
+  if (codes.some((c) => PRESENT_CODES.has(c))) return "present";
+  if (codes.some((c) => c === OBJECTIVE_NOT_WORKED)) return "present";
   if (codes.length === 0) return "unknown";
   return "unknown";
 }

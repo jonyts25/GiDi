@@ -11,6 +11,6 @@ import { PrismaModule } from "src/prisma/prisma.module";
   imports: [AuthModule, PrismaModule],
   controllers: [FollowUpsController, TherapistFollowUpsController],
   providers: [FollowUpsService, FollowUpAccessService, PrismaService],
-  exports: [FollowUpsService],
+  exports: [FollowUpsService, FollowUpAccessService],
 })
 export class FollowUpsModule {}

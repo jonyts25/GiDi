@@ -23,6 +23,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (roles.includes("THERAPIST")) router.replace("/therapist/patients");
     else if (roles.includes("PARENT")) router.replace("/parent/patients");
+    else if (roles.includes("SCHOOL")) router.replace("/school/patients");
   }, [roles, router]);
 
   if (!roles.length) return <p style={{ padding: 20 }}>Cargando...</p>;

@@ -39,7 +39,7 @@ export class AdminUsersService {
 
     const role = await this.prisma.role.findUnique({ where: { key: dto.role } });
   if (!role) {
-    throw new BadRequestException("Role ${dto.role} no existe");
+    throw new BadRequestException(`Role ${dto.role} no existe`);
   }
 
     const created = await this.prisma.user.create({

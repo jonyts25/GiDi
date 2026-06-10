@@ -40,6 +40,7 @@ export class AdminPatientsService {
         lastName: true,
         birthDate: true,
         notes: true,
+        center: true,
         createdAt: true,
         updatedAt: true,
 
@@ -170,6 +171,7 @@ export class AdminPatientsService {
         lastName: dto.lastName ?? undefined,
         birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
         notes: dto.notes ?? undefined,
+        center: dto.center ?? undefined,
       },
       select: {
         id: true,
@@ -177,6 +179,7 @@ export class AdminPatientsService {
         lastName: true,
         birthDate: true,
         notes: true,
+        center: true,
         createdAt: true,
         updatedAt: true,
       },

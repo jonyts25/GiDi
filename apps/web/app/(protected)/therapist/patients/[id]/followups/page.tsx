@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { filterAreasForUserRoles } from "@/lib/area-permissions";
 
-type Area = { id: string; key: string; name: string };
+type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type FollowUpRow = {
   id: string;
   periodYear: number;
@@ -43,13 +44,15 @@ export default function TherapistPatientFollowUpsPage() {
 
     (async () => {
       try {
-        const a = await apiFetch("/areas");
-        setAreas(a);
+        const a = (await apiFetch("/areas")) as Area[];
+        setAreas(filterAreasForUserRoles(roles, a));
       } catch (e: unknown) {
         setMsg(e instanceof Error ? e.message : "Error");
       }
     })();
   }, [router]);
+
+  const allowedAreas = areas;
 
   async function load() {
     setMsg("");
@@ -118,7 +121,7 @@ export default function TherapistPatientFollowUpsPage() {
         <div className="flex flex-wrap gap-2 border-t border-border pt-4">
           <select className="select max-w-xs flex-1" value={pickedAreaId} onChange={(e) => setPickedAreaId(e.target.value)}>
             <option value="">— Área —</option>
-            {areas.map((a) => (
+            {allowedAreas.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>

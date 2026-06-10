@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -8,12 +8,19 @@ import {
   ParentFollowUpSummaryCard,
   type ParentFollowUpCardData,
 } from "@/components/followups/ParentFollowUpSummaryCard";
+import { SaveBanner } from "@/components/ui/SaveBanner";
 
 type SummaryResponse = {
   patient: { id: string; firstName: string; lastName: string };
   periodYear: number;
   periodMonth: number;
   followUps: ParentFollowUpCardData[];
+};
+
+type FollowUpRow = {
+  id: string;
+  status: string;
+  area: { name: string; key: string };
 };
 
 export default function ParentPatientFollowUpsPage() {
@@ -25,7 +32,10 @@ export default function ParentPatientFollowUpsPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [data, setData] = useState<SummaryResponse | null>(null);
+  const [myRows, setMyRows] = useState<FollowUpRow[]>([]);
+  const [familiarAreaId, setFamiliarAreaId] = useState("");
   const [msg, setMsg] = useState("");
+  const [parentId, setParentId] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -34,18 +44,47 @@ export default function ParentPatientFollowUpsPage() {
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
     if (!roles.includes("PARENT")) return router.replace("/dashboard");
+    const user = JSON.parse(userRaw);
+    setParentId(user.id ?? "");
 
     (async () => {
       setMsg("");
       try {
-        const res = await apiFetch(`/parent/patients/${patientId}/followups/summary?year=${year}&month=${month}`);
+        const [res, areas, mine] = await Promise.all([
+          apiFetch(`/parent/patients/${patientId}/followups/summary?year=${year}&month=${month}`),
+          apiFetch("/areas"),
+          apiFetch(`/patients/${patientId}/followups?year=${year}&month=${month}`),
+        ]);
         setData(res);
+        const fam = (areas as { id: string; key: string }[]).find((a) => a.key === "FAMILIAR");
+        if (fam) setFamiliarAreaId(fam.id);
+        setMyRows((mine as FollowUpRow[]).filter((r) => r.area.key === "FAMILIAR"));
       } catch (e: unknown) {
         setMsg(e instanceof Error ? e.message : "Error");
         setData(null);
       }
     })();
   }, [router, patientId, year, month]);
+
+  async function onCreateFamiliar() {
+    if (!familiarAreaId || !parentId) return;
+    setMsg("");
+    try {
+      const created = await apiFetch("/followups", {
+        method: "POST",
+        body: JSON.stringify({
+          patientId,
+          therapistId: parentId,
+          areaId: familiarAreaId,
+          periodYear: year,
+          periodMonth: month,
+        }),
+      });
+      router.push(`/parent/followups/${created.id}`);
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error");
+    }
+  }
 
   const monthLabel = data
     ? new Date(data.periodYear, data.periodMonth - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" })
@@ -61,7 +100,6 @@ export default function ParentPatientFollowUpsPage() {
               {data.patient.firstName} {data.patient.lastName} · {monthLabel}
             </p>
           ) : null}
-          <p className="mt-1 text-xs text-subtle">Vista informativa · solo lectura</p>
         </div>
         <Link className="btn rounded-xl px-3 py-2 text-sm" href={`/parent/patients/${patientId}`}>
           ← Volver
@@ -85,14 +123,36 @@ export default function ParentPatientFollowUpsPage() {
         </label>
       </section>
 
-      {msg ? <p className="rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">{msg}</p> : null}
+      <section className="card space-y-3 border-l-4 border-l-info">
+        <h2 className="text-lg font-semibold">Mi seguimiento familiar</h2>
+        <p className="text-sm text-subtle">Registre observaciones del mes. Guarde borrador y publíquelo cuando esté listo.</p>
+        {myRows.length ? (
+          <ul className="space-y-2 text-sm">
+            {myRows.map((r) => (
+              <li key={r.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
+                <span>Familiar · {r.status === "CLOSED" ? "Publicado" : "Borrador"}</span>
+                <Link className="btn rounded-lg px-3 py-1 text-xs" href={`/parent/followups/${r.id}`}>
+                  {r.status === "CLOSED" ? "Ver" : "Continuar"}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onCreateFamiliar()}>
+            + Crear seguimiento familiar
+          </button>
+        )}
+      </section>
+
+      <SaveBanner message={msg} type={msg.includes("✅") ? "success" : "error"} />
 
       {!data && !msg ? <p className="text-subtle">Cargando resumen…</p> : null}
+
+      <h2 className="text-lg font-semibold">Progreso publicado por el centro</h2>
 
       {data?.followUps.length === 0 ? (
         <section className="card text-center text-sm text-subtle">
           <p>No hay seguimientos publicados para este mes.</p>
-          <p className="mt-2">Su terapeuta aún no ha registrado información en este periodo.</p>
         </section>
       ) : (
         <div className="space-y-6">

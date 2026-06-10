@@ -1,17 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "../../../../../lib/api";
+import { SaveBanner } from "@/components/ui/SaveBanner";
 
 type UserDetail = {
   id: string;
   fullName: string;
   email: string;
   status: "ACTIVE" | "INACTIVE";
-  roles?: any;
 };
+
+type SchoolPatient = {
+  patientId: string;
+  firstName: string;
+  lastName: string;
+  center?: string;
+};
+
+type AvailablePatient = { id: string; firstName: string; lastName: string; center?: string };
 
 export default function AdminSchoolDetailPage() {
   const router = useRouter();
@@ -21,10 +30,22 @@ export default function AdminSchoolDetailPage() {
   const [u, setU] = useState<UserDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
+  const [patients, setPatients] = useState<SchoolPatient[]>([]);
+  const [available, setAvailable] = useState<AvailablePatient[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
+
+  async function loadPatients() {
+    const [linked, avail] = await Promise.all([
+      apiFetch(`/admin/schools/${id}/patients`),
+      apiFetch(`/admin/schools/${id}/available-patients`),
+    ]);
+    setPatients(linked);
+    setAvailable(avail);
+  }
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -41,8 +62,9 @@ export default function AdminSchoolDetailPage() {
         setFullName(data.fullName);
         setEmail(data.email);
         setStatus(data.status);
-      } catch (e: any) {
-        setMsg(e.message);
+        await loadPatients();
+      } catch (e: unknown) {
+        setMsg(e instanceof Error ? e.message : "Error");
       } finally {
         setLoading(false);
       }
@@ -52,7 +74,6 @@ export default function AdminSchoolDetailPage() {
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
-
     try {
       const updated = await apiFetch(`/admin/users/${id}`, {
         method: "PATCH",
@@ -60,10 +81,28 @@ export default function AdminSchoolDetailPage() {
       });
       setU(updated);
       setMsg("✅ Guardado");
-    } catch (e: any) {
-      setMsg(e.message);
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error");
     }
   }
+
+  async function onAssignPatients() {
+    if (!picked.length) return;
+    setMsg("");
+    try {
+      await apiFetch(`/admin/schools/${id}/patients`, {
+        method: "POST",
+        body: JSON.stringify({ patientIds: picked }),
+      });
+      setPicked([]);
+      await loadPatients();
+      setMsg(`✅ ${picked.length} paciente(s) vinculado(s)`);
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error");
+    }
+  }
+
+  const availableFiltered = useMemo(() => available, [available]);
 
   if (loading) return <p style={{ padding: 20 }}>Cargando...</p>;
 
@@ -78,24 +117,59 @@ export default function AdminSchoolDetailPage() {
       </div>
 
       <section className="card" style={{ marginTop: 14 }}>
-        <form onSubmit={onSave} style={{ display: "grid", gap: 10 }}>
+        <form onSubmit={(e) => void onSave(e)} style={{ display: "grid", gap: 10 }}>
           <label className="sub">Nombre</label>
           <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-
           <label className="sub">Email</label>
           <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
-
           <label className="sub">Status</label>
-          <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)}>
+          <select className="input" value={status} onChange={(e) => setStatus(e.target.value as "ACTIVE" | "INACTIVE")}>
             <option value="ACTIVE">ACTIVE</option>
             <option value="INACTIVE">INACTIVE</option>
           </select>
-
-          <button className="btn" type="submit">Guardar</button>
+          <button className="btn-primary" type="submit">Guardar</button>
         </form>
-
-        {msg && <p className="sub" style={{ marginTop: 12 }}>{msg}</p>}
       </section>
+
+      <section className="card" style={{ marginTop: 14 }}>
+        <h2 className="h2">Pacientes vinculados ({patients.length})</h2>
+        {patients.length === 0 ? (
+          <p className="sub">Esta escuela aún no tiene pacientes asignados.</p>
+        ) : (
+          <ul style={{ paddingLeft: 18 }}>
+            {patients.map((p) => (
+              <li key={p.patientId}>
+                {p.lastName}, {p.firstName}
+                {p.center ? ` · ${p.center === "VALLARTA" ? "Vallarta" : "San Agustín"}` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card" style={{ marginTop: 14 }}>
+        <h2 className="h2">Agregar pacientes</h2>
+        <p className="sub">Seleccione uno o varios pacientes para vincular a esta escuela.</p>
+        <select
+          className="input"
+          multiple
+          size={8}
+          value={picked}
+          onChange={(e) => setPicked(Array.from(e.target.selectedOptions, (o) => o.value))}
+          style={{ width: "100%", maxWidth: 480 }}
+        >
+          {availableFiltered.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.lastName}, {p.firstName}
+            </option>
+          ))}
+        </select>
+        <button className="btn-primary" type="button" style={{ marginTop: 10 }} disabled={!picked.length} onClick={() => void onAssignPatients()}>
+          Vincular seleccionados
+        </button>
+      </section>
+
+      <SaveBanner message={msg} type={msg.includes("✅") ? "success" : "error"} />
     </main>
   );
 }

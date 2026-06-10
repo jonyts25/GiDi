@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { getApiBaseUrl } from "../lib/get-api-base-url";
 
 export default function Home() {
-  const [email, setEmail] = useState("admin@gidi.local");
-  const [password, setPassword] = useState("Admin123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [msg, setMsg] = useState("");
   const router = useRouter();
@@ -66,10 +66,16 @@ export default function Home() {
         </div>
       </div>
 
-      <form className="card space-y-4 border-l-4 border-l-primary" onSubmit={onLogin}>
+      <form className="card space-y-4 border-l-4 border-l-primary" onSubmit={onLogin} autoComplete="off">
         <label className="grid gap-1 text-sm">
           <span className="text-subtle">Email</span>
-          <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input
+            className="input"
+            type="email"
+            autoComplete="off"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
         </label>
 
         <label className="grid gap-1 text-sm">
@@ -78,6 +84,7 @@ export default function Home() {
             <input
               className="input pr-11"
               type={show ? "text" : "password"}
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />

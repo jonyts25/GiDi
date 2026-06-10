@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../../../lib/api";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
 
 type Patient = {
   id: string;
   firstName: string;
   lastName: string;
   notes?: string | null;
+  center?: string;
   createdAt: string;
 };
 
@@ -22,6 +24,8 @@ export default function AdminPatientsPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [notes, setNotes] = useState("");
+  const [query, setQuery] = useState("");
+  const [centerFilter, setCenterFilter] = useState<"" | "SAN_AGUSTIN" | "VALLARTA">("");
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -63,6 +67,12 @@ export default function AdminPatientsPage() {
     }
   }
 
+  const filtered = useMemo(() => {
+    let list = filterByQuery(patients, query, (p) => `${p.firstName} ${p.lastName} ${p.notes ?? ""}`);
+    if (centerFilter) list = list.filter((p) => p.center === centerFilter);
+    return list;
+  }, [patients, query, centerFilter]);
+
   return (
     <main style={{ paddingTop: 18 }}>
       <div className="row">
@@ -71,7 +81,16 @@ export default function AdminPatientsPage() {
           <p className="sub">Admin · listado y alta</p>
         </div>
                <Link className="btn" href="/dashboard">← Volver</Link>
-               <span className="badge">{patients.length} registrados</span>
+               <span className="badge">{filtered.length} / {patients.length}</span>
+      </div>
+
+      <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar paciente…" />
+        <select className="input" value={centerFilter} onChange={(e) => setCenterFilter(e.target.value as "" | "SAN_AGUSTIN" | "VALLARTA")}>
+          <option value="">Todos los centros</option>
+          <option value="SAN_AGUSTIN">San Agustín</option>
+          <option value="VALLARTA">Vallarta</option>
+        </select>
       </div>
 
       <div className="grid2" style={{ marginTop: 14 }}>
@@ -114,7 +133,7 @@ export default function AdminPatientsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {patients.map((p) => (
+                  {filtered.map((p) => (
                     <tr key={p.id}>
                       <td>
                         <Link href={`/admin/patients/${p.id}`} style={{ fontWeight: 800 }}>

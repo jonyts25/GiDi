@@ -7,10 +7,11 @@ import { AdminUsersController } from "./admin-users.controller";
 import { AdminUsersService } from "./admin-users.service";
 import { AdminPatientsController } from "./admin-patients.controller";
 import { AdminPatientsService } from "./admin-patients.service";
+import { AdminSchoolsController } from "./admin-schools.controller";
 
 @Module({
   imports: [AuthModule, PrismaModule, FollowUpsModule],
-  controllers: [AdminController, AdminUsersController, AdminPatientsController],
+  controllers: [AdminController, AdminUsersController, AdminPatientsController, AdminSchoolsController],
   providers: [AdminUsersService, AdminPatientsService],
 })
 export class AdminModule {}

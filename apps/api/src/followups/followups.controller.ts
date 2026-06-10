@@ -50,6 +50,11 @@ export class FollowUpsController {
     return this.service.update(user, id, dto);
   }
 
+  @Delete("/followups/:id")
+  deleteFollowUp(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.service.deleteFollowUp(user, id);
+  }
+
   @Post("/followups/:id/objectives")
   replaceObjectives(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: ReplaceObjectivesDto) {
     return this.service.replaceObjectives(user, id, dto);

@@ -16,6 +16,15 @@ describe("followup-metrics attendance", () => {
     ).toBe("absent");
   });
 
+  it("treats X as present (objective not worked, child attended)", () => {
+    expect(sessionAttendanceFromMarks([{ code: "X" }, { code: "X" }])).toBe("present");
+  });
+
+  it("treats V and E as excluded from attendance percent", () => {
+    expect(sessionAttendanceFromMarks([{ code: "V" }])).toBe("excluded");
+    expect(sessionAttendanceFromMarks([{ code: "E" }])).toBe("excluded");
+  });
+
   it("includes scale-only sessions in attendance percent", () => {
     const result = computeAttendancePercent([
       { sessionDate: "2026-01-05", marks: [{ progressScale: 3 }] },

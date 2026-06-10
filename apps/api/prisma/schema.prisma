@@ -28,6 +28,8 @@ model User {
 
   objectivesCreated ObjectiveBank[]
 
+  patientDocumentsUploaded PatientDocument[] @relation("PatientDocumentUploader")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -72,12 +74,14 @@ model Patient {
   lastName  String
   birthDate DateTime?
   notes     String?
+  center    GidiCenter @default(SAN_AGUSTIN)
 
   parents     ParentPatient[]
   assignments PatientTherapist[]
   schools     SchoolPatient[]
 
   followUps FollowUp[]
+  documents PatientDocument[]
 
   appointmentRequests AppointmentRequest[]
 
@@ -85,6 +89,35 @@ model Patient {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum GidiCenter {
+  SAN_AGUSTIN
+  VALLARTA
+}
+
+enum PatientDocumentCategory {
+  EVALUACION
+  REVALUACION
+  SEGUIMIENTO_PADRES
+}
+
+model PatientDocument {
+  id           String                  @id @default(uuid()) @db.Uuid
+  patientId    String                  @db.Uuid
+  category     PatientDocumentCategory
+  fileName     String
+  mimeType     String
+  dataUrl      String                  @db.Text
+  uploadedById String                  @db.Uuid
+
+  patient    Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation("PatientDocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([patientId])
+  @@index([category])
 }
 
 model PatientTherapist {

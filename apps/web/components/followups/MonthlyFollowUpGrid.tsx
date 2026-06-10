@@ -19,9 +19,10 @@ function cellKey(sessionId: string, objectiveId: string) {
   return `${sessionId}:${objectiveId}`;
 }
 
+import { formatCalendarDate } from "@/lib/date-utils";
+
 function formatSessionHeader(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" });
+  return formatCalendarDate(iso, { day: "2-digit", month: "short" });
 }
 
 function markPayload(mark: Mark | null | undefined): { code?: string; progressScale?: number } | null {
@@ -64,8 +65,9 @@ export function MonthlyFollowUpGrid(props: {
   objectives: Objective[];
   sessions: Session[];
   onSaved: () => Promise<void> | void;
+  readOnly?: boolean;
 }) {
-  const { followUpId, objectives, sessions, onSaved } = props;
+  const { followUpId, objectives, sessions, onSaved, readOnly = false } = props;
 
   const [picker, setPicker] = useState<{ sessionId: string; objectiveId: string } | null>(null);
   const [draftMarks, setDraftMarks] = useState<Record<string, Mark>>({});
@@ -210,13 +212,13 @@ export function MonthlyFollowUpGrid(props: {
             <td key={s.id} className="border-r border-border p-0 text-center last:border-r-0">
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || readOnly}
                 className={
                   active
                     ? "h-10 w-full bg-primary/20 font-bold text-primary ring-2 ring-inset ring-primary"
                     : "h-10 w-full bg-transparent font-semibold text-ink hover:bg-primary/10"
                 }
-                onClick={() => setPicker({ sessionId: s.id, objectiveId: obj.id })}
+                onClick={() => !readOnly && setPicker({ sessionId: s.id, objectiveId: obj.id })}
               >
                 {cellLabel(mark) || "·"}
               </button>
@@ -226,8 +228,7 @@ export function MonthlyFollowUpGrid(props: {
         <td className="px-2 py-1 align-top">
           <textarea
             className="textarea min-h-[64px] text-xs"
-            disabled={busy}
-            value={notesByObjective[obj.id] ?? ""}
+            disabled={busy || readOnly}
             onChange={(e) => setNotesDraft((prev) => ({ ...prev, [obj.id]: e.target.value }))}
             placeholder="Notas del mes para este objetivo…"
           />
@@ -250,14 +251,16 @@ export function MonthlyFollowUpGrid(props: {
         <p className="text-sm text-subtle">
           {hasUnsavedChanges ? "Hay cambios sin guardar en la cuadrícula." : "Cuadrícula sincronizada."}
         </p>
-        <button
-          type="button"
-          className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
-          disabled={busy || !hasUnsavedChanges}
-          onClick={() => void saveGrid()}
-        >
-          {busy ? "Guardando…" : "Guardar cuadrícula"}
-        </button>
+        {!readOnly ? (
+          <button
+            type="button"
+            className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+            disabled={busy || !hasUnsavedChanges}
+            onClick={() => void saveGrid()}
+          >
+            {busy ? "Guardando…" : "Guardar cuadrícula"}
+          </button>
+        ) : null}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card/60">

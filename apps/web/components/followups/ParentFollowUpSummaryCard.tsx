@@ -72,13 +72,16 @@ function ObjectiveBar({ percent }: { percent: number | null }) {
 
 export function ParentFollowUpSummaryCard({ data }: { data: ParentFollowUpCardData }) {
   const isTextOnly = data.area.trackingMode === "TEXT_ONLY";
+  const authorLabel = data.observationsAuthor?.trim() || data.therapist.fullName;
 
   return (
     <article className="card overflow-hidden border-l-4 border-l-primary">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
         <div>
           <h2 className="text-lg font-bold text-ink">{data.area.name}</h2>
-          <p className="text-sm text-subtle">Terapeuta: {data.therapist.fullName}</p>
+          <p className="text-sm text-subtle">
+            {isTextOnly ? `Registrado por: ${authorLabel}` : `Terapeuta: ${data.therapist.fullName}`}
+          </p>
           <p className="mt-1 text-xs text-subtle">{data.sessionCount} sesión(es) registrada(s) este mes</p>
         </div>
         {!isTextOnly ? (
@@ -87,7 +90,7 @@ export function ParentFollowUpSummaryCard({ data }: { data: ParentFollowUpCardDa
             <ProgressRing percent={data.attendance.percent} />
             <p className="mt-1 text-xs text-subtle">
               {data.attendance.present} presente(s) · {data.attendance.absent} falta(s)
-              {data.attendance.excluded > 0 ? ` · ${data.attendance.excluded} no cuenta(n)` : ""}
+              {data.attendance.excluded > 0 ? ` · ${data.attendance.excluded} no cuenta(n) (V/E/R)` : ""}
             </p>
           </div>
         ) : null}
@@ -120,7 +123,11 @@ export function ParentFollowUpSummaryCard({ data }: { data: ParentFollowUpCardDa
                       <span className="text-primary">{obj.idx}.</span> {obj.text}
                     </p>
                     <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
-                      {obj.lastProgressPercent != null ? `${obj.lastProgressPercent}%` : "Sin registro"}
+                      {obj.lastProgressPercent != null
+                        ? `${obj.lastProgressPercent}%`
+                        : obj.lastProgressScale === null
+                          ? "Sin registro"
+                          : "Objetivo no trabajado (X)"}
                     </span>
                   </div>
                   <div className="mt-2">

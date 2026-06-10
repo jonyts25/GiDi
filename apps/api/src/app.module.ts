@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AdminModule } from "./admin/admin.module";
 import { TherapistModule } from "./therapist/therapist.module";
 import { ParentModule } from "./parent/parent.module";
+import { SchoolModule } from "./school/school.module";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { AreasModule } from "./areas/areas.module";
@@ -24,6 +25,7 @@ import { MetaWhatsappModule } from "./meta-whatsapp/meta-whatsapp.module";
     AdminModule,
     TherapistModule,
     ParentModule,
+    SchoolModule,
     AreasModule,
     FollowUpsModule,
     ObjectiveBankModule,
