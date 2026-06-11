@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { PatientProfileService } from "../patients/patient-profile.service";
 import { PrismaService } from "../prisma.service";
 
 @Injectable()
 export class SchoolPortalService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private profiles: PatientProfileService,
+  ) {}
 
   async listMyPatients(schoolId: string) {
     const rows = await this.prisma.schoolPatient.findMany({
@@ -35,20 +39,8 @@ export class SchoolPortalService {
   async getPatient(schoolId: string, patientId: string) {
     const link = await this.prisma.schoolPatient.findFirst({
       where: { schoolId, patientId },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            birthDate: true,
-            center: true,
-            notes: true,
-          },
-        },
-      },
     });
     if (!link) throw new NotFoundException("Paciente no vinculado a esta escuela");
-    return { patient: link.patient, schoolNotes: link.notes };
+    return this.profiles.build(patientId);
   }
 }

@@ -3,23 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { apiFetch } from "../../../../../lib/api";
-
-type Patient = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  birthDate?: string | null;
-  notes?: string | null;
-};
+import { apiFetch } from "@/lib/api";
+import { PatientGeneralProfile, type PatientProfileData } from "@/components/patients/PatientGeneralProfile";
 
 export default function ParentPatientDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id;
-
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [msg, setMsg] = useState("Cargando...");
+  const [profile, setProfile] = useState<PatientProfileData | null>(null);
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -31,9 +23,8 @@ export default function ParentPatientDetailPage() {
 
     (async () => {
       try {
-        const p = await apiFetch(`/parent/patients/${id}`);
-        setPatient(p);
-        setMsg("");
+        const data = (await apiFetch(`/parent/patients/${id}`)) as PatientProfileData;
+        setProfile(data);
       } catch (e: unknown) {
         setMsg(e instanceof Error ? e.message : "Error");
       }
@@ -41,31 +32,19 @@ export default function ParentPatientDetailPage() {
   }, [id, router]);
 
   return (
-    <main className="max-w-[720px] space-y-6 py-6">
+    <main className="container max-w-[820px] space-y-4 py-6">
       <Link className="btn inline-flex rounded-xl px-3 py-2 text-sm" href="/parent/patients">
         ← Mis hijos
       </Link>
-
-      <div className="card">
-        <h1 className="text-2xl font-bold">
-          {patient ? `${patient.firstName} ${patient.lastName}` : "Paciente"}
-        </h1>
-        {patient?.notes ? <p className="mt-2 text-sm text-subtle">{patient.notes}</p> : null}
-        {msg ? <p className="mt-2 text-sm text-subtle">{msg}</p> : null}
-      </div>
-
-      <section className="card border-l-4 border-l-primary">
-        <h2 className="text-lg font-semibold">Seguimiento terapéutico</h2>
-        <p className="mt-1 text-sm text-subtle">
-          Consulte el avance del mes: asistencia, objetivos y observaciones de cada área.
-        </p>
-        <Link
-          className="btn-primary mt-4 inline-flex rounded-xl px-5 py-2.5 text-sm font-semibold"
-          href={`/parent/patients/${id}/followups`}
-        >
-          Ver resumen del mes →
-        </Link>
-      </section>
+      {msg ? <p className="text-sm text-danger">{msg}</p> : null}
+      {!profile && !msg ? <p className="text-subtle">Cargando…</p> : null}
+      {profile ? (
+        <PatientGeneralProfile
+          profile={profile}
+          followUpsHref={`/parent/patients/${id}/followups`}
+          followUpsLabel="Ver progreso y seguimiento familiar →"
+        />
+      ) : null}
     </main>
   );
 }

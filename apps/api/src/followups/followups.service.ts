@@ -334,18 +334,6 @@ export class FollowUpsService {
       await this.ensureSingleTherapistAssignment(dto.patientId, therapistId);
     }
 
-    const existing = await this.prisma.followUp.findFirst({
-      where: {
-        patientId: dto.patientId,
-        therapistId,
-        areaId: dto.areaId,
-        periodYear: dto.periodYear,
-        periodMonth: dto.periodMonth,
-      },
-      select: { id: true },
-    });
-    if (existing) return this.get(user, existing.id);
-
     const { prevYear, prevMonth } = previousCalendarMonth(dto.periodYear, dto.periodMonth);
 
     const prevFu = await this.prisma.followUp.findFirst({

@@ -124,9 +124,9 @@ export default function AdminPatientFollowUpsPage() {
 
         <hr />
 
-        <div className="h2">Crear follow-up del mes</div>
+        <div className="h2">Crear seguimiento del mes</div>
         <p className="sub" style={{ marginBottom: 8 }}>
-          El terapeuta se preselecciona del paciente. Al crear el seguimiento se asigna automáticamente si aún no lo estaba.
+          Puede crear varios seguimientos en el mismo mes (misma área y terapeuta). Cada uno es independiente.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10 }}>
           <select className="input" value={pickedAreaId} onChange={(e) => setPickedAreaId(e.target.value)}>
@@ -143,7 +143,9 @@ export default function AdminPatientFollowUpsPage() {
             ))}
           </select>
 
-          <button className="btn" disabled={!canCreate} onClick={onCreate}>+ Crear / Abrir</button>
+          <button className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" disabled={!canCreate} onClick={onCreate}>
+            + Crear nuevo
+          </button>
         </div>
 
         {msg && <p className="sub" style={{ marginTop: 10 }}>{msg}</p>}
@@ -160,6 +162,7 @@ export default function AdminPatientFollowUpsPage() {
                 <th style={{ padding: 8 }}>Área</th>
                 <th style={{ padding: 8 }}>Terapeuta</th>
                 <th style={{ padding: 8 }}>Status</th>
+                <th style={{ padding: 8 }}>Creado</th>
                 <th style={{ padding: 8 }}></th>
               </tr>
             </thead>
@@ -169,6 +172,9 @@ export default function AdminPatientFollowUpsPage() {
                   <td style={{ padding: 8 }}>{r.area?.name}</td>
                   <td style={{ padding: 8 }}>{r.therapist?.fullName}</td>
                   <td style={{ padding: 8 }}>{r.status}</td>
+                  <td style={{ padding: 8, color: "var(--muted)", fontSize: 13 }}>
+                    {new Date(r.createdAt).toLocaleString("es-MX")}
+                  </td>
                   <td style={{ padding: 8 }}>
                     <Link className="btn" href={`/admin/followups/${r.id}`}>Abrir</Link>
                   </td>

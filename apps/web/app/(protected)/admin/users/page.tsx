@@ -29,6 +29,7 @@ export default function AdminUsersPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [createRole, setCreateRole] = useState<RoleKey>("ADMIN");
+  const [formKey, setFormKey] = useState(0);
 
   async function loadUsers() {
     setLoading(true);
@@ -74,6 +75,7 @@ export default function AdminUsersPage() {
       setFullName("");
       setEmail("");
       setPassword("");
+      setFormKey((k) => k + 1);
       setMsgType("success");
       setMsg(created?.generatedPassword ? `✅ Creado. Contraseña: ${created.generatedPassword}` : "✅ Usuario creado correctamente");
       if (createRole !== role) setRole(createRole);
@@ -97,10 +99,10 @@ export default function AdminUsersPage() {
 
       <section className="card" style={{ marginTop: 14 }}>
         <div className="h2">Crear usuario</div>
-        <form onSubmit={(e) => void onCreate(e)} style={{ display: "grid", gap: 10, marginTop: 10, maxWidth: 520 }}>
-          <input className="input" placeholder="Nombre completo" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-          <input className="input" type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <input className="input" type="password" placeholder="Contraseña (opcional, se genera automática)" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <form key={formKey} onSubmit={(e) => void onCreate(e)} autoComplete="off" style={{ display: "grid", gap: 10, marginTop: 10, maxWidth: 520 }}>
+          <input className="input" autoComplete="off" placeholder="Nombre completo" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          <input className="input" type="email" autoComplete="off" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <input className="input" type="password" autoComplete="new-password" placeholder="Contraseña (opcional, se genera automática)" value={password} onChange={(e) => setPassword(e.target.value)} />
           <select className="input" value={createRole} onChange={(e) => setCreateRole(e.target.value as RoleKey)}>
             {roles.map((r) => (
               <option key={r} value={r}>{r}</option>

@@ -3,7 +3,7 @@ import { PatientDocumentCategory } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
 
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 20 * 1024 * 1024;
 
 @Injectable()
 export class PatientDocumentsService {
@@ -42,7 +42,7 @@ export class PatientDocumentsService {
     const base64 = dataUrl.split(",")[1] ?? "";
     const approxBytes = Math.ceil((base64.length * 3) / 4);
     if (approxBytes > MAX_BYTES) {
-      throw new BadRequestException("Archivo demasiado grande (máx. 5 MB)");
+      throw new BadRequestException("Archivo demasiado grande (máx. 20 MB). Intente una foto más pequeña o comprima el PDF.");
     }
 
     return this.prisma.patientDocument.create({

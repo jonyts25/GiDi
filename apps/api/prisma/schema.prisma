@@ -258,8 +258,8 @@ model FollowUp {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([patientId, therapistId, areaId, periodYear, periodMonth])
   @@index([patientId])
+  @@index([patientId, areaId, periodYear, periodMonth])
   @@index([therapistId])
   @@index([areaId])
   @@index([periodYear, periodMonth])

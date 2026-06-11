@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
+import { prepareFileForUpload } from "@/lib/compress-upload";
+
 const CATEGORY_LABELS: Record<string, string> = {
   EVALUACION: "Evaluación",
   REVALORACION: "Revaloración",
@@ -17,15 +19,6 @@ type DocRow = {
   createdAt: string;
   uploadedBy: { fullName: string };
 };
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 export function PatientDocumentsPanel({ patientId, canUpload = true }: { patientId: string; canUpload?: boolean }) {
   const [docs, setDocs] = useState<DocRow[]>([]);
@@ -48,17 +41,18 @@ export function PatientDocumentsPanel({ patientId, canUpload = true }: { patient
     setBusy(true);
     setMsg("");
     try {
-      const dataUrl = await readFileAsDataUrl(file);
+      setMsg("Comprimiendo y subiendo…");
+      const prepared = await prepareFileForUpload(file);
       await apiFetch(`/patients/${patientId}/documents`, {
         method: "POST",
         body: JSON.stringify({
           category,
-          fileName: file.name,
-          mimeType: file.type || "application/octet-stream",
-          dataUrl,
+          fileName: prepared.fileName,
+          mimeType: prepared.mimeType,
+          dataUrl: prepared.dataUrl,
         }),
       });
-      setMsg(`✅ «${file.name}» subido correctamente`);
+      setMsg(`✅ «${prepared.fileName}» subido correctamente`);
       await reload();
     } catch (ex: unknown) {
       setMsg(ex instanceof Error ? ex.message : "Error al subir");
@@ -72,7 +66,13 @@ export function PatientDocumentsPanel({ patientId, canUpload = true }: { patient
     const data = (await apiFetch(`/patients/${patientId}/documents/${docId}/file`)) as {
       dataUrl: string;
       fileName: string;
+      mimeType: string;
     };
+    if (data.mimeType === "application/pdf") {
+      const w = window.open();
+      if (w) w.location.href = data.dataUrl;
+      return;
+    }
     const w = window.open();
     if (w) {
       w.document.write(`<title>${data.fileName}</title><img src="${data.dataUrl}" style="max-width:100%" />`);

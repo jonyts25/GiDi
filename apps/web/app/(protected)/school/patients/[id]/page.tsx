@@ -4,36 +4,34 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { PatientGeneralProfile, type PatientProfileData } from "@/components/patients/PatientGeneralProfile";
 
 export default function SchoolPatientDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const [data, setData] = useState<{ patient: { firstName: string; lastName: string; birthDate?: string | null; center?: string; notes?: string | null } } | null>(null);
+  const [profile, setProfile] = useState<PatientProfileData | null>(null);
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
     if (!token) return router.replace("/");
     (async () => {
-      const res = await apiFetch(`/school/patients/${params.id}`);
-      setData(res);
-    })().catch(() => router.replace("/school/patients"));
+      try {
+        const data = (await apiFetch(`/school/patients/${params.id}`)) as PatientProfileData;
+        setProfile(data);
+      } catch (e: unknown) {
+        setMsg(e instanceof Error ? e.message : "Error");
+      }
+    })();
   }, [params.id, router]);
 
-  if (!data) return <p className="p-8 text-subtle">Cargando…</p>;
-
-  const p = data.patient;
+  if (!profile && !msg) return <p className="p-8 text-subtle">Cargando…</p>;
 
   return (
-    <main className="container max-w-xl py-8">
-      <Link className="btn mb-4 inline-block" href="/school/patients">← Volver</Link>
-      <h1 className="text-2xl font-bold">{p.firstName} {p.lastName}</h1>
-      <p className="mt-2 text-sm text-subtle">
-        Centro: {p.center === "VALLARTA" ? "GiDi Vallarta" : "GiDi San Agustín"}
-      </p>
-      {p.birthDate ? (
-        <p className="text-sm text-subtle">Nacimiento: {new Date(p.birthDate).toLocaleDateString("es-MX")}</p>
-      ) : null}
-      {p.notes ? <p className="mt-4 rounded-xl border border-border p-4 text-sm">{p.notes}</p> : null}
+    <main className="container max-w-[820px] space-y-4 py-8">
+      <Link className="btn inline-block" href="/school/patients">← Volver</Link>
+      {msg ? <p className="text-sm text-danger">{msg}</p> : null}
+      {profile ? <PatientGeneralProfile profile={profile} /> : null}
     </main>
   );
 }

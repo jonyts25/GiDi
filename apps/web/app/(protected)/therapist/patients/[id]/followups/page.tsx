@@ -13,6 +13,7 @@ type FollowUpRow = {
   periodMonth: number;
   status: string;
   area: Area;
+  createdAt: string;
 };
 
 export default function TherapistPatientFollowUpsPage() {
@@ -128,7 +129,7 @@ export default function TherapistPatientFollowUpsPage() {
             ))}
           </select>
           <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" disabled={!canCreate} onClick={onCreate}>
-            + Crear / abrir mes
+            + Crear nuevo
           </button>
         </div>
         {msg ? <p className="text-sm text-subtle">{msg}</p> : null}
@@ -143,6 +144,9 @@ export default function TherapistPatientFollowUpsPage() {
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
                 <span>
                   <b>{r.area.name}</b> · {r.status}
+                  <span className="ml-2 text-xs text-subtle">
+                    {new Date(r.createdAt).toLocaleString("es-MX")}
+                  </span>
                 </span>
                 <Link className="btn rounded-lg px-3 py-1.5 text-xs" href={`/therapist/followups/${r.id}`}>
                   Abrir

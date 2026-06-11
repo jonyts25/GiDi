@@ -25,6 +25,7 @@ export default function AdminTherapistsPage() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
   const [password, setPassword] = useState("");
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -72,6 +73,7 @@ export default function AdminTherapistsPage() {
       setEmail("");
       setPassword("");
       setStatus("ACTIVE");
+      setFormKey((k) => k + 1);
 
       const gp = created?.generatedPassword;
       setMsg(gp ? `✅ Creado. Password: ${gp}` : "✅ Creado");
@@ -98,12 +100,12 @@ export default function AdminTherapistsPage() {
             Crea un terapeuta para asignarlo a pacientes.
           </p>
 
-          <form onSubmit={onCreate} style={{ display: "grid", gap: 10, marginTop: 12 }}>
+          <form key={formKey} onSubmit={onCreate} autoComplete="off" style={{ display: "grid", gap: 10, marginTop: 12 }}>
             <label className="sub">Nombre</label>
-            <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+            <input className="input" autoComplete="off" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
 
             <label className="sub">Email</label>
-            <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input className="input" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
             <label className="sub">Status</label>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)}>
@@ -114,6 +116,8 @@ export default function AdminTherapistsPage() {
             <label className="sub">Password (opcional)</label>
             <input
               className="input"
+              type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Si lo dejas vacío, se genera uno"

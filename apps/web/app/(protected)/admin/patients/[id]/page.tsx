@@ -339,24 +339,33 @@ export default function AdminPatientDetail() {
       <SaveBanner message={msg} type={msg.includes("✅") ? "success" : "error"} />
 
       {/* -------- terapeutas -------- */}
-      <section style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 18 }}>
-        <h2>Terapeuta asignado</h2>
-        <p className="sub" style={{ marginTop: 4 }}>
-          Solo un terapeuta por paciente. Asignar uno nuevo reemplaza al anterior.
-        </p>
+      <section className="card mt-6 space-y-4 border-l-4 border-l-success">
+        <div>
+          <h2 className="text-lg font-semibold">Terapeuta asignado</h2>
+          <p className="text-sm text-subtle">
+            Solo un terapeuta por paciente. Asignar uno nuevo reemplaza al anterior.
+          </p>
+        </div>
 
-        <ul style={{ paddingLeft: 18 }}>
-          {data.therapists.length === 0 && <li>No hay terapeuta asignado</li>}
-          {data.therapists.map((t) => (
-            <li key={t.therapistId} style={{ marginBottom: 6 }}>
-              {t.fullName} ({t.email}){" "}
-              <button onClick={() => onUnassignTherapist(t.therapistId)}>Quitar</button>
-            </li>
-          ))}
-        </ul>
+        {data.therapists.length === 0 ? (
+          <p className="text-sm text-subtle">No hay terapeuta asignado.</p>
+        ) : (
+          <ul className="space-y-2">
+            {data.therapists.map((t) => (
+              <li key={t.therapistId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+                <span>
+                  <strong>{t.fullName}</strong> · <span className="text-subtle">{t.email}</span>
+                </span>
+                <button type="button" className="btn rounded-lg px-3 py-1.5 text-xs" onClick={() => onUnassignTherapist(t.therapistId)}>
+                  Quitar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10 }}>
-          <select value={pickedTherapist} onChange={(e) => setPickedTherapist(e.target.value)}>
+        <div className="flex flex-wrap gap-3">
+          <select className="select max-w-md flex-1" value={pickedTherapist} onChange={(e) => setPickedTherapist(e.target.value)}>
             <option value="">{data.therapists.length ? "— Cambiar terapeuta —" : "— Asignar terapeuta —"}</option>
             {allTherapists.map((t) => (
               <option key={t.id} value={t.id} disabled={assignedTherapistIds.has(t.id)}>
@@ -364,22 +373,29 @@ export default function AdminPatientDetail() {
               </option>
             ))}
           </select>
-          <button onClick={onAssignTherapist} disabled={!pickedTherapist}>
+          <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onAssignTherapist} disabled={!pickedTherapist}>
             {data.therapists.length ? "Cambiar" : "Asignar"}
           </button>
         </div>
       </section>
 
       {/* -------- escuela -------- */}
-      <section style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 18 }}>
-        <h2>Escuela</h2>
+      <section className="card mt-6 space-y-4 border-l-4 border-l-warning">
+        <h2 className="text-lg font-semibold">Escuela</h2>
 
-        <p style={{ marginTop: 6, opacity: 0.85 }}>
-          Actual: {data.school ? `${data.school.fullName} (${data.school.email})` : "— sin escuela —"}
+        <p className="text-sm">
+          Actual:{" "}
+          {data.school ? (
+            <>
+              <strong>{data.school.fullName}</strong> · <span className="text-subtle">{data.school.email}</span>
+            </>
+          ) : (
+            <span className="text-subtle">Sin escuela asignada</span>
+          )}
         </p>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10 }}>
-          <select value={pickedSchool} onChange={(e) => setPickedSchool(e.target.value)}>
+        <div className="flex flex-wrap gap-3">
+          <select className="select max-w-md flex-1" value={pickedSchool} onChange={(e) => setPickedSchool(e.target.value)}>
             <option value="">— Sin escuela —</option>
             {allSchools.map((s) => (
               <option key={s.id} value={s.id}>
@@ -387,144 +403,163 @@ export default function AdminPatientDetail() {
               </option>
             ))}
           </select>
-
-          <button onClick={onSetSchool}>Guardar escuela</button>
+          <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onSetSchool}>
+            Guardar escuela
+          </button>
         </div>
       </section>
 
       {/* -------- padres -------- */}
-      <section style={{ border: "1px solid #ddd", borderRadius: 10, padding: 14, marginTop: 18 }}>
-        <h2>Padres / Tutores</h2>
+      <section className="card mt-6 space-y-4 border-l-4 border-l-info">
+        <h2 className="text-lg font-semibold">Padres / tutores</h2>
 
         {data.guardians.length === 0 ? (
-          <p>No hay padres/tutores asignados.</p>
+          <p className="text-sm text-subtle">No hay padres o tutores asignados.</p>
         ) : (
-          <ul style={{ paddingLeft: 18 }}>
+          <ul className="space-y-3">
             {data.guardians.map((g) => (
-              <li key={g.parentId} style={{ marginBottom: 10 }}>
-                <div>
-                  <b>{g.fullName}</b> ({g.email}) — {g.relationship}{" "}
-                  {g.isPrimary ? <b>· PRIMARY</b> : null}
+              <li key={g.parentId} className="rounded-lg border border-border px-3 py-3 text-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <strong>{g.fullName}</strong> · <span className="text-subtle">{g.email}</span>
+                    <br />
+                    <span className="text-subtle">
+                      {g.relationship}{g.isPrimary ? " · principal" : ""}
+                    </span>
+                  </div>
+                  <button type="button" className="btn rounded-lg px-3 py-1.5 text-xs" onClick={() => onRemoveGuardian(g.parentId)}>
+                    Quitar
+                  </button>
                 </div>
 
-                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
-                  <select
-                    value={g.relationship}
-                    onChange={(e) => onSetGuardianMeta(g.parentId, { relationship: e.target.value })}
-                  >
-                    <option value="MOTHER">MOTHER</option>
-                    <option value="FATHER">FATHER</option>
-                    <option value="TUTOR">TUTOR</option>
-                    <option value="OTHER">OTHER</option>
-                  </select>
+                <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3">
+                  <label className="grid gap-1 text-xs">
+                    <span className="text-subtle">Relación</span>
+                    <select
+                      className="select"
+                      value={g.relationship}
+                      onChange={(e) => onSetGuardianMeta(g.parentId, { relationship: e.target.value })}
+                    >
+                      <option value="MOTHER">Madre</option>
+                      <option value="FATHER">Padre</option>
+                      <option value="TUTOR">Tutor</option>
+                      <option value="OTHER">Otro</option>
+                    </select>
+                  </label>
 
-                  <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <label className="flex items-center gap-2 text-xs">
                     <input
                       type="checkbox"
                       checked={g.isPrimary}
                       onChange={(e) => onSetGuardianMeta(g.parentId, { isPrimary: e.target.checked })}
                     />
-                    Primary
+                    Principal
                   </label>
-
-                  <button onClick={() => onRemoveGuardian(g.parentId)}>Quitar del paciente</button>
                 </div>
               </li>
             ))}
           </ul>
         )}
 
-        <hr style={{ margin: "14px 0" }} />
+        <div className="border-t border-border pt-4">
+          <h3 className="font-semibold">Agregar padre o tutor</h3>
+          <p className="mt-1 text-sm text-subtle">
+            Vincula un usuario existente o crea uno nuevo con email.
+          </p>
 
-        <h3>Agregar padre/tutor</h3>
-        <p style={{ opacity: 0.85, fontSize: 14, marginTop: 6 }}>
-          Vincula un usuario que ya es padre/tutor en el sistema, o crea uno nuevo con email.
-        </p>
-
-        <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => setGuardianMode("existing")}
-            style={{
-              padding: "8px 12px",
-              fontWeight: guardianMode === "existing" ? 800 : 400,
-              opacity: guardianMode === "existing" ? 1 : 0.75,
-            }}
-          >
-            Elegir de la lista
-          </button>
-          <button
-            type="button"
-            onClick={() => setGuardianMode("new")}
-            style={{
-              padding: "8px 12px",
-              fontWeight: guardianMode === "new" ? 800 : 400,
-              opacity: guardianMode === "new" ? 1 : 0.75,
-            }}
-          >
-            Registrar nuevo
-          </button>
-        </div>
-
-        {guardianMode === "existing" ? (
-          <div style={{ marginTop: 14, display: "grid", gap: 10, maxWidth: 640 }}>
-            <label>Padre / tutor</label>
-            <select value={pickedParentId} onChange={(e) => setPickedParentId(e.target.value)}>
-              <option value="">— Seleccionar —</option>
-              {allParents.map((p) => (
-                <option key={p.id} value={p.id} disabled={assignedParentIds.has(p.id)}>
-                  {p.fullName} ({p.email})
-                </option>
-              ))}
-            </select>
-
-            <label>Relación</label>
-            <select value={gRel} onChange={(e) => setGRel(e.target.value as any)}>
-              <option value="MOTHER">MOTHER</option>
-              <option value="FATHER">FATHER</option>
-              <option value="TUTOR">TUTOR</option>
-              <option value="OTHER">OTHER</option>
-            </select>
-
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={gPrimary} onChange={(e) => setGPrimary(e.target.checked)} />
-              Marcar como Primary
-            </label>
-
-            <label>Notas (opcional)</label>
-            <input value={gNotes} onChange={(e) => setGNotes(e.target.value)} />
-
-            <button type="button" onClick={() => void onLinkExistingGuardian()}>
-              Asignar a este paciente
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={guardianMode === "existing" ? "btn-primary rounded-xl px-4 py-2 text-sm font-semibold" : "btn rounded-xl px-4 py-2 text-sm"}
+              onClick={() => setGuardianMode("existing")}
+            >
+              Elegir de la lista
+            </button>
+            <button
+              type="button"
+              className={guardianMode === "new" ? "btn-primary rounded-xl px-4 py-2 text-sm font-semibold" : "btn rounded-xl px-4 py-2 text-sm"}
+              onClick={() => setGuardianMode("new")}
+            >
+              Registrar nuevo
             </button>
           </div>
-        ) : (
-          <form onSubmit={onAddGuardian} style={{ display: "grid", gap: 10, maxWidth: 520, marginTop: 14 }}>
-            <label>Nombre completo</label>
-            <input value={gFullName} onChange={(e) => setGFullName(e.target.value)} required />
 
-            <label>Email</label>
-            <input value={gEmail} onChange={(e) => setGEmail(e.target.value)} required />
+          {guardianMode === "existing" ? (
+            <div className="mt-4 grid max-w-lg gap-3">
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Padre / tutor</span>
+                <select className="select" value={pickedParentId} onChange={(e) => setPickedParentId(e.target.value)}>
+                  <option value="">— Seleccionar —</option>
+                  {allParents.map((p) => (
+                    <option key={p.id} value={p.id} disabled={assignedParentIds.has(p.id)}>
+                      {p.fullName} ({p.email})
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <label>Relación</label>
-            <select value={gRel} onChange={(e) => setGRel(e.target.value as any)}>
-              <option value="MOTHER">MOTHER</option>
-              <option value="FATHER">FATHER</option>
-              <option value="TUTOR">TUTOR</option>
-              <option value="OTHER">OTHER</option>
-            </select>
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Relación</span>
+                <select className="select" value={gRel} onChange={(e) => setGRel(e.target.value as any)}>
+                  <option value="MOTHER">Madre</option>
+                  <option value="FATHER">Padre</option>
+                  <option value="TUTOR">Tutor</option>
+                  <option value="OTHER">Otro</option>
+                </select>
+              </label>
 
-            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input type="checkbox" checked={gPrimary} onChange={(e) => setGPrimary(e.target.checked)} />
-              Marcar como Primary
-            </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={gPrimary} onChange={(e) => setGPrimary(e.target.checked)} />
+                Marcar como principal
+              </label>
 
-            <label>Notas (opcional)</label>
-            <input value={gNotes} onChange={(e) => setGNotes(e.target.value)} />
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Notas (opcional)</span>
+                <input className="input" value={gNotes} onChange={(e) => setGNotes(e.target.value)} />
+              </label>
 
-            <button type="submit">Crear y asignar</button>
-          </form>
-        )}
+              <button type="button" className="btn-primary w-fit rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onLinkExistingGuardian()}>
+                Asignar a este paciente
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={onAddGuardian} className="mt-4 grid max-w-lg gap-3">
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Nombre completo</span>
+                <input className="input" value={gFullName} onChange={(e) => setGFullName(e.target.value)} required />
+              </label>
+
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Email</span>
+                <input className="input" type="email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} required />
+              </label>
+
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Relación</span>
+                <select className="select" value={gRel} onChange={(e) => setGRel(e.target.value as any)}>
+                  <option value="MOTHER">Madre</option>
+                  <option value="FATHER">Padre</option>
+                  <option value="TUTOR">Tutor</option>
+                  <option value="OTHER">Otro</option>
+                </select>
+              </label>
+
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={gPrimary} onChange={(e) => setGPrimary(e.target.checked)} />
+                Marcar como principal
+              </label>
+
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium">Notas (opcional)</span>
+                <input className="input" value={gNotes} onChange={(e) => setGNotes(e.target.value)} />
+              </label>
+
+              <button type="submit" className="btn-primary w-fit rounded-xl px-4 py-2 text-sm font-semibold">
+                Crear y asignar
+              </button>
+            </form>
+          )}
+        </div>
       </section>
 
       <PatientDocumentsPanel patientId={id} />
