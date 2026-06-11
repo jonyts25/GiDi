@@ -1,16 +1,16 @@
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
 import { buildCorsOptions } from "./cors-options";
-import { json, urlencoded } from "express";
 
 const BODY_LIMIT = "25mb";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
-  app.use(json({ limit: BODY_LIMIT }));
-  app.use(urlencoded({ limit: BODY_LIMIT, extended: true }));
+  app.useBodyParser("json", { limit: BODY_LIMIT });
+  app.useBodyParser("urlencoded", { limit: BODY_LIMIT, extended: true });
 
   app.enableCors(buildCorsOptions());
 
