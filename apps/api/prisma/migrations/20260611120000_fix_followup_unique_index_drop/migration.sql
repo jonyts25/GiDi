@@ -1,3 +1,4 @@
--- El índice único original fue truncado por Postgres a 63 caracteres (periodMont, no periodMonth).
--- La migración anterior usó nombre y tipo incorrectos (DROP CONSTRAINT), por lo que el índice siguió activo.
-DROP INDEX IF EXISTS "FollowUp_patientId_therapistId_areaId_periodYear_periodMont_key";
+-- Postgres truncó el identificador a 63 chars (periodMont). Es una CONSTRAINT, no un índice suelto.
+ALTER TABLE "FollowUp" DROP CONSTRAINT IF EXISTS "FollowUp_patientId_therapistId_areaId_periodYear_periodMont_key";
+-- Nombre completo por si la BD no truncó el identificador
+ALTER TABLE "FollowUp" DROP CONSTRAINT IF EXISTS "FollowUp_patientId_therapistId_areaId_periodYear_periodMonth_key";

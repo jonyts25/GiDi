@@ -7,6 +7,7 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const apiRoot = path.join(__dirname, "..");
+const FAILED_MIGRATION = "20260611120000_fix_followup_unique_index_drop";
 
 function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, {
@@ -20,8 +21,30 @@ function run(cmd, args, opts = {}) {
   }
 }
 
+function migrateDeploy() {
+  const r = spawnSync("npx", ["prisma", "migrate", "deploy"], {
+    stdio: "pipe",
+    cwd: apiRoot,
+    env: process.env,
+    encoding: "utf8",
+  });
+  const out = `${r.stdout || ""}${r.stderr || ""}`;
+  if (out) process.stderr.write(out);
+
+  if (r.status === 0) return;
+
+  if (out.includes("P3009") && out.includes(FAILED_MIGRATION)) {
+    console.log(`Recovering failed migration ${FAILED_MIGRATION}…`);
+    run("npx", ["prisma", "migrate", "resolve", "--rolled-back", FAILED_MIGRATION]);
+    migrateDeploy();
+    return;
+  }
+
+  process.exit(r.status ?? 1);
+}
+
 console.log("Running prisma migrate deploy...");
-run("npx", ["prisma", "migrate", "deploy"]);
+migrateDeploy();
 
 const candidates = [
   path.join(apiRoot, "dist", "main.js"),
