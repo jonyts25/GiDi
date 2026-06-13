@@ -30,7 +30,7 @@ export function NewFollowUpSessionForm(props: {
   const [ok, setOk] = useState("");
 
   function parseMultiDates(raw: string): string[] {
-    return [...new Set(raw.split(/[\n,;\s]+/).map((s) => s.trim()).filter(/^\d{4}-\d{2}-\d{2}$/.test))];
+    return [...new Set(raw.split(/[\n,;\s]+/).map((s) => s.trim()).filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s)))];
   }
 
   async function createSessions(dates: string[]) {

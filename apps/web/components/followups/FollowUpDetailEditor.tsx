@@ -81,7 +81,7 @@ export function FollowUpDetailEditor(props: {
   const objectives = useMemo(
     () =>
       objectivesText
-        .split("\n")
+        .split(/[\n,]+/)
         .map((s) => s.trim())
         .filter(Boolean),
     [objectivesText],
@@ -368,6 +368,7 @@ export function FollowUpDetailEditor(props: {
                 ))}
               </div>
             ) : null}
+            <p className="text-xs text-subtle">Una por línea o separadas por coma.</p>
             <textarea
               className="textarea min-h-[140px]"
               value={objectivesText}

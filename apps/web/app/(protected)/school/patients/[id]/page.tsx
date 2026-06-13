@@ -31,7 +31,13 @@ export default function SchoolPatientDetailPage() {
     <main className="container max-w-[820px] space-y-4 py-8">
       <Link className="btn inline-block" href="/school/patients">← Volver</Link>
       {msg ? <p className="text-sm text-danger">{msg}</p> : null}
-      {profile ? <PatientGeneralProfile profile={profile} /> : null}
+      {profile ? (
+        <PatientGeneralProfile
+          profile={profile}
+          followUpsHref={`/school/patients/${params.id}/followups`}
+          followUpsLabel="Seguimientos mensuales →"
+        />
+      ) : null}
     </main>
   );
 }

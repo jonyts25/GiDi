@@ -137,11 +137,10 @@ export default function ParentPatientFollowUpsPage() {
               </li>
             ))}
           </ul>
-        ) : (
-          <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onCreateFamiliar()}>
-            + Crear seguimiento familiar
-          </button>
-        )}
+        ) : null}
+        <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onCreateFamiliar()}>
+          {myRows.length ? "+ Crear otro seguimiento familiar" : "+ Crear seguimiento familiar"}
+        </button>
       </section>
 
       <SaveBanner message={msg} type={msg.includes("✅") ? "success" : "error"} />

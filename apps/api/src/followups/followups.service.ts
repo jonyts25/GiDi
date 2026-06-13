@@ -1,5 +1,5 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { FollowUpStatus } from "@prisma/client";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { FollowUpStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { CreateFollowUpDto } from "./dto/create-followup.dto";
 import { UpdateFollowUpDto } from "./dto/update-followup.dto";
@@ -350,32 +350,43 @@ export class FollowUpsService {
       },
     });
 
-    const created = await this.prisma.followUp.create({
-      data: {
-        patientId: dto.patientId,
-        therapistId,
-        areaId: dto.areaId,
-        periodYear: dto.periodYear,
-        periodMonth: dto.periodMonth,
-        generalGoal: dto.generalGoal ?? null,
-        generalNotes: dto.generalNotes ?? null,
-        homeWork: dto.homeWork ?? null,
-      },
-      select: { id: true },
-    });
+    let createdId: string;
+    try {
+      const created = await this.prisma.followUp.create({
+        data: {
+          patientId: dto.patientId,
+          therapistId,
+          areaId: dto.areaId,
+          periodYear: dto.periodYear,
+          periodMonth: dto.periodMonth,
+          generalGoal: dto.generalGoal ?? null,
+          generalNotes: dto.generalNotes ?? null,
+          homeWork: dto.homeWork ?? null,
+        },
+        select: { id: true },
+      });
+      createdId = created.id;
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        throw new ConflictException(
+          "Ya existe un seguimiento para este paciente, área y mes. Si la base de datos ya fue actualizada, intente de nuevo en unos minutos.",
+        );
+      }
+      throw e;
+    }
 
     const objectivesToCopy = prevFu ? objectivesEligibleForCarry(prevFu) : [];
     if (objectivesToCopy.length) {
       await this.prisma.followUpObjective.createMany({
         data: objectivesToCopy.map((o, i) => ({
-          followUpId: created.id,
+          followUpId: createdId,
           idx: i + 1,
           text: o.text,
         })),
       });
     }
 
-    return this.get(user, created.id);
+    return this.get(user, createdId);
   }
 
   async update(user: AuthUser, id: string, dto: UpdateFollowUpDto) {

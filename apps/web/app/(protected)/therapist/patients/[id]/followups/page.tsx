@@ -96,8 +96,8 @@ export default function TherapistPatientFollowUpsPage() {
           <h1 className="text-2xl font-bold">Seguimientos del paciente</h1>
           <p className="text-sm text-subtle">Solo verá y editará seguimientos a su nombre</p>
         </div>
-        <Link className="btn rounded-xl px-3 py-2 text-sm" href="/therapist/patients">
-          ← Mis pacientes
+        <Link className="btn rounded-xl px-3 py-2 text-sm" href={`/therapist/patients/${patientId}`}>
+          ← Perfil y documentos
         </Link>
       </div>
 

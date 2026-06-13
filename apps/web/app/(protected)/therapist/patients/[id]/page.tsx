@@ -43,6 +43,7 @@ export default function TherapistPatientDetailPage() {
           profile={profile}
           followUpsHref={`/therapist/patients/${id}/followups`}
           followUpsLabel="Seguimientos del mes →"
+          canUploadDocuments
         />
       ) : null}
     </main>

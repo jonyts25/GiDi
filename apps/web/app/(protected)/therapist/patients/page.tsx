@@ -52,11 +52,15 @@ export default function TherapistPatientsPage() {
         ) : items.length === 0 ? (
           <p className="sub">No tienes pacientes asignados.</p>
         ) : (
-          <ul style={{ paddingLeft: 18 }}>
+          <ul className="space-y-2 text-sm">
             {items.map((p) => (
-              <li key={p.id} style={{ marginBottom: 8 }}>
-                <Link href={`/therapist/patients/${p.id}/followups`} className="font-bold text-primary hover:underline">
+              <li key={p.id} className="flex flex-wrap items-center gap-2">
+                <Link href={`/therapist/patients/${p.id}`} className="font-bold text-primary hover:underline">
                   {p.firstName} {p.lastName}
+                </Link>
+                <span className="text-subtle">·</span>
+                <Link href={`/therapist/patients/${p.id}/followups`} className="text-sm text-subtle hover:text-primary">
+                  Seguimientos
                 </Link>
               </li>
             ))}

@@ -5,9 +5,11 @@ import { apiFetch } from "@/lib/api";
 
 import { prepareFileForUpload } from "@/lib/compress-upload";
 
+import { openDataUrlInNewTab } from "@/lib/open-data-url";
+
 const CATEGORY_LABELS: Record<string, string> = {
   EVALUACION: "Evaluación",
-  REVALORACION: "Revaloración",
+  REVALUACION: "Revaloración",
   SEGUIMIENTO_PADRES: "Seguimiento con papás",
 };
 
@@ -75,18 +77,14 @@ export function PatientDocumentsPanel({ patientId, canUpload = true }: { patient
       fileName: string;
       mimeType: string;
     };
-    if (data.mimeType === "application/pdf") {
-      const w = window.open();
-      if (w) w.location.href = data.dataUrl;
-      return;
-    }
-    const w = window.open();
-    if (w) {
-      w.document.write(`<title>${data.fileName}</title><img src="${data.dataUrl}" style="max-width:100%" />`);
+    try {
+      openDataUrlInNewTab(data.dataUrl, data.mimeType, data.fileName);
+    } catch (ex: unknown) {
+      setMsg(ex instanceof Error ? ex.message : "No se pudo abrir el archivo");
     }
   }
 
-  const grouped = ["EVALUACION", "REVALORACION", "SEGUIMIENTO_PADRES"].map((cat) => ({
+  const grouped = ["EVALUACION", "REVALUACION", "SEGUIMIENTO_PADRES"].map((cat) => ({
     cat,
     items: docs.filter((d) => d.category === cat),
   }));
