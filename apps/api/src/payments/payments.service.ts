@@ -102,8 +102,9 @@ export class PaymentsService {
       data: {
         sessionsPerWeek: dto.sessionsPerWeek ?? undefined,
         discountPercent: dto.discountPercent ?? undefined,
+        center: dto.center ?? undefined,
       },
-      select: { id: true, sessionsPerWeek: true, discountPercent: true },
+      select: { id: true, sessionsPerWeek: true, discountPercent: true, center: true },
     });
 
     return {

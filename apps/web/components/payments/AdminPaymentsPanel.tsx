@@ -14,6 +14,7 @@ import {
 } from "@/components/payments/payment-helpers";
 
 type PaymentsView = {
+  patient: { id: string; firstName: string; lastName: string; center: string };
   billing: { sessionsPerWeek: number | null; discountPercent: number; suggestedMonthly: number | null };
   totals: { totalPaid: number; outstanding: number };
   payments: PaymentRow[];
@@ -29,6 +30,7 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
 
   const [sessionsPerWeek, setSessionsPerWeek] = useState<string>("");
   const [discountPercent, setDiscountPercent] = useState<string>("0");
+  const [center, setCenter] = useState<string>("SAN_AGUSTIN");
 
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -45,6 +47,7 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
     setData(res);
     setSessionsPerWeek(res.billing.sessionsPerWeek ? String(res.billing.sessionsPerWeek) : "");
     setDiscountPercent(String(res.billing.discountPercent ?? 0));
+    setCenter(res.patient.center);
     if (!amountDue) setAmountDue(res.billing.suggestedMonthly != null ? String(res.billing.suggestedMonthly) : "");
   }, [patientId, amountDue]);
 
@@ -61,6 +64,7 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
         body: JSON.stringify({
           sessionsPerWeek: sessionsPerWeek ? Number(sessionsPerWeek) : 0,
           discountPercent: Number(discountPercent) || 0,
+          center,
         }),
       });
       setMsg(`✅ Cobro guardado · Mensualidad sugerida: ${res.suggestedMonthly != null ? formatMoney(res.suggestedMonthly) : "—"}`);
@@ -158,6 +162,13 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
       <div className="space-y-3 rounded-xl border border-border bg-surface/50 p-4">
         <h3 className="text-sm font-bold">Configuración de cobro</h3>
         <div className="flex flex-wrap items-end gap-3">
+          <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Sede</span>
+            <select className="select w-auto" value={center} onChange={(e) => setCenter(e.target.value)}>
+              <option value="SAN_AGUSTIN">San Agustín</option>
+              <option value="VALLARTA">Vallarta</option>
+            </select>
+          </label>
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Frecuencia</span>
             <select className="select w-auto" value={sessionsPerWeek} onChange={(e) => setSessionsPerWeek(e.target.value)}>
