@@ -20,9 +20,14 @@ describe("followup-metrics attendance", () => {
     expect(sessionAttendanceFromMarks([{ code: "X" }, { code: "X" }])).toBe("present");
   });
 
-  it("treats V and E as excluded from attendance percent", () => {
-    expect(sessionAttendanceFromMarks([{ code: "V" }])).toBe("excluded");
-    expect(sessionAttendanceFromMarks([{ code: "E" }])).toBe("excluded");
+  it("treats V, E and F as absences", () => {
+    expect(sessionAttendanceFromMarks([{ code: "V" }])).toBe("absent");
+    expect(sessionAttendanceFromMarks([{ code: "E" }])).toBe("absent");
+    expect(sessionAttendanceFromMarks([{ code: "F" }])).toBe("absent");
+  });
+
+  it("treats R (reposición) as present", () => {
+    expect(sessionAttendanceFromMarks([{ code: "R" }])).toBe("present");
   });
 
   it("includes scale-only sessions in attendance percent", () => {
@@ -36,13 +41,13 @@ describe("followup-metrics attendance", () => {
     expect(result.percent).toBe(67);
   });
 
-  it("keeps excluded sessions out of the denominator", () => {
+  it("counts V/E/F in the denominator as absences", () => {
     const result = computeAttendancePercent([
       { sessionDate: "2026-01-05", marks: [{ code: "V" }] },
       { sessionDate: "2026-01-12", marks: [{ progressScale: 2 }] },
     ]);
-    expect(result.excluded).toBe(1);
+    expect(result.absent).toBe(1);
     expect(result.present).toBe(1);
-    expect(result.percent).toBe(100);
+    expect(result.percent).toBe(50);
   });
 });

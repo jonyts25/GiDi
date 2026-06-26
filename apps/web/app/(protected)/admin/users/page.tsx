@@ -17,9 +17,12 @@ type UserRow = {
 const roles = ["THERAPIST", "PARENT", "SCHOOL", "ADMIN"] as const;
 type RoleKey = (typeof roles)[number];
 
+type StatusFilter = "ACTIVE" | "INACTIVE" | "ALL";
+
 export default function AdminUsersPage() {
   const router = useRouter();
   const [role, setRole] = useState<RoleKey>("PARENT");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
   const [items, setItems] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
@@ -85,7 +88,27 @@ export default function AdminUsersPage() {
     }
   }
 
-  const filtered = useMemo(() => items, [items]);
+  const filtered = useMemo(
+    () => (statusFilter === "ALL" ? items : items.filter((u) => u.status === statusFilter)),
+    [items, statusFilter],
+  );
+
+  async function onToggleStatus(u: UserRow) {
+    const next = u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    setMsg("");
+    try {
+      await apiFetch(`/admin/users/${u.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: next }),
+      });
+      setItems((prev) => prev.map((it) => (it.id === u.id ? { ...it, status: next } : it)));
+      setMsgType("success");
+      setMsg(next === "INACTIVE" ? "✅ Perfil marcado como inactivo" : "✅ Perfil reactivado");
+    } catch (e: unknown) {
+      setMsgType("error");
+      setMsg(e instanceof Error ? e.message : "Error");
+    }
+  }
 
   return (
     <main style={{ paddingTop: 18 }}>
@@ -120,6 +143,12 @@ export default function AdminUsersPage() {
               <option key={r} value={r}>{r}</option>
             ))}
           </select>
+          <label className="sub">Estado</label>
+          <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
+            <option value="ACTIVE">Activos</option>
+            <option value="INACTIVE">Inactivos</option>
+            <option value="ALL">Todos</option>
+          </select>
         </div>
 
         <SaveBanner message={msg} type={msgType} />
@@ -147,8 +176,11 @@ export default function AdminUsersPage() {
                     <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3" }}>
                       {(u.roles ?? []).map((r) => r.role.key).join(", ") || "-"}
                     </td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3" }}>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3", display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <Link className="btn" href={`/admin/users/${u.id}`}>Ver / Editar</Link>
+                      <button type="button" className="btn" onClick={() => void onToggleStatus(u)}>
+                        {u.status === "ACTIVE" ? "Desactivar" : "Reactivar"}
+                      </button>
                     </td>
                   </tr>
                 ))}

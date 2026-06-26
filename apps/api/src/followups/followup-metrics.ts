@@ -10,11 +10,12 @@ export type SessionInput = {
   marks: SessionMarkInput[];
 };
 
-/** Vacaciones, enfermedad y reposición no entran al cálculo de asistencia. */
-const EXCLUDED_ATTENDANCE_CODES = new Set<string>(["V", "E", "R"]);
-const PRESENT_CODES = new Set<string>(["A", "OK"]);
-/** Falta del niño (inasistencia). X = no se trabajó el objetivo, NO es falta. */
-const ABSENT_CODES = new Set<string>(["F"]);
+/** Ya no se excluye ningún código del cálculo de asistencia. */
+const EXCLUDED_ATTENDANCE_CODES = new Set<string>([]);
+/** Asistió: A/OK (asistencia), R (reposición, sí asistió). */
+const PRESENT_CODES = new Set<string>(["A", "OK", "R"]);
+/** Faltas: V (vacaciones), E (enfermedad), F (falta). */
+const ABSENT_CODES = new Set<string>(["V", "E", "F"]);
 /** X indica objetivo no trabajado pero el niño asistió. */
 const OBJECTIVE_NOT_WORKED = "X";
 

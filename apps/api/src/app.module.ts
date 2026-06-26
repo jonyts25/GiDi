@@ -14,6 +14,8 @@ import { AreasModule } from "./areas/areas.module";
 import { FollowUpsModule } from "./followups/followups.module";
 import { ObjectiveBankModule } from "./objective-bank/objective-bank.module";
 import { MetaWhatsappModule } from "./meta-whatsapp/meta-whatsapp.module";
+import { AnnouncementsModule } from "./announcements/announcements.module";
+import { PaymentsModule } from "./payments/payments.module";
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { MetaWhatsappModule } from "./meta-whatsapp/meta-whatsapp.module";
     FollowUpsModule,
     ObjectiveBankModule,
     MetaWhatsappModule,
+    AnnouncementsModule,
+    PaymentsModule,
   ],
   controllers: [AppController,],
   providers : [AppService],

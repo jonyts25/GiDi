@@ -1,9 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PatientDocumentCategory } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
 
 const MAX_BYTES = 20 * 1024 * 1024;
+
+function isAdminUser(user: AuthUser): boolean {
+  return user.roles.some((r) => r === "ADMIN" || r === "SUPERADMIN");
+}
 
 @Injectable()
 export class PatientDocumentsService {
@@ -34,6 +38,18 @@ export class PatientDocumentsService {
   ) {
     const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
+
+    // Las terapeutas solo pueden subir archivos en "Seguimiento con papás".
+    if (
+      !isAdminUser(user) &&
+      user.roles.includes("THERAPIST") &&
+      !user.roles.includes("PARENT") &&
+      category !== PatientDocumentCategory.SEGUIMIENTO_PADRES
+    ) {
+      throw new ForbiddenException(
+        "Las terapeutas solo pueden subir archivos en el apartado de Seguimiento con papás.",
+      );
+    }
 
     if (!dataUrl.startsWith("data:")) {
       throw new BadRequestException("Formato de archivo inválido");
@@ -78,8 +94,8 @@ export class PatientDocumentsService {
       where: { id: docId, patientId },
     });
     if (!doc) throw new NotFoundException("Documento no encontrado");
-    if (!isAdmin && doc.uploadedById !== user.sub) {
-      throw new BadRequestException("No puede eliminar este documento");
+    if (!isAdmin) {
+      throw new ForbiddenException("Solo un administrador puede eliminar archivos.");
     }
     await this.prisma.patientDocument.delete({ where: { id: docId } });
     return { ok: true };

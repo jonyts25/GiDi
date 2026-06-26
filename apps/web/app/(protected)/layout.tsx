@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { AnnouncementBanner } from "@/components/announcements/AnnouncementBanner";
 
 function getUser() {
   if (typeof window === "undefined") return null;
@@ -52,7 +53,11 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   }
 
   const nav = roles.includes("ADMIN")
-    ? [{ href: "/admin/patients", label: "Pacientes" }]
+    ? [
+        { href: "/admin/patients", label: "Pacientes" },
+        { href: "/admin/announcements", label: "Avisos" },
+        { href: "/admin/payments", label: "Ingresos" },
+      ]
     : roles.includes("THERAPIST")
       ? [
           { href: "/therapist/followups", label: "Seguimientos" },
@@ -118,6 +123,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
+
+      <AnnouncementBanner />
 
       <div className="container pb-10">{children}</div>
     </>

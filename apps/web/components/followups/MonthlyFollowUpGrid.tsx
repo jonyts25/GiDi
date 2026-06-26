@@ -12,7 +12,7 @@ type Session = {
 };
 type Objective = { id: string; idx: number; text: string; monthlyNotes?: string | null };
 
-const LETTERS = ["A", "V", "E", "F", "R", "X"] as const;
+const LETTERS = ["V", "E", "F", "R", "X"] as const;
 const ARCHIVED_OBJECTIVE_IDX = 1000;
 
 function cellKey(sessionId: string, objectiveId: string) {

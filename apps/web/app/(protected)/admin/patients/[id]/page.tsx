@@ -5,6 +5,7 @@ import { apiFetch } from "../../../../../lib/api";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PatientDocumentsPanel } from "@/components/patients/PatientDocumentsPanel";
+import { AdminPaymentsPanel } from "@/components/payments/AdminPaymentsPanel";
 import { SaveBanner } from "@/components/ui/SaveBanner";
 
 type MiniUser = { id: string; fullName: string; email: string; status: "ACTIVE" | "INACTIVE" };
@@ -561,6 +562,10 @@ export default function AdminPatientDetail() {
           )}
         </div>
       </section>
+
+      <div className="mt-6">
+        <AdminPaymentsPanel patientId={id} />
+      </div>
 
       <PatientDocumentsPanel patientId={id} />
     </main>

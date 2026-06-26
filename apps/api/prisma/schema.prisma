@@ -30,6 +30,10 @@ model User {
 
   patientDocumentsUploaded PatientDocument[] @relation("PatientDocumentUploader")
 
+  announcementsCreated Announcement[] @relation("AnnouncementAuthor")
+
+  paymentsCreated Payment[] @relation("PaymentCreatedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -76,12 +80,17 @@ model Patient {
   notes     String?
   center    GidiCenter @default(SAN_AGUSTIN)
 
+  // Configuración de cobro (mensualidad por frecuencia + descuento opcional).
+  sessionsPerWeek Int?
+  discountPercent Int? @default(0)
+
   parents     ParentPatient[]
   assignments PatientTherapist[]
   schools     SchoolPatient[]
 
   followUps FollowUp[]
   documents PatientDocument[]
+  payments  Payment[]
 
   appointmentRequests AppointmentRequest[]
 
@@ -244,6 +253,11 @@ model FollowUp {
   parentComments String?
   observationsAuthor String?
 
+  // Audiencia: a quién se publica el seguimiento (el admin siempre ve).
+  visibleToParent    Boolean @default(true)
+  visibleToTherapist Boolean @default(true)
+  visibleToSchool    Boolean @default(false)
+
   status FollowUpStatus @default(DRAFT)
 
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -379,6 +393,68 @@ model AppointmentRequest {
   createdAt     DateTime  @default(now())
 
   patient Patient? @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+enum PaymentStatus {
+  PENDIENTE
+  PAGADO
+  PARCIAL
+  DEUDA
+}
+
+/// Mensualidad de un paciente por mes.
+model Payment {
+  id          String @id @default(uuid()) @db.Uuid
+  patientId   String @db.Uuid
+  periodYear  Int
+  periodMonth Int
+
+  /// Monto esperado del mes (mensualidad - descuento, o proporcional). En pesos.
+  amountDue  Int
+  /// Monto efectivamente pagado. En pesos.
+  amountPaid Int           @default(0)
+  status     PaymentStatus @default(PENDIENTE)
+
+  paidAt    DateTime?
+  method    String?
+  reference String?
+  notes     String?
+
+  /// Comprobante de pago subido por el papá (data URL).
+  receiptUrl        String?   @db.Text
+  receiptName       String?
+  receiptUploadedAt DateTime?
+
+  createdById String? @db.Uuid
+
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("PaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([patientId, periodYear, periodMonth])
+  @@index([patientId])
+  @@index([periodYear, periodMonth])
+  @@index([status])
+}
+
+/// Avisos generales publicados por administración a uno o varios roles.
+model Announcement {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String
+  body        String    @db.Text
+  /// Roles que pueden ver el aviso. Vacío = todos los roles.
+  audience    RoleKey[] @default([])
+  isActive    Boolean   @default(true)
+  createdById String    @db.Uuid
+
+  createdBy User @relation("AnnouncementAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
 }
 
 model WhatsAppContactState {

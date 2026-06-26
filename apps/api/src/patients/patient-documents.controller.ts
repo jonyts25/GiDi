@@ -47,7 +47,7 @@ export class PatientDocumentsController {
   }
 
   @Delete(":docId")
-  @Roles("ADMIN", "PARENT")
+  @Roles("ADMIN")
   async remove(
     @CurrentUser() user: AuthUser,
     @Param("patientId") patientId: string,

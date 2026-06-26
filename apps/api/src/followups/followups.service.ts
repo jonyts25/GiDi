@@ -116,8 +116,15 @@ export class FollowUpsService {
     const periodYear = year ?? now.getFullYear();
     const periodMonth = month ?? now.getMonth() + 1;
 
+    // Audiencia: papás solo ven los marcados para papás; escuela los marcados para escuela; admin ve todo.
+    const visibilityFilter = this.access.isAdmin(user)
+      ? {}
+      : user.roles.includes("SCHOOL")
+        ? { visibleToSchool: true }
+        : { visibleToParent: true };
+
     const followUps = await this.prisma.followUp.findMany({
-      where: { patientId, periodYear, periodMonth, status: FollowUpStatus.CLOSED },
+      where: { patientId, periodYear, periodMonth, status: FollowUpStatus.CLOSED, ...visibilityFilter },
       include: {
         area: { select: { id: true, key: true, name: true, trackingMode: true } },
         therapist: { select: { id: true, fullName: true } },
@@ -148,6 +155,8 @@ export class FollowUpsService {
     id: string;
     periodYear: number;
     periodMonth: number;
+    createdAt: Date;
+    updatedAt: Date;
     generalNotes: string | null;
     homeWork: string | null;
     parentComments: string | null;
@@ -187,6 +196,8 @@ export class FollowUpsService {
       parentComments: fu.parentComments,
       observationsAuthor: fu.observationsAuthor,
       sessionCount: fu.sessions.length,
+      createdAt: fu.createdAt,
+      updatedAt: fu.updatedAt,
     };
   }
 
@@ -411,6 +422,9 @@ export class FollowUpsService {
         parentComments: dto.parentComments ?? undefined,
         observationsAuthor: dto.observationsAuthor ?? undefined,
         status: dto.status ?? undefined,
+        visibleToParent: dto.visibleToParent ?? undefined,
+        visibleToTherapist: dto.visibleToTherapist ?? undefined,
+        visibleToSchool: dto.visibleToSchool ?? undefined,
       },
     });
     return this.get(user, id);

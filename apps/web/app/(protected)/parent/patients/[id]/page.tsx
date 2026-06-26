@@ -39,11 +39,19 @@ export default function ParentPatientDetailPage() {
       {msg ? <p className="text-sm text-danger">{msg}</p> : null}
       {!profile && !msg ? <p className="text-subtle">Cargando…</p> : null}
       {profile ? (
-        <PatientGeneralProfile
-          profile={profile}
-          followUpsHref={`/parent/patients/${id}/followups`}
-          followUpsLabel="Ver progreso y seguimiento familiar →"
-        />
+        <>
+          <Link
+            className="btn inline-flex rounded-xl px-4 py-2 text-sm font-semibold"
+            href={`/parent/patients/${id}/payments`}
+          >
+            Ver mensualidades y pagos →
+          </Link>
+          <PatientGeneralProfile
+            profile={profile}
+            followUpsHref={`/parent/patients/${id}/followups`}
+            followUpsLabel="Ver progreso y seguimiento familiar →"
+          />
+        </>
       ) : null}
     </main>
   );

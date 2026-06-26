@@ -28,6 +28,8 @@ export type ParentFollowUpCardData = {
   homeWork: string | null;
   observationsAuthor: string | null;
   sessionCount: number;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
 function ProgressRing({ percent }: { percent: number | null }) {
@@ -83,6 +85,11 @@ export function ParentFollowUpSummaryCard({ data }: { data: ParentFollowUpCardDa
             {isTextOnly ? `Registrado por: ${authorLabel}` : `Terapeuta: ${data.therapist.fullName}`}
           </p>
           <p className="mt-1 text-xs text-subtle">{data.sessionCount} sesión(es) registrada(s) este mes</p>
+          {data.createdAt ? (
+            <p className="mt-0.5 text-xs text-subtle">
+              Subido el {new Date(data.createdAt).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })}
+            </p>
+          ) : null}
         </div>
         {!isTextOnly ? (
           <div className="text-center">
@@ -90,7 +97,6 @@ export function ParentFollowUpSummaryCard({ data }: { data: ParentFollowUpCardDa
             <ProgressRing percent={data.attendance.percent} />
             <p className="mt-1 text-xs text-subtle">
               {data.attendance.present} presente(s) · {data.attendance.absent} falta(s)
-              {data.attendance.excluded > 0 ? ` · ${data.attendance.excluded} no cuenta(n) (V/E/R)` : ""}
             </p>
           </div>
         ) : null}

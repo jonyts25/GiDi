@@ -33,6 +33,9 @@ export type FollowUpDetail = {
   parentComments: string | null;
   observationsAuthor: string | null;
   status: string;
+  visibleToParent?: boolean;
+  visibleToTherapist?: boolean;
+  visibleToSchool?: boolean;
   area: Area;
   patient?: { id: string; firstName: string; lastName: string };
   therapist?: { id: string; fullName: string; email: string };
@@ -77,6 +80,9 @@ export function FollowUpDetailEditor(props: {
   const [parentComments, setParentComments] = useState("");
   const [observationsAuthor, setObservationsAuthor] = useState("");
   const [objectivesText, setObjectivesText] = useState("");
+  const [visibleToParent, setVisibleToParent] = useState(true);
+  const [visibleToTherapist, setVisibleToTherapist] = useState(true);
+  const [visibleToSchool, setVisibleToSchool] = useState(false);
 
   const objectives = useMemo(
     () =>
@@ -116,6 +122,9 @@ export function FollowUpDetailEditor(props: {
       data.observationsAuthor ?? readLoggedUser()?.fullName ?? "",
     );
     setGeneralNotes(data.generalNotes ?? data.generalGoal ?? "");
+    setVisibleToParent(data.visibleToParent ?? true);
+    setVisibleToTherapist(data.visibleToTherapist ?? true);
+    setVisibleToSchool(data.visibleToSchool ?? false);
     setObjectivesText(
       (data.objectives ?? [])
         .filter((o) => o.idx < 1000)
@@ -208,6 +217,22 @@ export function FollowUpDetailEditor(props: {
     try {
       await apiFetch(`/followups/${followUpId}`, { method: "DELETE" });
       router.push(resolvedBackHref);
+    } catch (e: unknown) {
+      setMsgType("error");
+      setMsg(e instanceof Error ? e.message : "Error");
+    }
+  }
+
+  async function onSaveAudience() {
+    setMsg("");
+    try {
+      await apiFetch(`/followups/${followUpId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ visibleToParent, visibleToTherapist, visibleToSchool }),
+      });
+      await reload();
+      setMsgType("success");
+      setMsg("✅ Audiencia actualizada");
     } catch (e: unknown) {
       setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");
@@ -308,6 +333,34 @@ export function FollowUpDetailEditor(props: {
       </div>
 
       <SaveBanner message={msg} type={msgType} />
+
+      {isAdmin ? (
+        <section className="card space-y-3 border-l-4 border-l-accent-blue">
+          <div>
+            <h2 className="text-lg font-semibold">¿Quién puede ver este seguimiento?</h2>
+            <p className="text-sm text-subtle">
+              El administrador siempre lo ve. Puede cambiar la audiencia aun después de publicado.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={visibleToParent} onChange={(e) => setVisibleToParent(e.target.checked)} />
+              Papás
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={visibleToTherapist} onChange={(e) => setVisibleToTherapist(e.target.checked)} />
+              Terapeutas
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={visibleToSchool} onChange={(e) => setVisibleToSchool(e.target.checked)} />
+              Escuela
+            </label>
+          </div>
+          <button type="button" className="btn rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onSaveAudience()}>
+            Guardar audiencia
+          </button>
+        </section>
+      ) : null}
 
       {isLocked ? (
         <p className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm">

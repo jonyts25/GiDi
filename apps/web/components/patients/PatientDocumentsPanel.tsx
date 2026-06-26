@@ -16,6 +16,16 @@ const CATEGORY_LABELS: Record<string, string> = {
 const UPLOAD_HINT =
   "Formatos permitidos: JPG, PNG, WEBP o PDF · Máximo 20 MB · Las fotos se comprimen automáticamente al subir.";
 
+function getRoles(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("gidi_user");
+    return raw ? (JSON.parse(raw).roles ?? []) : [];
+  } catch {
+    return [];
+  }
+}
+
 type DocRow = {
   id: string;
   category: string;
@@ -26,8 +36,14 @@ type DocRow = {
 };
 
 export function PatientDocumentsPanel({ patientId, canUpload = true }: { patientId: string; canUpload?: boolean }) {
+  const roles = getRoles();
+  const isAdmin = roles.includes("ADMIN") || roles.includes("SUPERADMIN");
+  // Las terapeutas (que no son admin/papá) solo suben en "Seguimiento con papás".
+  const therapistOnly = !isAdmin && roles.includes("THERAPIST") && !roles.includes("PARENT");
+  const uploadCategories = therapistOnly ? (["SEGUIMIENTO_PADRES"] as const) : (["EVALUACION", "REVALUACION", "SEGUIMIENTO_PADRES"] as const);
+
   const [docs, setDocs] = useState<DocRow[]>([]);
-  const [category, setCategory] = useState("EVALUACION");
+  const [category, setCategory] = useState<string>(therapistOnly ? "SEGUIMIENTO_PADRES" : "EVALUACION");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -71,6 +87,18 @@ export function PatientDocumentsPanel({ patientId, canUpload = true }: { patient
     }
   }
 
+  async function onDelete(docId: string, fileName: string) {
+    if (!window.confirm(`¿Eliminar «${fileName}»? Esta acción no se puede deshacer.`)) return;
+    setMsg("");
+    try {
+      await apiFetch(`/patients/${patientId}/documents/${docId}`, { method: "DELETE" });
+      setMsg(`🗑️ «${fileName}» eliminado`);
+      await reload();
+    } catch (ex: unknown) {
+      setMsg(ex instanceof Error ? ex.message : "Error al eliminar");
+    }
+  }
+
   async function openDoc(docId: string) {
     const data = (await apiFetch(`/patients/${patientId}/documents/${docId}/file`)) as {
       dataUrl: string;
@@ -99,9 +127,9 @@ export function PatientDocumentsPanel({ patientId, canUpload = true }: { patient
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-subtle">Apartado</span>
               <select className="select w-auto min-w-[12rem]" value={category} onChange={(e) => setCategory(e.target.value)}>
-                {Object.entries(CATEGORY_LABELS).map(([k, label]) => (
+                {uploadCategories.map((k) => (
                   <option key={k} value={k}>
-                    {label}
+                    {CATEGORY_LABELS[k]}
                   </option>
                 ))}
               </select>
@@ -153,9 +181,20 @@ export function PatientDocumentsPanel({ patientId, canUpload = true }: { patient
                   <span className="text-xs text-subtle">
                     {new Date(d.createdAt).toLocaleString("es-MX")} · {d.uploadedBy.fullName}
                   </span>
-                  <button type="button" className="btn rounded-lg px-2 py-1 text-xs" onClick={() => void openDoc(d.id)}>
-                    Ver
-                  </button>
+                  <span className="flex items-center gap-2">
+                    <button type="button" className="btn rounded-lg px-2 py-1 text-xs" onClick={() => void openDoc(d.id)}>
+                      Ver
+                    </button>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        className="rounded-lg border border-danger/40 px-2 py-1 text-xs text-danger hover:bg-danger/10"
+                        onClick={() => void onDelete(d.id, d.fileName)}
+                      >
+                        Eliminar
+                      </button>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ul>

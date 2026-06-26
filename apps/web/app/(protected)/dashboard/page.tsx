@@ -40,6 +40,8 @@ export default function Dashboard() {
           <Link className="btn" href="/admin/parents">Padres</Link>
           <Link className="btn" href="/admin/schools">Escuelas</Link>
           <Link className="btn" href="/admin/users">Usuarios</Link>
+          <Link className="btn" href="/admin/announcements">Avisos</Link>
+          <Link className="btn" href="/admin/payments">Ingresos</Link>
         </div>
       </main>
     );

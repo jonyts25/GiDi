@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsEnum, IsOptional, IsString } from "class-validator";
 import { FollowUpStatus } from "@prisma/client";
 
 export class UpdateFollowUpDto {
@@ -25,4 +25,16 @@ export class UpdateFollowUpDto {
   @IsOptional()
   @IsEnum(FollowUpStatus)
   status?: FollowUpStatus;
+
+  @IsOptional()
+  @IsBoolean()
+  visibleToParent?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  visibleToTherapist?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  visibleToSchool?: boolean;
 }
