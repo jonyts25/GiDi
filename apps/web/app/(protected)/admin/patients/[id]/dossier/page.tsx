@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { PatientDossierPrint } from "@/components/followups/PatientDossierPrint";
 import type { PatientDossierReport } from "@/lib/followup-report.types";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 export default function AdminPatientDossierPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function AdminPatientDossierPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {

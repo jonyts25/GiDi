@@ -6,7 +6,7 @@ import { PrismaService } from "../prisma.service";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 
 @UseGuards(JwtGuard, RolesGuard)
-@Roles("ADMIN")
+@Roles("ADMIN", "SECRETARY")
 @Controller("admin/schools")
 export class AdminSchoolsController {
   constructor(private prisma: PrismaService) {}

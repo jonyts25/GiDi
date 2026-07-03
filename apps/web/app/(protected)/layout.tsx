@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { AnnouncementBanner } from "@/components/announcements/AnnouncementBanner";
+import { GiDiLogo } from "@/components/branding/GiDiLogo";
+import { canViewRevenueOverview, hasFullAdminRole, hasOfficeStaffRole, primaryRoleLabel } from "@/lib/role-permissions";
 
 function getUser() {
   if (typeof window === "undefined") return null;
@@ -18,15 +20,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<any>(null);
 
   const roles = useMemo(() => (user?.roles ?? []) as string[], [user]);
-  const roleLabel = roles.includes("ADMIN")
-    ? "ADMIN"
-    : roles.includes("THERAPIST")
-      ? "THERAPIST"
-      : roles.includes("PARENT")
-        ? "PARENT"
-        : roles.includes("SCHOOL")
-          ? "SCHOOL"
-          : "USER";
+  const roleLabel = primaryRoleLabel(roles);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -52,11 +46,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
     router.replace("/");
   }
 
-  const nav = roles.includes("ADMIN")
+  const nav = hasOfficeStaffRole(roles)
     ? [
         { href: "/admin/patients", label: "Pacientes" },
+        { href: "/admin/patients/discharged", label: "Bajas" },
         { href: "/admin/announcements", label: "Avisos" },
-        { href: "/admin/payments", label: "Ingresos" },
+        ...(canViewRevenueOverview(roles) ? [{ href: "/admin/payments", label: "Ingresos" }] : []),
+        ...(hasFullAdminRole(roles) ? [{ href: "/admin/branding", label: "Logo" }] : []),
       ]
     : roles.includes("THERAPIST")
       ? [
@@ -82,11 +78,8 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container flex flex-wrap items-center justify-between gap-3 py-3">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <Link
-              href="/dashboard"
-              className="text-lg font-extrabold tracking-wide text-primary hover:text-primary-hover"
-            >
-              GiDi
+            <Link href="/dashboard" className="flex items-center">
+              <GiDiLogo variant="header" />
             </Link>
             <span className="rounded-full border border-accent-yellow/35 bg-accent-yellow/15 px-2.5 py-0.5 text-xs font-semibold text-accent-yellow">
               {roleLabel}

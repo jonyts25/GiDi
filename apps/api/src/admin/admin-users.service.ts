@@ -4,6 +4,8 @@ import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { Prisma, RoleKey, UserStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+import { AuthUser } from "../auth/auth-user";
+import { userHasFullAdminRole } from "../auth/role-permissions";
 
 function randomPassword(len = 12) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -107,8 +109,17 @@ export class AdminUsersService {
     return u;
   }
 
-  async update(id: string, dto: UpdateUserDto) {
-    await this.get(id); // fuerza 404 limpio si no existe
+  async update(id: string, dto: UpdateUserDto, actor?: AuthUser) {
+    const current = await this.get(id); // fuerza 404 limpio si no existe
+
+    if (
+      current.status === UserStatus.INACTIVE &&
+      dto.status === UserStatus.ACTIVE &&
+      actor &&
+      !userHasFullAdminRole(actor)
+    ) {
+      throw new BadRequestException("Solo administración puede reactivar perfiles inactivos");
+    }
 
     try {
       const updated = await this.prisma.user.update({

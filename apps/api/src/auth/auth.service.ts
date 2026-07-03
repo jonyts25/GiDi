@@ -3,6 +3,8 @@ import * as bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { PrismaService } from "../prisma.service";
 
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
 /**
  * Login GiDi: usuario en Postgres vía Prisma (tabla `User`), no Supabase Auth.
  * Contraseñas con hash bcrypt/bcryptjs (`$2a$` / `$2b$` / `$2y$`); compatibilidad con texto plano solo para datos legacy.
@@ -35,6 +37,15 @@ export class AuthService {
       throw new UnauthorizedException("Credenciales inválidas");
     }
 
+    const lastActivity = user.lastLoginAt ?? user.updatedAt ?? user.createdAt;
+    if (lastActivity && Date.now() - lastActivity.getTime() > ONE_YEAR_MS) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { status: "INACTIVE" },
+      });
+      throw new UnauthorizedException("Perfil inactivo. Solicita reactivación a administración.");
+    }
+
     if (!(await this.passwordMatches(normalizedPassword, user.password))) {
       throw new UnauthorizedException("Credenciales inválidas");
     }
@@ -47,6 +58,11 @@ export class AuthService {
       secret,
       { expiresIn: "7d" },
     );
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     return {
       token,

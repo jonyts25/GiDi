@@ -11,7 +11,7 @@ export class SchoolPortalService {
 
   async listMyPatients(schoolId: string) {
     const rows = await this.prisma.schoolPatient.findMany({
-      where: { schoolId },
+      where: { schoolId, patient: { status: "ACTIVE" } },
       include: {
         patient: {
           select: {
@@ -38,7 +38,7 @@ export class SchoolPortalService {
 
   async getPatient(schoolId: string, patientId: string) {
     const link = await this.prisma.schoolPatient.findFirst({
-      where: { schoolId, patientId },
+      where: { schoolId, patientId, patient: { status: "ACTIVE" } },
     });
     if (!link) throw new NotFoundException("Paciente no vinculado a esta escuela");
     return this.profiles.build(patientId);

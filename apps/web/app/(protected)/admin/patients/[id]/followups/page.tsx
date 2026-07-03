@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { filterAreasForUserRoles } from "@/lib/area-permissions";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type Therapist = { id: string; fullName: string; email: string };
@@ -26,6 +27,7 @@ export default function AdminPatientFollowUpsPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [allMonths, setAllMonths] = useState(false);
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
@@ -43,7 +45,7 @@ export default function AdminPatientFollowUpsPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {
@@ -65,7 +67,8 @@ export default function AdminPatientFollowUpsPage() {
   async function load() {
     setMsg("");
     try {
-      const r = await apiFetch(`/patients/${patientId}/followups?year=${year}&month=${month}`);
+      const url = allMonths ? `/patients/${patientId}/followups` : `/patients/${patientId}/followups?year=${year}&month=${month}`;
+      const r = await apiFetch(url);
       setRows(r);
     } catch (e: any) {
       setMsg(e.message);
@@ -75,7 +78,7 @@ export default function AdminPatientFollowUpsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId, year, month]);
+  }, [patientId, year, month, allMonths]);
 
   async function onCreate() {
     setMsg("");
@@ -101,7 +104,7 @@ export default function AdminPatientFollowUpsPage() {
     <main style={{ maxWidth: 980, margin: "30px auto", padding: 16 }}>
       <div className="row">
         <div>
-          <div className="h1">Seguimientos (FollowUps)</div>
+          <div className="h1">Seguimientos</div>
           <p className="sub">Paciente: {patientId}</p>
         </div>
         <Link className="btn" href={`/admin/patients/${patientId}`}>← Volver al paciente</Link>
@@ -118,6 +121,10 @@ export default function AdminPatientFollowUpsPage() {
                 <option key={i + 1} value={i + 1}>{i + 1}</option>
               ))}
             </select>
+            <label className="sub" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+              <input type="checkbox" checked={allMonths} onChange={(e) => setAllMonths(e.target.checked)} />
+              Ver todos los meses
+            </label>
           </div>
           <button className="btn" onClick={load}>Refrescar</button>
         </div>
@@ -152,16 +159,17 @@ export default function AdminPatientFollowUpsPage() {
       </section>
 
       <section className="card" style={{ marginTop: 14 }}>
-        <div className="h2">Follow-ups del periodo</div>
+        <div className="h2">Seguimientos del periodo</div>
         {rows.length === 0 ? (
-          <p className="sub">No hay follow-ups para este mes.</p>
+          <p className="sub">No hay seguimientos para {allMonths ? "mostrar" : "este mes"}.</p>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ textAlign: "left" }}>
                 <th style={{ padding: 8 }}>Área</th>
+                {allMonths ? <th style={{ padding: 8 }}>Mes</th> : null}
                 <th style={{ padding: 8 }}>Terapeuta</th>
-                <th style={{ padding: 8 }}>Status</th>
+                <th style={{ padding: 8 }}>Estado</th>
                 <th style={{ padding: 8 }}>Creado</th>
                 <th style={{ padding: 8 }}></th>
               </tr>
@@ -170,8 +178,13 @@ export default function AdminPatientFollowUpsPage() {
               {rows.map((r) => (
                 <tr key={r.id} style={{ borderTop: "1px solid #eee" }}>
                   <td style={{ padding: 8 }}>{r.area?.name}</td>
+                  {allMonths ? (
+                    <td style={{ padding: 8 }}>
+                      {new Date(r.periodYear, r.periodMonth - 1, 1).toLocaleDateString("es-MX", { month: "short", year: "numeric" })}
+                    </td>
+                  ) : null}
                   <td style={{ padding: 8 }}>{r.therapist?.fullName}</td>
-                  <td style={{ padding: 8 }}>{r.status}</td>
+                  <td style={{ padding: 8 }}>{r.status === "CLOSED" ? "Enviado" : "Borrador"}</td>
                   <td style={{ padding: 8, color: "var(--muted)", fontSize: 13 }}>
                     {new Date(r.createdAt).toLocaleString("es-MX")}
                   </td>

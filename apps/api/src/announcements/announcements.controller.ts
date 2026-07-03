@@ -20,25 +20,25 @@ export class AnnouncementsController {
   }
 
   @Get()
-  @Roles("ADMIN")
+  @Roles("ADMIN", "SECRETARY")
   list() {
     return this.svc.listAll();
   }
 
   @Post()
-  @Roles("ADMIN")
+  @Roles("ADMIN", "SECRETARY")
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateAnnouncementDto) {
     return this.svc.create(user.sub, dto);
   }
 
   @Patch(":id")
-  @Roles("ADMIN")
+  @Roles("ADMIN", "SECRETARY")
   update(@Param("id") id: string, @Body() dto: UpdateAnnouncementDto) {
     return this.svc.update(id, dto);
   }
 
   @Delete(":id")
-  @Roles("ADMIN")
+  @Roles("ADMIN", "SECRETARY")
   remove(@Param("id") id: string) {
     return this.svc.remove(id);
   }

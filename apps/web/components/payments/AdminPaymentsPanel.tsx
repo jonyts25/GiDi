@@ -16,7 +16,7 @@ import {
 type PaymentsView = {
   patient: { id: string; firstName: string; lastName: string; center: string };
   billing: { sessionsPerWeek: number | null; discountPercent: number; suggestedMonthly: number | null };
-  totals: { totalPaid: number; outstanding: number };
+  totals: { outstanding: number };
   payments: PaymentRow[];
 };
 

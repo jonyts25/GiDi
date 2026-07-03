@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../../lib/api"; // <-- AJUSTA si tu lib/api está en otra ruta
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 type Row = {
   id: string;
@@ -33,7 +34,7 @@ export default function AdminSchoolsPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {

@@ -34,6 +34,7 @@ model User {
 
   paymentsCreated Payment[] @relation("PaymentCreatedBy")
 
+  lastLoginAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -62,6 +63,11 @@ enum UserStatus {
   INACTIVE
 }
 
+enum PatientStatus {
+  ACTIVE
+  DISCHARGED
+}
+
 enum RoleKey {
   SUPERADMIN
   ADMIN
@@ -79,6 +85,9 @@ model Patient {
   birthDate DateTime?
   notes     String?
   center    GidiCenter @default(SAN_AGUSTIN)
+  status    PatientStatus @default(ACTIVE)
+  dischargedAt DateTime?
+  dischargeReason String?
 
   // Configuración de cobro (mensualidad por frecuencia + descuento opcional).
   sessionsPerWeek Int?
@@ -463,4 +472,11 @@ model WhatsAppContactState {
   welcomeMenuShown Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+/// Configuración global de la aplicación (p. ej. logo institucional).
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
 }

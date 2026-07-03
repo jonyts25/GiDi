@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/csv-download";
+import { canViewRevenueOverview } from "@/lib/role-permissions";
 import {
   formatMoney,
   statusClasses,
@@ -77,7 +78,7 @@ export default function AdminPaymentsOverviewPage() {
     const userRaw = localStorage.getItem("gidi_user");
     if (!token || !userRaw) return router.replace("/");
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!canViewRevenueOverview(roles)) return router.replace("/dashboard");
     void reload();
   }, [router, reload]);
 

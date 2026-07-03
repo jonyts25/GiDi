@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getApiBaseUrl } from "../lib/get-api-base-url";
+import { GiDiLogo } from "@/components/branding/GiDiLogo";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -56,14 +57,9 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-md px-4 py-10 text-ink">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-lg font-black text-white shadow-lg ring-2 ring-accent-yellow/40">
-          G
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">GiDi</h1>
-          <p className="text-sm text-subtle">Acceso institucional</p>
-        </div>
+      <div className="mb-6 flex flex-col items-center gap-3 text-center">
+        <GiDiLogo variant="login" />
+        <p className="text-sm text-subtle">Acceso institucional</p>
       </div>
 
       <form className="card space-y-4 border-l-4 border-l-primary" onSubmit={onLogin} autoComplete="off">

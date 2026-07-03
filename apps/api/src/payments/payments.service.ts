@@ -6,6 +6,7 @@ import { CENTER_PAYMENT_INFO, suggestedMonthly } from "./payment-config";
 import { SetBillingDto } from "./dto/set-billing.dto";
 import { UpsertPaymentDto } from "./dto/upsert-payment.dto";
 import { UploadReceiptDto } from "./dto/upload-receipt.dto";
+import { userHasOfficeStaffRole } from "../auth/role-permissions";
 
 const MAX_RECEIPT_BYTES = 20 * 1024 * 1024;
 
@@ -31,7 +32,7 @@ export class PaymentsService {
   constructor(private prisma: PrismaService) {}
 
   private isAdmin(user: AuthUser): boolean {
-    return user.roles.some((r) => r === "ADMIN" || r === "SUPERADMIN");
+    return userHasOfficeStaffRole(user);
   }
 
   /** Pagos solo los ven admin o el papá vinculado al paciente. */
@@ -39,7 +40,7 @@ export class PaymentsService {
     if (this.isAdmin(user)) return;
     if (user.roles.includes("PARENT")) {
       const link = await this.prisma.parentPatient.findFirst({
-        where: { patientId, parentId: user.sub },
+        where: { patientId, parentId: user.sub, patient: { status: "ACTIVE" } },
       });
       if (link) return;
     }
@@ -63,13 +64,15 @@ export class PaymentsService {
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
 
+    const parentOnly = user.roles.includes("PARENT") && !this.isAdmin(user);
+
     const payments = await this.prisma.payment.findMany({
       where: { patientId },
       orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }],
       select: paymentSelect,
+      take: parentOnly ? 6 : undefined,
     });
 
-    const totalPaid = payments.reduce((acc, p) => acc + p.amountPaid, 0);
     const outstanding = payments.reduce(
       (acc, p) => acc + Math.max(p.amountDue - p.amountPaid, 0),
       0,
@@ -88,7 +91,7 @@ export class PaymentsService {
         suggestedMonthly: suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent),
       },
       transferInfo: CENTER_PAYMENT_INFO[patient.center],
-      totals: { totalPaid, outstanding },
+      totals: { outstanding },
       payments,
     };
   }

@@ -21,6 +21,7 @@ export default function TherapistFollowUpsPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [allMonths, setAllMonths] = useState(false);
   const [rows, setRows] = useState<FollowUpRow[]>([]);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
@@ -37,7 +38,8 @@ export default function TherapistFollowUpsPage() {
       setLoading(true);
       setMsg("");
       try {
-        const data = await apiFetch(`/therapist/followups?year=${year}&month=${month}`);
+        const url = allMonths ? "/therapist/followups?all=true" : `/therapist/followups?year=${year}&month=${month}`;
+        const data = await apiFetch(url);
         setRows(data ?? []);
       } catch (e: unknown) {
         setMsg(e instanceof Error ? e.message : "Error");
@@ -45,7 +47,7 @@ export default function TherapistFollowUpsPage() {
         setLoading(false);
       }
     })();
-  }, [router, year, month]);
+  }, [router, year, month, allMonths]);
 
   return (
     <main className="max-w-[980px] space-y-6 py-6">
@@ -69,6 +71,10 @@ export default function TherapistFollowUpsPage() {
             ))}
           </select>
         </label>
+        <label className="flex items-center gap-2 text-sm text-subtle">
+          <input type="checkbox" checked={allMonths} onChange={(e) => setAllMonths(e.target.checked)} />
+          Ver todos los meses
+        </label>
       </section>
 
       {msg ? <p className="text-sm text-danger">{msg}</p> : null}
@@ -78,7 +84,7 @@ export default function TherapistFollowUpsPage() {
           <p className="text-subtle">Cargando…</p>
         ) : rows.length === 0 ? (
           <div className="space-y-3 text-sm text-subtle">
-            <p>No hay seguimientos suyos para este mes.</p>
+            <p>No hay seguimientos para {allMonths ? "mostrar" : "este mes"}.</p>
             <p>
               Abra un paciente en{" "}
               <Link className="font-medium text-primary hover:underline" href="/therapist/patients">
@@ -92,6 +98,7 @@ export default function TherapistFollowUpsPage() {
             <thead>
               <tr className="text-left text-subtle">
                 <th>Paciente</th>
+                {allMonths ? <th>Mes</th> : null}
                 <th>Área</th>
                 <th>Sesiones</th>
                 <th>Estado</th>
@@ -104,10 +111,15 @@ export default function TherapistFollowUpsPage() {
                   <td className="font-medium">
                     {r.patient.firstName} {r.patient.lastName}
                   </td>
+                  {allMonths ? (
+                    <td className="capitalize">
+                      {new Date(r.periodYear, r.periodMonth - 1, 1).toLocaleDateString("es-MX", { month: "short", year: "numeric" })}
+                    </td>
+                  ) : null}
                   <td>{r.area.name}</td>
                   <td>{r.sessions.length}</td>
                   <td>
-                    <span className="badge">{r.status}</span>
+                    <span className="badge">{r.status === "CLOSED" ? "Enviado" : "Borrador"}</span>
                   </td>
                   <td>
                     <Link className="btn rounded-lg px-3 py-1.5 text-xs" href={`/therapist/followups/${r.id}`}>

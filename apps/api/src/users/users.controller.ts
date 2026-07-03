@@ -16,14 +16,14 @@ export class UsersController {
 
   @Get("parents")
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles("ADMIN")
+  @Roles("ADMIN", "SECRETARY")
   getParents() {
     return this.service.listByRole("PARENT");
   }
 
   @Get("schools")
   @UseGuards(JwtGuard, RolesGuard)
-  @Roles("ADMIN")
+  @Roles("ADMIN", "SECRETARY")
   getSchools() {
     return this.service.listByRole("SCHOOL");
   }

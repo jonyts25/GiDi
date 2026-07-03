@@ -3,6 +3,7 @@ import { FollowUpStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { canRoleUseArea } from "../areas/area-permissions";
 import { AuthUser } from "../auth/auth-user";
+import { userHasFullAdminRole, userHasOfficeStaffRole } from "../auth/role-permissions";
 
 export { AuthUser };
 
@@ -11,11 +12,23 @@ export class FollowUpAccessService {
   constructor(private prisma: PrismaService) {}
 
   isAdmin(user: AuthUser): boolean {
-    return user.roles.some((r) => r === "ADMIN" || r === "SUPERADMIN");
+    return userHasFullAdminRole(user);
+  }
+
+  isOfficeStaff(user: AuthUser): boolean {
+    return userHasOfficeStaffRole(user);
   }
 
   async assertCanViewPatient(user: AuthUser, patientId: string): Promise<void> {
-    if (this.isAdmin(user)) return;
+    if (this.isOfficeStaff(user)) return;
+
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { status: true },
+    });
+    if (!patient || patient.status !== "ACTIVE") {
+      throw new ForbiddenException("No tiene acceso a este paciente");
+    }
 
     if (user.roles.includes("THERAPIST")) {
       const ok = await this.prisma.patientTherapist.findFirst({
@@ -42,7 +55,7 @@ export class FollowUpAccessService {
   }
 
   async assertCanEditPatientFollowUps(user: AuthUser, patientId: string, areaKey?: string): Promise<void> {
-    if (this.isAdmin(user)) return;
+    if (this.isOfficeStaff(user)) return;
 
     if (user.roles.includes("THERAPIST")) {
       const ok = await this.prisma.patientTherapist.findFirst({
@@ -88,7 +101,7 @@ export class FollowUpAccessService {
   async assertCanEditFollowUp(user: AuthUser, followUpId: string): Promise<void> {
     const fu = await this.getFollowUpForAccess(followUpId);
 
-    if (this.isAdmin(user)) return;
+    if (this.isOfficeStaff(user)) return;
 
     await this.assertFollowUpNotLocked(user, fu.status);
 
@@ -119,7 +132,7 @@ export class FollowUpAccessService {
   }
 
   assertFollowUpNotLocked(user: AuthUser, status: FollowUpStatus): void {
-    if (this.isAdmin(user)) return;
+    if (this.isOfficeStaff(user)) return;
     if (status === FollowUpStatus.CLOSED) {
       throw new ForbiddenException("Este seguimiento ya fue publicado y no se puede modificar");
     }

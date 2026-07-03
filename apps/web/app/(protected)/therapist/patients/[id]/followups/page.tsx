@@ -24,6 +24,7 @@ export default function TherapistPatientFollowUpsPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [allMonths, setAllMonths] = useState(false);
   const [areas, setAreas] = useState<Area[]>([]);
   const [rows, setRows] = useState<FollowUpRow[]>([]);
   const [msg, setMsg] = useState("");
@@ -58,7 +59,8 @@ export default function TherapistPatientFollowUpsPage() {
   async function load() {
     setMsg("");
     try {
-      const r = await apiFetch(`/patients/${patientId}/followups?year=${year}&month=${month}`);
+      const url = allMonths ? `/patients/${patientId}/followups` : `/patients/${patientId}/followups?year=${year}&month=${month}`;
+      const r = await apiFetch(url);
       setRows(r);
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error");
@@ -68,7 +70,7 @@ export default function TherapistPatientFollowUpsPage() {
   useEffect(() => {
     if (therapistId) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId, year, month, therapistId]);
+  }, [patientId, year, month, therapistId, allMonths]);
 
   async function onCreate() {
     setMsg("");
@@ -94,7 +96,7 @@ export default function TherapistPatientFollowUpsPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Seguimientos del paciente</h1>
-          <p className="text-sm text-subtle">Solo verá y editará seguimientos a su nombre</p>
+          <p className="text-sm text-subtle">Verá sus seguimientos y los enviados para terapeutas</p>
         </div>
         <Link className="btn rounded-xl px-3 py-2 text-sm" href={`/therapist/patients/${patientId}`}>
           ← Perfil y documentos
@@ -117,6 +119,10 @@ export default function TherapistPatientFollowUpsPage() {
               ))}
             </select>
           </label>
+          <label className="flex items-center gap-2 text-sm text-subtle">
+            <input type="checkbox" checked={allMonths} onChange={(e) => setAllMonths(e.target.checked)} />
+            Ver todos los meses
+          </label>
         </div>
 
         <div className="flex flex-wrap gap-2 border-t border-border pt-4">
@@ -137,13 +143,18 @@ export default function TherapistPatientFollowUpsPage() {
 
       <section className="card">
         {rows.length === 0 ? (
-          <p className="text-sm text-subtle">No hay seguimientos para este mes.</p>
+          <p className="text-sm text-subtle">No hay seguimientos para {allMonths ? "mostrar" : "este mes"}.</p>
         ) : (
           <ul className="space-y-2">
             {rows.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
                 <span>
-                  <b>{r.area.name}</b> · {r.status}
+                  <b>{r.area.name}</b> · {r.status === "CLOSED" ? "Enviado" : "Borrador"}
+                  {allMonths ? (
+                    <span className="ml-2 text-xs text-primary">
+                      {new Date(r.periodYear, r.periodMonth - 1, 1).toLocaleDateString("es-MX", { month: "short", year: "numeric" })}
+                    </span>
+                  ) : null}
                   <span className="ml-2 text-xs text-subtle">
                     {new Date(r.createdAt).toLocaleString("es-MX")}
                   </span>

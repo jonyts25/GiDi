@@ -18,7 +18,7 @@ type PaymentsView = {
   patient: { id: string; firstName: string; lastName: string; center: string };
   billing: { sessionsPerWeek: number | null; discountPercent: number; suggestedMonthly: number | null };
   transferInfo: TransferInfo;
-  totals: { totalPaid: number; outstanding: number };
+  totals: { outstanding: number };
   payments: PaymentRow[];
 };
 
@@ -92,16 +92,12 @@ export default function ParentPaymentsPage() {
 
       {data ? (
         <>
-          <section className="card grid gap-4 border-l-4 border-l-primary sm:grid-cols-2">
+          <section className="card border-l-4 border-l-primary">
             <div>
               <p className="text-xs uppercase tracking-wide text-subtle">Saldo pendiente</p>
               <p className={`text-3xl font-bold ${data.totals.outstanding > 0 ? "text-danger" : "text-success"}`}>
                 {formatMoney(data.totals.outstanding)}
               </p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-subtle">Total pagado (histórico)</p>
-              <p className="text-3xl font-bold text-ink">{formatMoney(data.totals.totalPaid)}</p>
             </div>
           </section>
 
@@ -128,7 +124,7 @@ export default function ParentPaymentsPage() {
           ) : null}
 
           <section className="space-y-3">
-            <h2 className="text-lg font-semibold">Historial por mes</h2>
+            <h2 className="text-lg font-semibold">Historial de los últimos 6 meses</h2>
             {data.payments.length === 0 ? (
               <p className="card text-sm text-subtle">Aún no hay mensualidades registradas.</p>
             ) : (

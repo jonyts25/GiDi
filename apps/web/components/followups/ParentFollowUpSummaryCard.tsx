@@ -20,6 +20,8 @@ type ObjectiveSummary = {
 
 export type ParentFollowUpCardData = {
   followUpId: string;
+  periodYear: number;
+  periodMonth: number;
   area: { id: string; key: string; name: string; trackingMode?: string };
   therapist: { id: string; fullName: string };
   attendance: Attendance;
@@ -75,12 +77,17 @@ function ObjectiveBar({ percent }: { percent: number | null }) {
 export function ParentFollowUpSummaryCard({ data }: { data: ParentFollowUpCardData }) {
   const isTextOnly = data.area.trackingMode === "TEXT_ONLY";
   const authorLabel = data.observationsAuthor?.trim() || data.therapist.fullName;
+  const periodLabel = new Date(data.periodYear, data.periodMonth - 1, 1).toLocaleDateString("es-MX", {
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <article className="card overflow-hidden border-l-4 border-l-primary">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-4">
         <div>
           <h2 className="text-lg font-bold text-ink">{data.area.name}</h2>
+          <p className="text-xs font-semibold capitalize text-primary">{periodLabel}</p>
           <p className="text-sm text-subtle">
             {isTextOnly ? `Registrado por: ${authorLabel}` : `Terapeuta: ${data.therapist.fullName}`}
           </p>

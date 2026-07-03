@@ -2,6 +2,7 @@
 
 import type { FollowUpReport } from "@/lib/followup-report.types";
 import { FollowUpReportBody } from "@/components/followups/FollowUpReportBody";
+import { GiDiLogo } from "@/components/branding/GiDiLogo";
 
 function formatPeriod(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" });
@@ -23,14 +24,8 @@ export function FollowUpReportPrint({ report }: { report: FollowUpReport }) {
     <div id="follow-up-report-print" className="gidi-report-root" aria-hidden="true">
       <header className="gidi-report-header gidi-report-avoid-break">
         <div className="gidi-report-brand">
-          <div className="gidi-report-logo" aria-hidden>
-            <span className="gidi-report-logo-g">G</span>
-            <span className="gidi-report-logo-i">i</span>
-            <span className="gidi-report-logo-d">D</span>
-            <span className="gidi-report-logo-i2">i</span>
-          </div>
+          <GiDiLogo variant="print" />
           <div>
-            <p className="gidi-report-brand-name">GiDi</p>
             <p className="gidi-report-brand-tag">Centro de desarrollo integral</p>
           </div>
         </div>

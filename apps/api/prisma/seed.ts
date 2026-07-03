@@ -41,7 +41,7 @@ async function ensureRoles() {
     { key: RoleKey.PARENT, name: "Padre/Madre" },
     { key: RoleKey.SCHOOL, name: "Escuela" },
     { key: RoleKey.FINANCE, name: "Finanzas" },
-    { key: RoleKey.SECRETARY, name: "Secretaría" },
+    { key: RoleKey.SECRETARY, name: "Secretaria" },
   ];
 
   for (const r of roles) {

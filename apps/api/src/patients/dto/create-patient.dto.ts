@@ -1,10 +1,13 @@
-import { GuardianRelationship } from "@prisma/client";
+import { GidiCenter, GuardianRelationship } from "@prisma/client";
 
 export class CreatePatientDto {
   firstName: string;
   lastName: string;
   birthDate?: string;
   notes?: string;
+  center?: GidiCenter;
+  sessionsPerWeek?: number;
+  discountPercent?: number;
   therapistIds?: string[];
 
   parent?: {

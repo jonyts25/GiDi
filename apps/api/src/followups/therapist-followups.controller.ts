@@ -17,11 +17,13 @@ export class TherapistFollowUpsController {
     @CurrentUser() user: AuthUser,
     @Query("year") year?: string,
     @Query("month") month?: string,
+    @Query("all") all?: string,
   ) {
     return this.service.listForTherapist(
       user,
-      year ? Number(year) : undefined,
-      month ? Number(month) : undefined,
+      all === "true" ? undefined : year ? Number(year) : undefined,
+      all === "true" ? undefined : month ? Number(month) : undefined,
+      all === "true",
     );
   }
 }

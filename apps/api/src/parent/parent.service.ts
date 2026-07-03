@@ -11,7 +11,7 @@ export class ParentService {
 
   async listMyPatients(parentId: string) {
     const rows = await this.prisma.parentPatient.findMany({
-      where: { parentId },
+      where: { parentId, patient: { status: "ACTIVE" } },
       select: {
         patient: {
           select: {
@@ -33,7 +33,7 @@ export class ParentService {
 
   async getMyPatient(parentId: string, patientId: string) {
     const row = await this.prisma.parentPatient.findFirst({
-      where: { parentId, patientId },
+      where: { parentId, patientId, patient: { status: "ACTIVE" } },
     });
     if (!row) throw new NotFoundException("Paciente no encontrado para este padre");
     return this.profiles.build(patientId);

@@ -19,7 +19,7 @@ import { AddGuardianDto } from "./dto/add-guardian.dto";
 import { SetGuardianMetaDto } from "./dto/set-guardian-meta.dto";
 
 @UseGuards(JwtGuard, RolesGuard)
-@Roles("ADMIN")
+@Roles("ADMIN", "SECRETARY")
 @Controller("admin/patients")
 export class AdminPatientsController {
   constructor(private readonly svc: AdminPatientsService) {}
@@ -28,6 +28,11 @@ export class AdminPatientsController {
   @Post()
   create(@Body() dto: CreatePatientDto) {
     return this.svc.createPatient(dto);
+  }
+
+  @Get("discharged")
+  listDischarged() {
+    return this.svc.listDischarged();
   }
 
   // ✅ FULL patient view
@@ -45,6 +50,16 @@ export class AdminPatientsController {
   @Patch(":id")
   updatePatient(@Param("id") id: string, @Body() dto: UpdatePatientDto) {
     return this.svc.updatePatient(id, dto);
+  }
+
+  @Post(":id/discharge")
+  dischargePatient(@Param("id") id: string, @Body() body: { reason?: string }) {
+    return this.svc.dischargePatient(id, body.reason);
+  }
+
+  @Post(":id/reactivate")
+  reactivatePatient(@Param("id") id: string) {
+    return this.svc.reactivatePatient(id);
   }
 
   // -------- therapists assignment ----------

@@ -16,6 +16,7 @@ import { ObjectiveBankModule } from "./objective-bank/objective-bank.module";
 import { MetaWhatsappModule } from "./meta-whatsapp/meta-whatsapp.module";
 import { AnnouncementsModule } from "./announcements/announcements.module";
 import { PaymentsModule } from "./payments/payments.module";
+import { SettingsModule } from "./settings/settings.module";
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { PaymentsModule } from "./payments/payments.module";
     MetaWhatsappModule,
     AnnouncementsModule,
     PaymentsModule,
+    SettingsModule,
   ],
   controllers: [AppController,],
   providers : [AppService],

@@ -36,7 +36,7 @@ async function ensureRoles() {
         { key: client_1.RoleKey.PARENT, name: "Padre/Madre" },
         { key: client_1.RoleKey.SCHOOL, name: "Escuela" },
         { key: client_1.RoleKey.FINANCE, name: "Finanzas" },
-        { key: client_1.RoleKey.SECRETARY, name: "Secretaría" },
+        { key: client_1.RoleKey.SECRETARY, name: "Secretaria" },
     ];
     for (const r of roles) {
         await prisma.role.upsert({

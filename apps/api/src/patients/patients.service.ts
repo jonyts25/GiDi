@@ -47,6 +47,9 @@ export class PatientsService {
           lastName: dto.lastName,
           birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
           notes: dto.notes,
+          center: dto.center ?? undefined,
+          sessionsPerWeek: dto.sessionsPerWeek ?? undefined,
+          discountPercent: dto.discountPercent ?? undefined,
           assignments: therapistId
             ? {
                 create: { therapistId },
@@ -199,6 +202,7 @@ export class PatientsService {
 
   async findAll() {
     return this.prisma.patient.findMany({
+      where: { status: "ACTIVE" },
       include: {
         assignments: {
           include: {
@@ -229,6 +233,7 @@ export class PatientsService {
   async findForTherapist(therapistId: string) {
     return this.prisma.patient.findMany({
       where: {
+        status: "ACTIVE",
         assignments: {
           some: { therapistId },
         },

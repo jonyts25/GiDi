@@ -12,8 +12,8 @@ import { SaveBanner } from "@/components/ui/SaveBanner";
 
 type SummaryResponse = {
   patient: { id: string; firstName: string; lastName: string };
-  periodYear: number;
-  periodMonth: number;
+  periodYear: number | null;
+  periodMonth: number | null;
   followUps: ParentFollowUpCardData[];
 };
 
@@ -31,6 +31,7 @@ export default function ParentPatientFollowUpsPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [allMonths, setAllMonths] = useState(false);
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [myRows, setMyRows] = useState<FollowUpRow[]>([]);
   const [familiarAreaId, setFamiliarAreaId] = useState("");
@@ -50,10 +51,16 @@ export default function ParentPatientFollowUpsPage() {
     (async () => {
       setMsg("");
       try {
+        const summaryUrl = allMonths
+          ? `/parent/patients/${patientId}/followups/summary`
+          : `/parent/patients/${patientId}/followups/summary?year=${year}&month=${month}`;
+        const mineUrl = allMonths
+          ? `/patients/${patientId}/followups`
+          : `/patients/${patientId}/followups?year=${year}&month=${month}`;
         const [res, areas, mine] = await Promise.all([
-          apiFetch(`/parent/patients/${patientId}/followups/summary?year=${year}&month=${month}`),
+          apiFetch(summaryUrl),
           apiFetch("/areas"),
-          apiFetch(`/patients/${patientId}/followups?year=${year}&month=${month}`),
+          apiFetch(mineUrl),
         ]);
         setData(res);
         const fam = (areas as { id: string; key: string }[]).find((a) => a.key === "FAMILIAR");
@@ -64,7 +71,7 @@ export default function ParentPatientFollowUpsPage() {
         setData(null);
       }
     })();
-  }, [router, patientId, year, month]);
+  }, [router, patientId, year, month, allMonths]);
 
   async function onCreateFamiliar() {
     if (!familiarAreaId || !parentId) return;
@@ -86,9 +93,9 @@ export default function ParentPatientFollowUpsPage() {
     }
   }
 
-  const monthLabel = data
+  const monthLabel = data?.periodYear && data?.periodMonth
     ? new Date(data.periodYear, data.periodMonth - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" })
-    : "";
+    : "Todos los meses";
 
   return (
     <main className="max-w-[720px] space-y-6 py-6">
@@ -121,6 +128,10 @@ export default function ParentPatientFollowUpsPage() {
             ))}
           </select>
         </label>
+        <label className="flex items-center gap-2 text-sm text-subtle">
+          <input type="checkbox" checked={allMonths} onChange={(e) => setAllMonths(e.target.checked)} />
+          Ver todos los meses
+        </label>
       </section>
 
       <section className="card space-y-3 border-l-4 border-l-info">
@@ -130,7 +141,7 @@ export default function ParentPatientFollowUpsPage() {
           <ul className="space-y-2 text-sm">
             {myRows.map((r) => (
               <li key={r.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-                <span>Familiar · {r.status === "CLOSED" ? "Publicado" : "Borrador"}</span>
+                <span>Familiar · {r.status === "CLOSED" ? "Enviado" : "Borrador"}</span>
                 <Link className="btn rounded-lg px-3 py-1 text-xs" href={`/parent/followups/${r.id}`}>
                   {r.status === "CLOSED" ? "Ver" : "Continuar"}
                 </Link>

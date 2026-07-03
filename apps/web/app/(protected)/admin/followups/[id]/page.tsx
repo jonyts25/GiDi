@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FollowUpDetailEditor } from "@/components/followups/FollowUpDetailEditor";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 export default function AdminFollowUpDetailPage() {
   const router = useRouter();
@@ -14,7 +15,7 @@ export default function AdminFollowUpDetailPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
   }, [router]);
 
   return (

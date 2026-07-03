@@ -9,17 +9,18 @@ import { SetBillingDto } from "./dto/set-billing.dto";
 import { UpsertPaymentDto } from "./dto/upsert-payment.dto";
 
 @UseGuards(JwtGuard, RolesGuard)
-@Roles("ADMIN")
 @Controller("admin")
 export class AdminPaymentsController {
   constructor(private svc: PaymentsService) {}
 
   @Patch("patients/:patientId/billing")
+  @Roles("ADMIN", "SECRETARY")
   setBilling(@Param("patientId") patientId: string, @Body() dto: SetBillingDto) {
     return this.svc.setBilling(patientId, dto);
   }
 
   @Put("patients/:patientId/payments/:year/:month")
+  @Roles("ADMIN", "SECRETARY")
   upsertPayment(
     @CurrentUser() user: AuthUser,
     @Param("patientId") patientId: string,
@@ -31,6 +32,7 @@ export class AdminPaymentsController {
   }
 
   @Get("payments/export")
+  @Roles("ADMIN")
   exportRows(
     @Query("year") year: string,
     @Query("month") month: string,
@@ -46,6 +48,7 @@ export class AdminPaymentsController {
   }
 
   @Get("payments")
+  @Roles("ADMIN")
   monthOverview(@Query("year") year: string, @Query("month") month: string) {
     const now = new Date();
     return this.svc.monthOverview(

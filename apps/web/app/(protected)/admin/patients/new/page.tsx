@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../../../../lib/api";
 import { useRouter } from "next/navigation";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { prepareFileForUpload } from "@/lib/compress-upload";
+
+type DocCategory = "EVALUACION" | "REVALUACION" | "SEGUIMIENTO_PADRES";
 
 type UserLite = { id: string; fullName: string; email: string; status: string };
 
@@ -35,6 +39,16 @@ export default function AdminNewPatientPage() {
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState(""); // yyyy-mm-dd
   const [notes, setNotes] = useState("");
+  const [center, setCenter] = useState<"SAN_AGUSTIN" | "VALLARTA">("SAN_AGUSTIN");
+  const [sessionsPerWeek, setSessionsPerWeek] = useState("");
+  const [discountPercent, setDiscountPercent] = useState("0");
+  const [payYear, setPayYear] = useState(String(new Date().getFullYear()));
+  const [payMonth, setPayMonth] = useState(String(new Date().getMonth() + 1));
+  const [payAmountDue, setPayAmountDue] = useState("");
+  const [payAmountPaid, setPayAmountPaid] = useState("");
+  const [docEval, setDocEval] = useState<File | null>(null);
+  const [docReval, setDocReval] = useState<File | null>(null);
+  const [docSeg, setDocSeg] = useState<File | null>(null);
 
   // guardians
   const [guardians, setGuardians] = useState<GuardianRow[]>([]);
@@ -79,7 +93,7 @@ export default function AdminNewPatientPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {
@@ -163,6 +177,19 @@ export default function AdminNewPatientPage() {
     );
   }
 
+  async function uploadDoc(patientId: string, category: DocCategory, file: File) {
+    const prepared = await prepareFileForUpload(file);
+    await apiFetch(`/patients/${patientId}/documents`, {
+      method: "POST",
+      body: JSON.stringify({
+        category,
+        fileName: prepared.fileName,
+        mimeType: prepared.mimeType,
+        dataUrl: prepared.dataUrl,
+      }),
+    });
+  }
+
   async function onSave() {
     setMsg("Guardando...");
     setCreatedCreds([]);
@@ -190,6 +217,9 @@ export default function AdminNewPatientPage() {
         lastName: lastName.trim(),
         birthDate: birthDate ? new Date(birthDate).toISOString() : undefined,
         notes: notes.trim() || undefined,
+        center,
+        sessionsPerWeek: sessionsPerWeek ? Number(sessionsPerWeek) : undefined,
+        discountPercent: Number(discountPercent) || 0,
         therapistIds: selectedTherapistIds.length ? selectedTherapistIds : undefined,
       };
 
@@ -202,6 +232,29 @@ export default function AdminNewPatientPage() {
         body: JSON.stringify(payload),
         headers: { "Content-Type": "application/json" },
       });
+
+      const patientId = res?.patient?.id as string | undefined;
+      if (!patientId) throw new Error("No se recibió el ID del paciente");
+
+      if (payAmountDue || payAmountPaid) {
+        await apiFetch(`/admin/patients/${patientId}/payments/${payYear}/${payMonth}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            amountDue: payAmountDue ? Number(payAmountDue) : undefined,
+            amountPaid: payAmountPaid ? Number(payAmountPaid) : undefined,
+            status: payAmountPaid && payAmountDue && Number(payAmountPaid) >= Number(payAmountDue) ? "PAGADO" : "PENDIENTE",
+          }),
+        });
+      }
+
+      const uploads: Array<[DocCategory, File | null]> = [
+        ["EVALUACION", docEval],
+        ["REVALUACION", docReval],
+        ["SEGUIMIENTO_PADRES", docSeg],
+      ];
+      for (const [cat, file] of uploads) {
+        if (file) await uploadDoc(patientId, cat, file);
+      }
 
       setMsg("✅ Paciente creado");
 
@@ -224,6 +277,7 @@ export default function AdminNewPatientPage() {
       }
 
       setCreatedCreds(creds);
+      router.push(`/admin/patients/${patientId}`);
     } catch (e: any) {
       setMsg(e.message);
     }
@@ -257,6 +311,59 @@ export default function AdminNewPatientPage() {
         <div className="row">
           <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           <input className="input" placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+        <div className="row">
+          <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Centro GiDi</span>
+            <select className="select" value={center} onChange={(e) => setCenter(e.target.value as "SAN_AGUSTIN" | "VALLARTA")}>
+              <option value="SAN_AGUSTIN">San Agustín</option>
+              <option value="VALLARTA">Vallarta</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 12 }}>
+        <h3 style={{ marginTop: 0 }}>Mensualidad (opcional)</h3>
+        <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>
+          <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Frecuencia</span>
+            <select className="select" value={sessionsPerWeek} onChange={(e) => setSessionsPerWeek(e.target.value)}>
+              <option value="">Sin definir</option>
+              <option value="1">1 vez/semana</option>
+              <option value="2">2 veces/semana</option>
+              <option value="3">3 veces/semana</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Descuento (%)</span>
+            <input className="input w-24" type="number" min={0} max={100} value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} />
+          </label>
+        </div>
+        <p className="sub" style={{ marginTop: 8 }}>Primer mes registrado (opcional):</p>
+        <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>
+          <input className="input w-24" type="number" placeholder="Año" value={payYear} onChange={(e) => setPayYear(e.target.value)} />
+          <input className="input w-24" type="number" placeholder="Mes" min={1} max={12} value={payMonth} onChange={(e) => setPayMonth(e.target.value)} />
+          <input className="input w-32" type="number" placeholder="Monto a pagar" value={payAmountDue} onChange={(e) => setPayAmountDue(e.target.value)} />
+          <input className="input w-32" type="number" placeholder="Monto pagado" value={payAmountPaid} onChange={(e) => setPayAmountPaid(e.target.value)} />
+        </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 12 }}>
+        <h3 style={{ marginTop: 0 }}>Documentos iniciales (opcional)</h3>
+        <div className="grid gap-3 text-sm">
+          <label className="grid gap-1">
+            <span>Evaluación</span>
+            <input type="file" accept="image/*,.pdf" onChange={(e) => setDocEval(e.target.files?.[0] ?? null)} />
+          </label>
+          <label className="grid gap-1">
+            <span>Revaloración</span>
+            <input type="file" accept="image/*,.pdf" onChange={(e) => setDocReval(e.target.files?.[0] ?? null)} />
+          </label>
+          <label className="grid gap-1">
+            <span>Seguimiento con papás</span>
+            <input type="file" accept="image/*,.pdf" onChange={(e) => setDocSeg(e.target.files?.[0] ?? null)} />
+          </label>
         </div>
       </section>
 

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { PatientDocumentsPanel } from "@/components/patients/PatientDocumentsPanel";
 import { AdminPaymentsPanel } from "@/components/payments/AdminPaymentsPanel";
 import { SaveBanner } from "@/components/ui/SaveBanner";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 type MiniUser = { id: string; fullName: string; email: string; status: "ACTIVE" | "INACTIVE" };
 
@@ -90,7 +91,7 @@ export default function AdminPatientDetail() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {
@@ -289,6 +290,21 @@ export default function AdminPatientDetail() {
       setMsg("✅ Padre removido del paciente");
     } catch (e: any) {
       setMsg(e.message);
+    }
+  }
+
+  async function onDischarge() {
+    const reason = window.prompt("Motivo de baja (opcional):");
+    if (reason === null) return;
+    setMsg("");
+    try {
+      await apiFetch(`/admin/patients/${id}/discharge`, {
+        method: "POST",
+        body: JSON.stringify({ reason: reason.trim() || undefined }),
+      });
+      router.push("/admin/patients/discharged");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error al dar de baja");
     }
   }
 
@@ -561,6 +577,16 @@ export default function AdminPatientDetail() {
             </form>
           )}
         </div>
+      </section>
+
+      <section className="card mt-6 space-y-3 border-l-4 border-l-danger">
+        <h2 className="text-lg font-semibold">Dar de baja</h2>
+        <p className="text-sm text-subtle">
+          Desvincula al paciente de sus terapeutas y lo mueve a la lista de Bajas. Papás, escuela e historial se conservan.
+        </p>
+        <button type="button" className="btn rounded-xl px-4 py-2 text-sm text-danger" onClick={() => void onDischarge()}>
+          Dar de baja paciente
+        </button>
       </section>
 
       <div className="mt-6">

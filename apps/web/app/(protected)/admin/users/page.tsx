@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../../lib/api";
 import { SaveBanner } from "@/components/ui/SaveBanner";
+import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
+import { hasFullAdminRole, hasOfficeStaffRole, labelForRole, STATUS_LABELS } from "@/lib/role-permissions";
 
 type UserRow = {
   id: string;
@@ -14,15 +16,17 @@ type UserRow = {
   roles?: { role: { key: string; name: string } }[];
 };
 
-const roles = ["THERAPIST", "PARENT", "SCHOOL", "ADMIN"] as const;
+const roles = ["ADMIN", "SECRETARY", "THERAPIST", "PARENT", "SCHOOL"] as const;
 type RoleKey = (typeof roles)[number];
 
 type StatusFilter = "ACTIVE" | "INACTIVE" | "ALL";
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const [myRoles, setMyRoles] = useState<string[]>([]);
   const [role, setRole] = useState<RoleKey>("PARENT");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ACTIVE");
+  const [query, setQuery] = useState("");
   const [items, setItems] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
@@ -53,8 +57,9 @@ export default function AdminUsersPage() {
     const userRaw = localStorage.getItem("gidi_user");
     if (!token || !userRaw) return router.replace("/");
 
-    const myRoles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!myRoles.includes("ADMIN")) return router.replace("/dashboard");
+    const rolesFromSession: string[] = JSON.parse(userRaw).roles ?? [];
+    setMyRoles(rolesFromSession);
+    if (!hasOfficeStaffRole(rolesFromSession)) return router.replace("/dashboard");
 
     void loadUsers();
   }, [role, router]);
@@ -89,8 +94,11 @@ export default function AdminUsersPage() {
   }
 
   const filtered = useMemo(
-    () => (statusFilter === "ALL" ? items : items.filter((u) => u.status === statusFilter)),
-    [items, statusFilter],
+    () => {
+      const byStatus = statusFilter === "ALL" ? items : items.filter((u) => u.status === statusFilter);
+      return filterByQuery(byStatus, query, (u) => `${u.fullName} ${u.email}`);
+    },
+    [items, statusFilter, query],
   );
 
   async function onToggleStatus(u: UserRow) {
@@ -128,7 +136,7 @@ export default function AdminUsersPage() {
           <input className="input" type="password" autoComplete="new-password" placeholder="Contraseña (opcional, se genera automática)" value={password} onChange={(e) => setPassword(e.target.value)} />
           <select className="input" value={createRole} onChange={(e) => setCreateRole(e.target.value as RoleKey)}>
             {roles.map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r}>{labelForRole(r)}</option>
             ))}
           </select>
           <button className="btn-primary" type="submit">+ Crear usuario</button>
@@ -140,7 +148,7 @@ export default function AdminUsersPage() {
           <label className="sub">Filtrar por rol</label>
           <select className="input" value={role} onChange={(e) => setRole(e.target.value as RoleKey)}>
             {roles.map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r}>{labelForRole(r)}</option>
             ))}
           </select>
           <label className="sub">Estado</label>
@@ -149,6 +157,7 @@ export default function AdminUsersPage() {
             <option value="INACTIVE">Inactivos</option>
             <option value="ALL">Todos</option>
           </select>
+          <SearchInput value={query} onChange={setQuery} placeholder="Buscar usuario…" />
         </div>
 
         <SaveBanner message={msg} type={msgType} />
@@ -162,7 +171,7 @@ export default function AdminUsersPage() {
                 <tr>
                   <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>Nombre</th>
                   <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>Email</th>
-                  <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>Status</th>
+                  <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>Estado</th>
                   <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>Roles</th>
                   <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #eee" }}>Acciones</th>
                 </tr>
@@ -172,15 +181,17 @@ export default function AdminUsersPage() {
                   <tr key={u.id}>
                     <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3" }}>{u.fullName}</td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3" }}>{u.email}</td>
-                    <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3" }}>{u.status}</td>
+                    <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3" }}>{STATUS_LABELS[u.status] ?? u.status}</td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3" }}>
-                      {(u.roles ?? []).map((r) => r.role.key).join(", ") || "-"}
+                      {(u.roles ?? []).map((r) => labelForRole(r.role.key)).join(", ") || "-"}
                     </td>
                     <td style={{ padding: 8, borderBottom: "1px solid #f3f3f3", display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <Link className="btn" href={`/admin/users/${u.id}`}>Ver / Editar</Link>
-                      <button type="button" className="btn" onClick={() => void onToggleStatus(u)}>
-                        {u.status === "ACTIVE" ? "Desactivar" : "Reactivar"}
-                      </button>
+                      {u.status === "ACTIVE" || hasFullAdminRole(myRoles) ? (
+                        <button type="button" className="btn" onClick={() => void onToggleStatus(u)}>
+                          {u.status === "ACTIVE" ? "Desactivar" : "Reactivar"}
+                        </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

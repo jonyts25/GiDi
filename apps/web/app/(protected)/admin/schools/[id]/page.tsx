@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "../../../../../lib/api";
 import { SaveBanner } from "@/components/ui/SaveBanner";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 type UserDetail = {
   id: string;
@@ -53,7 +54,7 @@ export default function AdminSchoolDetailPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {

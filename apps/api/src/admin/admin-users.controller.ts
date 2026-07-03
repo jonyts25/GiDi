@@ -6,9 +6,11 @@ import { AdminUsersService } from "./admin-users.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { RoleKey } from "@prisma/client";
+import { CurrentUser } from "../auth/current-user.decorator";
+import { AuthUser } from "../auth/auth-user";
 
 @UseGuards(JwtGuard, RolesGuard)
-@Roles("ADMIN")
+@Roles("ADMIN", "SECRETARY")
 @Controller("admin/users")
 export class AdminUsersController {
   constructor(private svc: AdminUsersService) {}
@@ -38,7 +40,7 @@ export class AdminUsersController {
 
   // ✅ Editar usuario
   @Patch(":id")
-  update(@Param("id") id: string, @Body() dto: UpdateUserDto) {
-    return this.svc.update(id,dto);
+  update(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: UpdateUserDto) {
+    return this.svc.update(id, dto, user);
   }
 }

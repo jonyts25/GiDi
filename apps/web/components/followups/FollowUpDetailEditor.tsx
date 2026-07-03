@@ -306,7 +306,7 @@ export function FollowUpDetailEditor(props: {
             {isTextOnly ? `Registrado por: ${submitterLabel}` : `Terapeuta: ${submitterLabel}`}
           </p>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-subtle">
-            Estado: {fu.status === "CLOSED" ? "Publicado" : "Borrador"}
+            Estado: {fu.status === "CLOSED" ? "Enviado" : "Borrador"}
             {isLocked ? " · Solo lectura" : ""}
           </p>
         </div>

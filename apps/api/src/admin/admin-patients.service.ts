@@ -41,6 +41,9 @@ export class AdminPatientsService {
         birthDate: true,
         notes: true,
         center: true,
+        status: true,
+        dischargedAt: true,
+        dischargeReason: true,
         createdAt: true,
         updatedAt: true,
 
@@ -90,6 +93,10 @@ export class AdminPatientsService {
         lastName: patient.lastName,
         birthDate: patient.birthDate,
         notes: patient.notes,
+        center: patient.center,
+        status: patient.status,
+        dischargedAt: patient.dischargedAt,
+        dischargeReason: patient.dischargeReason,
         createdAt: patient.createdAt,
         updatedAt: patient.updatedAt,
       },
@@ -159,6 +166,23 @@ export class AdminPatientsService {
     });
   }
 
+  async listDischarged() {
+    return this.prisma.patient.findMany({
+      where: { status: "DISCHARGED" },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        center: true,
+        notes: true,
+        dischargedAt: true,
+        dischargeReason: true,
+        updatedAt: true,
+      },
+      orderBy: [{ dischargedAt: "desc" }, { lastName: "asc" }],
+    });
+  }
+
 
 
   async updatePatient(patientId: string, dto: UpdatePatientDto) {
@@ -182,6 +206,49 @@ export class AdminPatientsService {
         center: true,
         createdAt: true,
         updatedAt: true,
+      },
+    });
+  }
+
+  async dischargePatient(patientId: string, reason?: string | null) {
+    await this.ensurePatient(patientId);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.patientTherapist.deleteMany({ where: { patientId } });
+      return tx.patient.update({
+        where: { id: patientId },
+        data: {
+          status: "DISCHARGED",
+          dischargedAt: new Date(),
+          dischargeReason: reason?.trim() || null,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+          dischargedAt: true,
+          dischargeReason: true,
+        },
+      });
+    });
+  }
+
+  async reactivatePatient(patientId: string) {
+    await this.ensurePatient(patientId);
+    return this.prisma.patient.update({
+      where: { id: patientId },
+      data: {
+        status: "ACTIVE",
+        dischargedAt: null,
+        dischargeReason: null,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        status: true,
+        dischargedAt: true,
+        dischargeReason: true,
       },
     });
   }

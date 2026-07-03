@@ -11,8 +11,8 @@ import {
 
 type SummaryResponse = {
   patient: { id: string; firstName: string; lastName: string };
-  periodYear: number;
-  periodMonth: number;
+  periodYear: number | null;
+  periodMonth: number | null;
   followUps: ParentFollowUpCardData[];
 };
 
@@ -24,6 +24,7 @@ export default function SchoolPatientFollowUpsPage() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [allMonths, setAllMonths] = useState(false);
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [msg, setMsg] = useState("");
 
@@ -34,18 +35,21 @@ export default function SchoolPatientFollowUpsPage() {
     (async () => {
       setMsg("");
       try {
-        const res = await apiFetch(`/school/patients/${patientId}/followups/summary?year=${year}&month=${month}`);
+        const url = allMonths
+          ? `/school/patients/${patientId}/followups/summary`
+          : `/school/patients/${patientId}/followups/summary?year=${year}&month=${month}`;
+        const res = await apiFetch(url);
         setData(res as SummaryResponse);
       } catch (e: unknown) {
         setMsg(e instanceof Error ? e.message : "Error");
         setData(null);
       }
     })();
-  }, [router, patientId, year, month]);
+  }, [router, patientId, year, month, allMonths]);
 
-  const monthLabel = data
+  const monthLabel = data?.periodYear && data?.periodMonth
     ? new Date(data.periodYear, data.periodMonth - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" })
-    : "";
+    : "Todos los meses";
 
   return (
     <main className="container max-w-[720px] space-y-6 py-8">
@@ -79,6 +83,10 @@ export default function SchoolPatientFollowUpsPage() {
             ))}
           </select>
         </label>
+        <label className="flex items-center gap-2 text-sm text-subtle">
+          <input type="checkbox" checked={allMonths} onChange={(e) => setAllMonths(e.target.checked)} />
+          Ver todos los meses
+        </label>
       </section>
 
       {msg ? <p className="text-sm text-danger">{msg}</p> : null}
@@ -86,7 +94,7 @@ export default function SchoolPatientFollowUpsPage() {
 
       {data?.followUps.length === 0 ? (
         <section className="card text-center text-sm text-subtle">
-          <p>No hay seguimientos publicados para este mes.</p>
+          <p>No hay seguimientos publicados para {allMonths ? "mostrar" : "este mes"}.</p>
         </section>
       ) : (
         <div className="space-y-6">

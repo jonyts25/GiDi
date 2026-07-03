@@ -13,13 +13,13 @@ export class PaymentsController {
   constructor(private svc: PaymentsService) {}
 
   @Get()
-  @Roles("ADMIN", "PARENT")
+  @Roles("ADMIN", "SECRETARY", "PARENT")
   view(@CurrentUser() user: AuthUser, @Param("patientId") patientId: string) {
     return this.svc.getPatientView(user, patientId);
   }
 
   @Post(":year/:month/receipt")
-  @Roles("ADMIN", "PARENT")
+  @Roles("ADMIN", "SECRETARY", "PARENT")
   uploadReceipt(
     @CurrentUser() user: AuthUser,
     @Param("patientId") patientId: string,
@@ -31,7 +31,7 @@ export class PaymentsController {
   }
 
   @Get(":paymentId/receipt")
-  @Roles("ADMIN", "PARENT")
+  @Roles("ADMIN", "SECRETARY", "PARENT")
   receipt(
     @CurrentUser() user: AuthUser,
     @Param("patientId") patientId: string,

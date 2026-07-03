@@ -23,11 +23,12 @@ export class JwtGuard implements CanActivate {
           id: true,
           email: true,
           fullName: true,
+          status: true,
           roles: { select: { role: { select: { key: true } } } },
         },
       });
 
-      if (!user) throw new UnauthorizedException("User not found");
+      if (!user || user.status !== "ACTIVE") throw new UnauthorizedException("User not found");
 
       req.user = {
         sub: user.id,

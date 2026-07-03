@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { SaveBanner } from "@/components/ui/SaveBanner";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 type Announcement = {
   id: string;
@@ -60,7 +61,7 @@ export default function AdminAnnouncementsPage() {
     const userRaw = localStorage.getItem("gidi_user");
     if (!token || !userRaw) return router.replace("/");
     const myRoles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!myRoles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(myRoles)) return router.replace("/dashboard");
     void load();
   }, [router]);
 

@@ -19,6 +19,14 @@ import {
 /** Objetivos archivados (con datos en cuadrícula pero fuera de la lista activa). */
 const ARCHIVED_OBJECTIVE_IDX = 1000;
 
+function nowYear(): number {
+  return new Date().getFullYear();
+}
+
+function nowMonth(): number {
+  return new Date().getMonth() + 1;
+}
+
 const followUpInclude = {
   patient: { select: { id: true, firstName: true, lastName: true } },
   therapist: { select: { id: true, fullName: true, email: true, status: true } },
@@ -50,6 +58,7 @@ export class FollowUpsService {
       therapistId?: string;
       periodYear?: number;
       periodMonth?: number;
+      OR?: Prisma.FollowUpWhereInput[];
     } = {
       patientId,
       ...(year ? { periodYear: year } : {}),
@@ -57,7 +66,10 @@ export class FollowUpsService {
     };
 
     if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user)) {
-      where.therapistId = user.sub;
+      where.OR = [
+        { therapistId: user.sub },
+        { visibleToTherapist: true, status: FollowUpStatus.CLOSED },
+      ];
     }
 
     return this.prisma.followUp.findMany({
@@ -71,24 +83,27 @@ export class FollowUpsService {
     });
   }
 
-  async listForTherapist(user: AuthUser, year?: number, month?: number) {
+  async listForTherapist(user: AuthUser, year?: number, month?: number, allMonths = false) {
     if (!user.roles.includes("THERAPIST") && !this.access.isAdmin(user)) {
       throw new ForbiddenException("Solo terapeutas");
     }
 
     const therapistId = user.sub;
-    const now = new Date();
-    const y = year ?? now.getFullYear();
-    const m = month ?? now.getMonth() + 1;
-
     return this.prisma.followUp.findMany({
       where: {
-        therapistId,
-        periodYear: y,
-        periodMonth: m,
+        ...(allMonths ? {} : { periodYear: year ?? nowYear(), periodMonth: month ?? nowMonth() }),
         patient: { assignments: { some: { therapistId } } },
+        OR: [
+          { therapistId },
+          { visibleToTherapist: true, status: FollowUpStatus.CLOSED },
+        ],
       },
-      orderBy: [{ patient: { lastName: "asc" } }, { area: { sortOrder: "asc" } }],
+      orderBy: [
+        { periodYear: "desc" },
+        { periodMonth: "desc" },
+        { patient: { lastName: "asc" } },
+        { area: { sortOrder: "asc" } },
+      ],
       include: {
         area: { select: { id: true, key: true, name: true, trackingMode: true } },
         patient: { select: { id: true, firstName: true, lastName: true } },
@@ -112,10 +127,6 @@ export class FollowUpsService {
   async getParentSummary(user: AuthUser, patientId: string, year?: number, month?: number) {
     await this.access.assertCanViewPatient(user, patientId);
 
-    const now = new Date();
-    const periodYear = year ?? now.getFullYear();
-    const periodMonth = month ?? now.getMonth() + 1;
-
     // Audiencia: papás solo ven los marcados para papás; escuela los marcados para escuela; admin ve todo.
     const visibilityFilter = this.access.isAdmin(user)
       ? {}
@@ -124,7 +135,13 @@ export class FollowUpsService {
         : { visibleToParent: true };
 
     const followUps = await this.prisma.followUp.findMany({
-      where: { patientId, periodYear, periodMonth, status: FollowUpStatus.CLOSED, ...visibilityFilter },
+      where: {
+        patientId,
+        ...(year ? { periodYear: year } : {}),
+        ...(month ? { periodMonth: month } : {}),
+        status: FollowUpStatus.CLOSED,
+        ...visibilityFilter,
+      },
       include: {
         area: { select: { id: true, key: true, name: true, trackingMode: true } },
         therapist: { select: { id: true, fullName: true } },
@@ -134,7 +151,7 @@ export class FollowUpsService {
           include: { marks: true },
         },
       },
-      orderBy: { area: { sortOrder: "asc" } },
+      orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }, { area: { sortOrder: "asc" } }],
     });
 
     const patient = await this.prisma.patient.findUnique({
@@ -145,8 +162,8 @@ export class FollowUpsService {
 
     return {
       patient,
-      periodYear,
-      periodMonth,
+      periodYear: year ?? null,
+      periodMonth: month ?? null,
       followUps: followUps.map((fu) => this.buildSummaryCard(fu)),
     };
   }
@@ -187,6 +204,8 @@ export class FollowUpsService {
 
     return {
       followUpId: fu.id,
+      periodYear: fu.periodYear,
+      periodMonth: fu.periodMonth,
       area: fu.area,
       therapist: fu.therapist,
       attendance,

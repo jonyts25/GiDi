@@ -7,6 +7,7 @@ import Link from "next/link";
 import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
 import { ListPagination } from "@/components/ui/ListPagination";
 import { paginate, sortByFullName, type SortDir } from "@/lib/list-utils";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 type Patient = {
   id: string;
@@ -40,7 +41,7 @@ export default function AdminPatientsPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("ADMIN")) return router.replace("/dashboard");
+    if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {
@@ -82,6 +83,9 @@ export default function AdminPatientsPage() {
         </div>
         <Link className="btn" href="/dashboard">
           ← Volver
+        </Link>
+        <Link className="btn" href="/admin/patients/discharged">
+          Bajas
         </Link>
         <span className="badge">
           {filtered.length} / {patients.length}
