@@ -33,6 +33,13 @@ export const CENTER_PAYMENT_INFO: Record<GidiCenter, CenterPaymentInfo> = {
     cuenta: "0676596144",
     concepto: "Nombre del paciente",
   },
+  COLEGIOS: {
+    centerLabel: "GiDi Colegios",
+    titular: "",
+    banco: "",
+    clabe: "",
+    concepto: "Nombre del paciente",
+  },
 };
 
 /** Mensualidad sugerida a partir de frecuencia y descuento (%). */

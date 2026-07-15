@@ -27,4 +27,14 @@ export class CreatePatientDto {
     isPrimary?: boolean;
     notes?: string | null;
   }>;
+
+  /** Escuela ya registrada. */
+  schoolId?: string;
+
+  /** Alta inline de escuela si no hay schoolId. */
+  school?: {
+    email?: string;
+    fullName?: string;
+    notes?: string | null;
+  };
 }

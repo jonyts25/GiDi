@@ -253,6 +253,22 @@ export class AdminPatientsService {
     });
   }
 
+  /** Borrado permanente (cascada de seguimientos, documentos, pagos, vínculos). */
+  async deletePatient(patientId: string) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { id: true, firstName: true, lastName: true },
+    });
+    if (!patient) throw new NotFoundException("Patient not found");
+
+    await this.prisma.patient.delete({ where: { id: patientId } });
+    return {
+      ok: true,
+      deletedId: patient.id,
+      fullName: `${patient.firstName} ${patient.lastName}`.trim(),
+    };
+  }
+
   // -------------------- Padres --------------------
   async addGuardian(patientId: string, dto: AddGuardianDto) {
     await this.ensurePatient(patientId);

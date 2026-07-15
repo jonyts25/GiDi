@@ -168,11 +168,77 @@ export class PatientsService {
         }
       }
 
+      let schoolUser: { id: string; email: string; fullName: string } | null = null;
+      let schoolTempPassword: string | null = null;
+
+      const schoolId = dto.schoolId?.trim();
+      if (schoolId) {
+        const school = await tx.user.findUnique({
+          where: { id: schoolId },
+          include: { roles: { include: { role: true } } },
+        });
+        if (!school) throw new BadRequestException("Escuela no encontrada");
+        const hasSchool = school.roles.some((r) => r.role.key === RoleKey.SCHOOL);
+        if (!hasSchool) {
+          throw new BadRequestException("El usuario seleccionado no tiene rol de escuela");
+        }
+        await tx.schoolPatient.create({
+          data: { patientId: patient.id, schoolId: school.id, notes: dto.school?.notes ?? undefined },
+        });
+        schoolUser = { id: school.id, email: school.email, fullName: school.fullName };
+      } else if (dto.school?.email?.trim() && dto.school?.fullName?.trim()) {
+        const schoolRole = await tx.role.findUnique({ where: { key: RoleKey.SCHOOL } });
+        if (!schoolRole) throw new BadRequestException("Rol SCHOOL no existe (seed)");
+
+        const email = dto.school.email.toLowerCase().trim();
+        const fullName = dto.school.fullName.trim();
+        let school = await tx.user.findUnique({ where: { email } });
+        let newTemp: string | null = null;
+
+        if (!school) {
+          newTemp = generateTempPassword(12);
+          const passwordHash = await bcrypt.hash(newTemp, 12);
+          school = await tx.user.create({
+            data: {
+              email,
+              fullName,
+              password: passwordHash,
+              mustChangePassword: true,
+              status: "ACTIVE",
+            },
+          });
+          await tx.userRole.create({
+            data: { userId: school.id, roleId: schoolRole.id },
+          });
+        } else {
+          const hasRole = await tx.userRole.findFirst({
+            where: { userId: school.id, roleId: schoolRole.id },
+          });
+          if (!hasRole) {
+            await tx.userRole.create({
+              data: { userId: school.id, roleId: schoolRole.id },
+            });
+          }
+        }
+
+        await tx.schoolPatient.create({
+          data: {
+            patientId: patient.id,
+            schoolId: school.id,
+            notes: dto.school.notes ?? undefined,
+          },
+        });
+        schoolUser = { id: school.id, email: school.email, fullName: school.fullName };
+        if (newTemp) schoolTempPassword = newTemp;
+      }
+
       return {
         patient,
         parent: parentUser,
         parentTempPassword,
         parentCredentials: parentCredentials.length ? parentCredentials : undefined,
+        school: schoolUser,
+        schoolTempPassword,
       };
     });
   }

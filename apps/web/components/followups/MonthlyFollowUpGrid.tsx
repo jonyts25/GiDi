@@ -79,15 +79,33 @@ export function MonthlyFollowUpGrid(props: {
 
   useEffect(() => {
     const initialMarks = buildInitialMarks(sessions);
-    setDraftMarks(initialMarks);
+    setDraftMarks((prev) => {
+      const next = { ...initialMarks };
+      for (const [key, mark] of Object.entries(prev)) {
+        const saved = savedMarks[key];
+        if (!marksEqual(mark, saved)) {
+          next[key] = mark;
+        }
+      }
+      return next;
+    });
     setSavedMarks(initialMarks);
 
     const initialNotes: Record<string, string> = {};
     for (const o of objectives) {
       initialNotes[o.id] = o.monthlyNotes ?? "";
     }
-    setNotesDraft(initialNotes);
+    setNotesDraft((prev) => {
+      const next = { ...initialNotes };
+      for (const [id, note] of Object.entries(prev)) {
+        if ((savedNotes[id] ?? "") !== note) {
+          next[id] = note;
+        }
+      }
+      return next;
+    });
     setSavedNotes(initialNotes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- preserve local drafts across prop reloads
   }, [followUpId, objectives, sessions]);
 
   const sortedObjectives = useMemo(

@@ -8,23 +8,25 @@ import { CreateObjectiveBankDto } from "./dto/create-objective-bank.dto";
 import { UpdateObjectiveBankDto } from "./dto/update-objective-bank.dto";
 
 @UseGuards(JwtGuard, RolesGuard)
-@Roles("THERAPIST")
+@Roles("THERAPIST", "ADMIN", "SUPERADMIN", "SECRETARY")
 @Controller("therapist/objective-bank")
 export class TherapistObjectiveBankController {
   constructor(private readonly objectives: ObjectiveBankService) {}
 
-  /** Banco del terapeuta: objetivos propios + públicos (admin / catálogo compartido). */
+  /** Banco: objetivos propios + públicos (admin / catálogo compartido). */
   @Get()
   list(@CurrentUser() user: { sub: string }, @Query("areaId") areaId?: string) {
     return this.objectives.listTherapistBank(user.sub, areaId);
   }
 
   @Post()
+  @Roles("THERAPIST", "ADMIN", "SUPERADMIN")
   create(@CurrentUser() user: { sub: string }, @Body() dto: CreateObjectiveBankDto) {
     return this.objectives.createForTherapist(user.sub, dto);
   }
 
   @Patch(":id")
+  @Roles("THERAPIST", "ADMIN", "SUPERADMIN")
   update(
     @CurrentUser() user: { sub: string },
     @Param("id") id: string,

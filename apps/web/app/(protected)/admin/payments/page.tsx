@@ -13,6 +13,7 @@ import {
   type PaymentRow,
   type PaymentStatus,
 } from "@/components/payments/payment-helpers";
+import { GIDI_CENTER_OPTIONS, labelForCenter } from "@/lib/centers";
 
 type OverviewRow = PaymentRow & {
   patient: { id: string; firstName: string; lastName: string; center: string };
@@ -111,8 +112,9 @@ export default function AdminPaymentsOverviewPage() {
           <span className="text-subtle">Sede (para exportar)</span>
           <select className="select w-40" value={center} onChange={(e) => setCenter(e.target.value)}>
             <option value="">Todas</option>
-            <option value="SAN_AGUSTIN">San Agustín</option>
-            <option value="VALLARTA">Vallarta</option>
+            {GIDI_CENTER_OPTIONS.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
           </select>
         </label>
         <div className="flex flex-wrap gap-2">
@@ -170,7 +172,7 @@ export default function AdminPaymentsOverviewPage() {
                           {p.patient.firstName} {p.patient.lastName}
                         </Link>
                       </td>
-                      <td className="py-2 pr-3 text-subtle">{p.patient.center === "VALLARTA" ? "Vallarta" : "San Agustín"}</td>
+                      <td className="py-2 pr-3 text-subtle">{labelForCenter(p.patient.center)}</td>
                       <td className="py-2 pr-3">
                         <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClasses(p.status as PaymentStatus)}`}>
                           {STATUS_LABEL[p.status as PaymentStatus]}

@@ -42,7 +42,10 @@ export class AdminPaymentsController {
     return this.svc.exportRows({
       year: year ? Number(year) : undefined,
       month: month ? Number(month) : undefined,
-      center: center === "SAN_AGUSTIN" || center === "VALLARTA" ? center : undefined,
+      center:
+        center === "SAN_AGUSTIN" || center === "VALLARTA" || center === "COLEGIOS"
+          ? center
+          : undefined,
       patientId: patientId || undefined,
     });
   }

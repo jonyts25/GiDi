@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { labelForCenter } from "@/lib/centers";
 
 type DischargedPatient = {
   id: string;
@@ -15,11 +16,6 @@ type DischargedPatient = {
   notes?: string | null;
   dischargedAt?: string | null;
   dischargeReason?: string | null;
-};
-
-const CENTER_LABEL: Record<string, string> = {
-  SAN_AGUSTIN: "San Agustín",
-  VALLARTA: "Vallarta",
 };
 
 export default function DischargedPatientsPage() {
@@ -103,7 +99,7 @@ export default function DischargedPatientsPage() {
                     <td className="py-2 pr-3 font-semibold">
                       {p.firstName} {p.lastName}
                     </td>
-                    <td className="py-2 pr-3 text-subtle">{p.center ? (CENTER_LABEL[p.center] ?? p.center) : "—"}</td>
+                    <td className="py-2 pr-3 text-subtle">{labelForCenter(p.center)}</td>
                     <td className="py-2 pr-3 text-subtle">
                       {p.dischargedAt ? new Date(p.dischargedAt).toLocaleDateString("es-MX") : "—"}
                     </td>

@@ -12,6 +12,7 @@ import {
   type PaymentRow,
   type PaymentStatus,
 } from "@/components/payments/payment-helpers";
+import { GIDI_CENTER_OPTIONS } from "@/lib/centers";
 
 type PaymentsView = {
   patient: { id: string; firstName: string; lastName: string; center: string };
@@ -165,8 +166,9 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Sede</span>
             <select className="select w-auto" value={center} onChange={(e) => setCenter(e.target.value)}>
-              <option value="SAN_AGUSTIN">San Agustín</option>
-              <option value="VALLARTA">Vallarta</option>
+              {GIDI_CENTER_OPTIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
             </select>
           </label>
           <label className="grid gap-1 text-sm">

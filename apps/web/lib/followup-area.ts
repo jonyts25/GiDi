@@ -37,10 +37,22 @@ export function areaSupportsObjectiveSuggestions(area: { key: string; name: stri
   const k = area.key.toUpperCase();
   const n = area.name.toLowerCase();
   return (
-    ["LECTURA", "VISUALES", "AUDITIVAS", "AUDITIVO", "MEMORIA_DISPOSITIVOS_APRENDIZAJE"].includes(k) ||
+    [
+      "LECTURA",
+      "VISUALES",
+      "AUDITIVAS",
+      "AUDITIVO",
+      "MEMORIA_DISPOSITIVOS_APRENDIZAJE",
+      "ATENCION_DISPOSITIVOS_APRENDIZAJE",
+      "MOTIVACION_DISPOSITIVOS_APRENDIZAJE",
+    ].includes(k) ||
     n.includes("lectura") ||
     n.includes("visual") ||
     n.includes("audit") ||
-    n.includes("memoria")
+    n.includes("memoria") ||
+    n.includes("atención") ||
+    n.includes("atencion") ||
+    n.includes("motivación") ||
+    n.includes("motivacion")
   );
 }

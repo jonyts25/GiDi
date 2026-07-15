@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -11,6 +11,7 @@ import { NewFollowUpSessionForm } from "@/components/followups/NewFollowUpSessio
 import { FollowUpReportPrint } from "@/components/followups/FollowUpReportPrint";
 import { SaveBanner } from "@/components/ui/SaveBanner";
 import { formatCalendarDate } from "@/lib/date-utils";
+import { hasFullAdminRole, hasOfficeStaffRole } from "@/lib/role-permissions";
 import type { FollowUpReport } from "@/lib/followup-report.types";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
@@ -21,6 +22,13 @@ type Session = {
   sessionDate: string;
   therapist?: { id: string; fullName: string };
   marks: Mark[];
+};
+type BankObjective = {
+  id: string;
+  description: string;
+  isPublic: boolean;
+  area: { id: string; key: string; name: string };
+  creator: { id: string; fullName: string };
 };
 
 export type FollowUpDetail = {
@@ -55,6 +63,44 @@ function readLoggedUser(): { id: string; fullName: string; roles: string[] } | n
   }
 }
 
+function applyFollowUpToForm(
+  data: FollowUpDetail,
+  setters: {
+    setGeneralGoal: (v: string) => void;
+    setHomeWork: (v: string) => void;
+    setParentComments: (v: string) => void;
+    setObservationsAuthor: (v: string) => void;
+    setGeneralNotes: (v: string) => void;
+    setVisibleToParent: (v: boolean) => void;
+    setVisibleToTherapist: (v: boolean) => void;
+    setVisibleToSchool: (v: boolean) => void;
+    setObjectivesText: (v: string) => void;
+  },
+  options?: { skipObjectives?: boolean; skipHeader?: boolean; skipAudience?: boolean },
+) {
+  if (!options?.skipHeader) {
+    setters.setGeneralGoal(data.generalGoal ?? "");
+    setters.setHomeWork(data.homeWork ?? "");
+    setters.setParentComments(data.parentComments ?? "");
+    setters.setObservationsAuthor(data.observationsAuthor ?? readLoggedUser()?.fullName ?? "");
+    setters.setGeneralNotes(data.generalNotes ?? data.generalGoal ?? "");
+  }
+  if (!options?.skipAudience) {
+    setters.setVisibleToParent(data.visibleToParent ?? true);
+    setters.setVisibleToTherapist(data.visibleToTherapist ?? true);
+    setters.setVisibleToSchool(data.visibleToSchool ?? false);
+  }
+  if (!options?.skipObjectives) {
+    setters.setObjectivesText(
+      (data.objectives ?? [])
+        .filter((o) => o.idx < 1000)
+        .sort((a, b) => a.idx - b.idx)
+        .map((o) => o.text)
+        .join("\n"),
+    );
+  }
+}
+
 export function FollowUpDetailEditor(props: {
   followUpId: string;
   backHref: string;
@@ -84,10 +130,33 @@ export function FollowUpDetailEditor(props: {
   const [visibleToTherapist, setVisibleToTherapist] = useState(true);
   const [visibleToSchool, setVisibleToSchool] = useState(false);
 
+  const dirtyObjectives = useRef(false);
+  const dirtyHeader = useRef(false);
+  const dirtyAudience = useRef(false);
+
+  const [bankItems, setBankItems] = useState<BankObjective[]>([]);
+  const [bankQuery, setBankQuery] = useState("");
+  const [bankOpen, setBankOpen] = useState(false);
+
+  const formSetters = useMemo(
+    () => ({
+      setGeneralGoal,
+      setHomeWork,
+      setParentComments,
+      setObservationsAuthor,
+      setGeneralNotes,
+      setVisibleToParent,
+      setVisibleToTherapist,
+      setVisibleToSchool,
+      setObjectivesText,
+    }),
+    [],
+  );
+
   const objectives = useMemo(
     () =>
       objectivesText
-        .split(/[\n,]+/)
+        .split(/\n+/)
         .map((s) => s.trim())
         .filter(Boolean),
     [objectivesText],
@@ -95,15 +164,26 @@ export function FollowUpDetailEditor(props: {
 
   const tracking = useMemo(() => (fu?.area ? resolveTrackingMode(fu.area) : "MONTHLY_GRID"), [fu?.area]);
   const showSuggestions = useMemo(() => (fu?.area ? areaSupportsObjectiveSuggestions(fu.area) : false), [fu?.area]);
-  const isAdmin = useMemo(
-    () => loggedUser?.roles.some((r) => r === "ADMIN" || r === "SUPERADMIN") ?? false,
-    [loggedUser],
-  );
-  const isLocked = fu?.status === "CLOSED" && !isAdmin;
+  const isAdmin = useMemo(() => hasFullAdminRole(loggedUser?.roles ?? []), [loggedUser]);
+  const isOfficeStaff = useMemo(() => hasOfficeStaffRole(loggedUser?.roles ?? []), [loggedUser]);
+  const isLocked = fu?.status === "CLOSED" && !isOfficeStaff;
+  const canDelete =
+    !!fu && (isOfficeStaff || (fu.status === "DRAFT" && !isLocked));
   const isTextOnly = tracking === "TEXT_ONLY";
   const submitterLabel = isTextOnly
     ? fu?.observationsAuthor?.trim() || fu?.therapist?.fullName || "—"
     : fu?.therapist?.fullName ?? "—";
+
+  const filteredBank = useMemo(() => {
+    const q = bankQuery.trim().toLowerCase();
+    if (!q) return bankItems;
+    return bankItems.filter(
+      (b) =>
+        b.description.toLowerCase().includes(q) ||
+        b.creator.fullName.toLowerCase().includes(q) ||
+        (b.isPublic ? "público" : "privado").includes(q),
+    );
+  }, [bankItems, bankQuery]);
 
   const resolvedBackHref = useMemo(() => {
     if (fu?.patient?.id && patientFollowUpsPrefix) {
@@ -112,27 +192,19 @@ export function FollowUpDetailEditor(props: {
     return backHref;
   }, [fu?.patient?.id, patientFollowUpsPrefix, backHref]);
 
-  const reload = useCallback(async () => {
-    const data = (await apiFetch(`/followups/${followUpId}`)) as FollowUpDetail;
-    setFu(data);
-    setGeneralGoal(data.generalGoal ?? "");
-    setHomeWork(data.homeWork ?? "");
-    setParentComments(data.parentComments ?? "");
-    setObservationsAuthor(
-      data.observationsAuthor ?? readLoggedUser()?.fullName ?? "",
-    );
-    setGeneralNotes(data.generalNotes ?? data.generalGoal ?? "");
-    setVisibleToParent(data.visibleToParent ?? true);
-    setVisibleToTherapist(data.visibleToTherapist ?? true);
-    setVisibleToSchool(data.visibleToSchool ?? false);
-    setObjectivesText(
-      (data.objectives ?? [])
-        .filter((o) => o.idx < 1000)
-        .sort((a, b) => a.idx - b.idx)
-        .map((o) => o.text)
-        .join("\n"),
-    );
-  }, [followUpId]);
+  const reload = useCallback(
+    async (opts?: { skipObjectives?: boolean; skipHeader?: boolean; skipAudience?: boolean }) => {
+      const data = (await apiFetch(`/followups/${followUpId}`)) as FollowUpDetail;
+      setFu(data);
+      applyFollowUpToForm(data, formSetters, {
+        skipObjectives: opts?.skipObjectives || dirtyObjectives.current,
+        skipHeader: opts?.skipHeader || dirtyHeader.current,
+        skipAudience: opts?.skipAudience || dirtyAudience.current,
+      });
+      return data;
+    },
+    [followUpId, formSetters],
+  );
 
   useEffect(() => {
     const onAfterPrint = () => setReportForPrint(null);
@@ -142,6 +214,9 @@ export function FollowUpDetailEditor(props: {
 
   useEffect(() => {
     setLoggedUser(readLoggedUser());
+    dirtyObjectives.current = false;
+    dirtyHeader.current = false;
+    dirtyAudience.current = false;
     (async () => {
       try {
         if (loadTherapists) {
@@ -158,6 +233,26 @@ export function FollowUpDetailEditor(props: {
     })();
   }, [followUpId, loadTherapists, reload]);
 
+  useEffect(() => {
+    if (!fu?.area?.id || isTextOnly || isLocked) {
+      setBankItems([]);
+      return;
+    }
+    const roles = loggedUser?.roles ?? [];
+    const canLoadBank =
+      roles.includes("THERAPIST") || hasOfficeStaffRole(roles);
+    if (!canLoadBank) return;
+
+    (async () => {
+      try {
+        const rows = await apiFetch(`/therapist/objective-bank?areaId=${encodeURIComponent(fu.area.id)}`);
+        setBankItems(Array.isArray(rows) ? rows : []);
+      } catch {
+        setBankItems([]);
+      }
+    })();
+  }, [fu?.area?.id, isTextOnly, isLocked, loggedUser?.roles]);
+
   async function onSaveTextOnly(publish = false) {
     setMsg("");
     try {
@@ -169,11 +264,12 @@ export function FollowUpDetailEditor(props: {
           ...(publish ? { status: "CLOSED" } : { status: "DRAFT" }),
         }),
       });
+      dirtyHeader.current = false;
       if (publish) {
         router.push(resolvedBackHref);
         return;
       }
-      await reload();
+      await reload({ skipObjectives: true, skipAudience: true });
       setMsgType("success");
       setMsg("✅ Borrador guardado correctamente");
     } catch (e: unknown) {
@@ -192,11 +288,12 @@ export function FollowUpDetailEditor(props: {
         ...(publish ? { status: "CLOSED" } : { status: "DRAFT" }),
       };
       await apiFetch(`/followups/${followUpId}`, { method: "PATCH", body: JSON.stringify(body) });
+      dirtyHeader.current = false;
       if (publish) {
         router.push(resolvedBackHref);
         return;
       }
-      await reload();
+      await reload({ skipObjectives: true, skipAudience: true });
       setMsgType("success");
       setMsg("✅ Borrador guardado correctamente");
     } catch (e: unknown) {
@@ -212,7 +309,8 @@ export function FollowUpDetailEditor(props: {
   }
 
   async function onDeleteFollowUp() {
-    if (!confirm("¿Eliminar este seguimiento completo? Esta acción no se puede deshacer.")) return;
+    const label = fu?.status === "CLOSED" ? "publicado" : "borrador";
+    if (!confirm(`¿Eliminar este seguimiento ${label}? Esta acción no se puede deshacer.`)) return;
     setMsg("");
     try {
       await apiFetch(`/followups/${followUpId}`, { method: "DELETE" });
@@ -230,7 +328,8 @@ export function FollowUpDetailEditor(props: {
         method: "PATCH",
         body: JSON.stringify({ visibleToParent, visibleToTherapist, visibleToSchool }),
       });
-      await reload();
+      dirtyAudience.current = false;
+      await reload({ skipObjectives: true, skipHeader: true });
       setMsgType("success");
       setMsg("✅ Audiencia actualizada");
     } catch (e: unknown) {
@@ -246,9 +345,12 @@ export function FollowUpDetailEditor(props: {
         method: "POST",
         body: JSON.stringify({ objectives }),
       });
-      await reload();
+      dirtyObjectives.current = false;
+      await reload({ skipHeader: true, skipAudience: true });
+      setMsgType("success");
       setMsg("✅ Objetivos actualizados");
     } catch (e: unknown) {
+      setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");
     }
   }
@@ -259,14 +361,23 @@ export function FollowUpDetailEditor(props: {
     try {
       await apiFetch(`/followups/${followUpId}/sessions/${sessionId}`, { method: "DELETE" });
       await reload();
+      setMsgType("success");
       setMsg("✅ Sesión eliminada");
     } catch (e: unknown) {
+      setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");
     }
   }
 
   function appendSuggestion(text: string) {
+    dirtyObjectives.current = true;
     setObjectivesText((prev) => (prev.trim() ? `${prev.trim()}\n${text}` : text));
+  }
+
+  function appendBankObjective(text: string) {
+    appendSuggestion(text);
+    setBankQuery("");
+    setBankOpen(false);
   }
 
   async function printReport() {
@@ -321,7 +432,7 @@ export function FollowUpDetailEditor(props: {
               {exporting ? "Preparando expediente…" : "Exportar expediente"}
             </button>
           ) : null}
-          {isAdmin ? (
+          {canDelete ? (
             <button type="button" className="btn rounded-xl px-3 py-2 text-sm text-danger" onClick={() => void onDeleteFollowUp()}>
               Eliminar seguimiento
             </button>
@@ -344,15 +455,36 @@ export function FollowUpDetailEditor(props: {
           </div>
           <div className="flex flex-wrap gap-4 text-sm">
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={visibleToParent} onChange={(e) => setVisibleToParent(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={visibleToParent}
+                onChange={(e) => {
+                  dirtyAudience.current = true;
+                  setVisibleToParent(e.target.checked);
+                }}
+              />
               Papás
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={visibleToTherapist} onChange={(e) => setVisibleToTherapist(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={visibleToTherapist}
+                onChange={(e) => {
+                  dirtyAudience.current = true;
+                  setVisibleToTherapist(e.target.checked);
+                }}
+              />
               Terapeutas
             </label>
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={visibleToSchool} onChange={(e) => setVisibleToSchool(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={visibleToSchool}
+                onChange={(e) => {
+                  dirtyAudience.current = true;
+                  setVisibleToSchool(e.target.checked);
+                }}
+              />
               Escuela
             </label>
           </div>
@@ -376,7 +508,10 @@ export function FollowUpDetailEditor(props: {
             <textarea
               className="textarea min-h-[220px]"
               value={generalNotes}
-              onChange={(e) => setGeneralNotes(e.target.value)}
+              onChange={(e) => {
+                dirtyHeader.current = true;
+                setGeneralNotes(e.target.value);
+              }}
               placeholder="Escriba aquí las observaciones del mes…"
               disabled={isLocked}
             />
@@ -386,7 +521,10 @@ export function FollowUpDetailEditor(props: {
             <input
               className="input"
               value={observationsAuthor}
-              onChange={(e) => setObservationsAuthor(e.target.value)}
+              onChange={(e) => {
+                dirtyHeader.current = true;
+                setObservationsAuthor(e.target.value);
+              }}
               placeholder="Nombre de quien llenó este registro"
               disabled={isLocked}
             />
@@ -421,11 +559,64 @@ export function FollowUpDetailEditor(props: {
                 ))}
               </div>
             ) : null}
-            <p className="text-xs text-subtle">Una por línea o separadas por coma.</p>
+
+            {!isLocked ? (
+              <div className="space-y-2 rounded-xl border border-border bg-surface-elevated/40 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Buscar en banco de objetivos</p>
+                  <button
+                    type="button"
+                    className="text-xs text-subtle underline"
+                    onClick={() => setBankOpen((v) => !v)}
+                  >
+                    {bankOpen ? "Ocultar" : "Mostrar"}
+                  </button>
+                </div>
+                {bankOpen ? (
+                  <>
+                    <input
+                      className="input"
+                      placeholder="Buscar en mis objetivos o catálogo público…"
+                      value={bankQuery}
+                      onChange={(e) => setBankQuery(e.target.value)}
+                    />
+                    {filteredBank.length === 0 ? (
+                      <p className="text-xs text-subtle">
+                        {bankItems.length === 0
+                          ? "No hay objetivos en el banco para esta área."
+                          : "Sin coincidencias."}
+                      </p>
+                    ) : (
+                      <ul className="max-h-48 space-y-1 overflow-y-auto text-sm">
+                        {filteredBank.map((b) => (
+                          <li key={b.id}>
+                            <button
+                              type="button"
+                              className="w-full rounded-lg border border-transparent px-2 py-1.5 text-left hover:border-border hover:bg-surface-elevated"
+                              onClick={() => appendBankObjective(b.description)}
+                            >
+                              <span className="font-medium">{b.description}</span>
+                              <span className="mt-0.5 block text-xs text-subtle">
+                                {b.isPublic ? "Público" : "Privado"} · {b.creator.fullName}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+
+            <p className="text-xs text-subtle">Un objetivo por línea (Enter). Puede usar comas dentro del texto.</p>
             <textarea
               className="textarea min-h-[140px]"
               value={objectivesText}
-              onChange={(e) => setObjectivesText(e.target.value)}
+              onChange={(e) => {
+                dirtyObjectives.current = true;
+                setObjectivesText(e.target.value);
+              }}
               disabled={isLocked}
             />
             {!isLocked ? (
@@ -442,7 +633,7 @@ export function FollowUpDetailEditor(props: {
                 followUpId={fu.id}
                 defaultTherapistId={defaultTherapistId}
                 therapists={therapists.length ? therapists : [{ id: defaultTherapistId, fullName: fu.therapist?.fullName ?? "Terapeuta" }]}
-                onCreated={reload}
+                onCreated={() => void reload()}
                 disabled={isLocked}
               />
             ) : null}
@@ -470,7 +661,7 @@ export function FollowUpDetailEditor(props: {
                 followUpId={fu.id}
                 objectives={fu.objectives}
                 sessions={fu.sessions ?? []}
-                onSaved={reload}
+                onSaved={() => void reload()}
                 readOnly={isLocked}
               />
             ) : (
@@ -485,15 +676,39 @@ export function FollowUpDetailEditor(props: {
         <h2 className="text-lg font-semibold">Cierre de mes</h2>
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-subtle">Observaciones generales</span>
-          <textarea className="textarea min-h-[120px]" value={generalNotes} onChange={(e) => setGeneralNotes(e.target.value)} disabled={isLocked} />
+          <textarea
+            className="textarea min-h-[120px]"
+            value={generalNotes}
+            onChange={(e) => {
+              dirtyHeader.current = true;
+              setGeneralNotes(e.target.value);
+            }}
+            disabled={isLocked}
+          />
         </label>
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-subtle">Trabajo en casa</span>
-          <textarea className="textarea min-h-[120px]" value={homeWork} onChange={(e) => setHomeWork(e.target.value)} disabled={isLocked} />
+          <textarea
+            className="textarea min-h-[120px]"
+            value={homeWork}
+            onChange={(e) => {
+              dirtyHeader.current = true;
+              setHomeWork(e.target.value);
+            }}
+            disabled={isLocked}
+          />
         </label>
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-subtle">Comentarios que hizo el papá</span>
-          <textarea className="textarea min-h-[120px]" value={parentComments} onChange={(e) => setParentComments(e.target.value)} disabled={isLocked} />
+          <textarea
+            className="textarea min-h-[120px]"
+            value={parentComments}
+            onChange={(e) => {
+              dirtyHeader.current = true;
+              setParentComments(e.target.value);
+            }}
+            disabled={isLocked}
+          />
         </label>
         {!isLocked ? (
           <div className="flex flex-wrap gap-2">

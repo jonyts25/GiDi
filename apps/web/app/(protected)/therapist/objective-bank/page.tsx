@@ -42,9 +42,9 @@ export default function TherapistObjectiveBankPage() {
     () => rows.filter((r) => r.creator.id === user?.id),
     [rows, user?.id],
   );
-  const publicOthers = useMemo(
-    () => rows.filter((r) => r.isPublic && r.creator.id !== user?.id),
-    [rows, user?.id],
+  const publicCatalog = useMemo(
+    () => rows.filter((r) => r.isPublic),
+    [rows],
   );
 
   const load = useCallback(async () => {
@@ -264,11 +264,11 @@ export default function TherapistObjectiveBankPage() {
           <h2 className="text-lg font-semibold">Catálogo público</h2>
           <span className="text-xs text-subtle">Solo lectura</span>
         </div>
-        {publicOthers.length === 0 ? (
-          <p className="text-sm text-subtle">No hay objetivos públicos de otros usuarios.</p>
+        {publicCatalog.length === 0 ? (
+          <p className="text-sm text-subtle">No hay objetivos públicos todavía.</p>
         ) : (
           <ul className="space-y-2">
-            {publicOthers.map((o) => (
+            {publicCatalog.map((o) => (
               <li
                 key={o.id}
                 className="flex flex-col gap-2 rounded-xl border border-border bg-white/[0.03] p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -277,6 +277,7 @@ export default function TherapistObjectiveBankPage() {
                   <p className="font-medium">{o.description}</p>
                   <p className="text-xs text-subtle">
                     {o.area.name} · {o.creator.fullName}
+                    {o.creator.id === user?.id ? " · tuyo" : ""}
                   </p>
                 </div>
                 {isAdmin ? (

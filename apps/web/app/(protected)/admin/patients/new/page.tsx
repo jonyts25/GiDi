@@ -5,6 +5,7 @@ import { apiFetch } from "../../../../../lib/api";
 import { useRouter } from "next/navigation";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
 import { prepareFileForUpload } from "@/lib/compress-upload";
+import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
 
 type DocCategory = "EVALUACION" | "REVALUACION" | "SEGUIMIENTO_PADRES";
 
@@ -39,7 +40,7 @@ export default function AdminNewPatientPage() {
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState(""); // yyyy-mm-dd
   const [notes, setNotes] = useState("");
-  const [center, setCenter] = useState<"SAN_AGUSTIN" | "VALLARTA">("SAN_AGUSTIN");
+  const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
   const [sessionsPerWeek, setSessionsPerWeek] = useState("");
   const [discountPercent, setDiscountPercent] = useState("0");
   const [payYear, setPayYear] = useState(String(new Date().getFullYear()));
@@ -66,6 +67,9 @@ export default function AdminNewPatientPage() {
   const [selectedTherapistIds, setSelectedTherapistIds] = useState<string[]>([]);
 
   // school
+  const [schools, setSchools] = useState<UserLite[]>([]);
+  const [schoolMode, setSchoolMode] = useState<"existing" | "new" | "none">("existing");
+  const [pickedSchoolId, setPickedSchoolId] = useState("");
   const [schoolFullName, setSchoolFullName] = useState("");
   const [schoolEmail, setSchoolEmail] = useState("");
   const [schoolNotes, setSchoolNotes] = useState("");
@@ -97,12 +101,14 @@ export default function AdminNewPatientPage() {
 
     (async () => {
       try {
-        const [t, p] = await Promise.all([
+        const [t, p, s] = await Promise.all([
           apiFetch("/users/therapists"),
           apiFetch("/admin/users/role/PARENT"),
+          apiFetch("/admin/users/role/SCHOOL"),
         ]);
         setTherapists(t);
         setParents(p);
+        setSchools(s);
       } catch (e: any) {
         setMsg(e.message);
       }
@@ -227,6 +233,23 @@ export default function AdminNewPatientPage() {
         payload.guardians = guardiansPayload;
       }
 
+      if (schoolMode === "existing" && pickedSchoolId) {
+        payload.schoolId = pickedSchoolId;
+        if (schoolNotes.trim()) {
+          payload.school = { notes: schoolNotes.trim() };
+        }
+      } else if (schoolMode === "new") {
+        if (!schoolFullName.trim() || !schoolEmail.trim()) {
+          setMsg("Para registrar una escuela nueva indique nombre y email.");
+          return;
+        }
+        payload.school = {
+          fullName: schoolFullName.trim(),
+          email: schoolEmail.trim().toLowerCase(),
+          notes: schoolNotes.trim() || undefined,
+        };
+      }
+
       const res = await apiFetch("/patients", {
         method: "POST",
         body: JSON.stringify(payload),
@@ -276,6 +299,15 @@ export default function AdminNewPatientPage() {
         });
       }
 
+      if (res?.schoolTempPassword && res?.school?.email) {
+        creds.push({
+          role: "SCHOOL",
+          fullName: res.school.fullName,
+          email: res.school.email,
+          temporaryPassword: res.schoolTempPassword,
+        });
+      }
+
       setCreatedCreds(creds);
       router.push(`/admin/patients/${patientId}`);
     } catch (e: any) {
@@ -315,9 +347,10 @@ export default function AdminNewPatientPage() {
         <div className="row">
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Centro GiDi</span>
-            <select className="select" value={center} onChange={(e) => setCenter(e.target.value as "SAN_AGUSTIN" | "VALLARTA")}>
-              <option value="SAN_AGUSTIN">San Agustín</option>
-              <option value="VALLARTA">Vallarta</option>
+            <select className="select" value={center} onChange={(e) => setCenter(e.target.value as GidiCenterKey)}>
+              {GIDI_CENTER_OPTIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
             </select>
           </label>
         </div>
@@ -502,11 +535,89 @@ export default function AdminNewPatientPage() {
       {/* Escuela */}
       <section className="card" style={{ marginTop: 12 }}>
         <h3 style={{ marginTop: 0 }}>Escuela (opcional)</h3>
-        <div className="row">
-          <input className="input" placeholder="Nombre escuela / contacto" value={schoolFullName} onChange={(e) => setSchoolFullName(e.target.value)} />
-          <input className="input" placeholder="Email escuela" value={schoolEmail} onChange={(e) => setSchoolEmail(e.target.value)} />
+        <p className="sub" style={{ marginBottom: 12 }}>
+          Elija una escuela ya registrada o cree el usuario escuela aquí mismo.
+        </p>
+
+        <div className="row" style={{ marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <button
+            type="button"
+            className="btn"
+            style={{ fontWeight: schoolMode === "existing" ? 800 : 400, opacity: schoolMode === "existing" ? 1 : 0.75 }}
+            onClick={() => setSchoolMode("existing")}
+          >
+            Elegir de la lista
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{ fontWeight: schoolMode === "new" ? 800 : 400, opacity: schoolMode === "new" ? 1 : 0.75 }}
+            onClick={() => setSchoolMode("new")}
+          >
+            Registrar nueva
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{ fontWeight: schoolMode === "none" ? 800 : 400, opacity: schoolMode === "none" ? 1 : 0.75 }}
+            onClick={() => setSchoolMode("none")}
+          >
+            Sin escuela
+          </button>
         </div>
-        <input className="input" placeholder="Notas escuela (opcional)" value={schoolNotes} onChange={(e) => setSchoolNotes(e.target.value)} />
+
+        {schoolMode === "existing" ? (
+          <div className="row" style={{ flexWrap: "wrap", alignItems: "flex-end" }}>
+            <select
+              className="input"
+              style={{ minWidth: 260 }}
+              value={pickedSchoolId}
+              onChange={(e) => setPickedSchoolId(e.target.value)}
+            >
+              <option value="">— Escuela —</option>
+              {schools.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.fullName} ({s.email})
+                </option>
+              ))}
+            </select>
+            <input
+              className="input"
+              placeholder="Notas escuela (opcional)"
+              value={schoolNotes}
+              onChange={(e) => setSchoolNotes(e.target.value)}
+            />
+          </div>
+        ) : null}
+
+        {schoolMode === "new" ? (
+          <>
+            <div className="row">
+              <input
+                className="input"
+                placeholder="Nombre escuela / contacto"
+                value={schoolFullName}
+                onChange={(e) => setSchoolFullName(e.target.value)}
+              />
+              <input
+                className="input"
+                placeholder="Email escuela"
+                value={schoolEmail}
+                onChange={(e) => setSchoolEmail(e.target.value)}
+              />
+            </div>
+            <input
+              className="input"
+              placeholder="Notas escuela (opcional)"
+              value={schoolNotes}
+              onChange={(e) => setSchoolNotes(e.target.value)}
+            />
+          </>
+        ) : null}
+
+        {schoolMode === "none" ? (
+          <p className="sub">Este paciente se dará de alta sin escuela vinculada.</p>
+        ) : null}
       </section>
 
       {/* Guardar */}

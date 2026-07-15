@@ -112,6 +112,7 @@ model Patient {
 enum GidiCenter {
   SAN_AGUSTIN
   VALLARTA
+  COLEGIOS
 }
 
 enum PatientDocumentCategory {
