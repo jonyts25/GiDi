@@ -105,18 +105,30 @@ export default function ParentPaymentsPage() {
             <section className="card space-y-2 border-l-4 border-l-info text-sm">
               <h2 className="text-lg font-semibold">Datos para transferencia</h2>
               <p className="text-subtle">{data.transferInfo.centerLabel}</p>
-              <ul className="space-y-1">
-                <li><span className="text-subtle">Titular:</span> <strong>{data.transferInfo.titular}</strong></li>
-                <li><span className="text-subtle">Banco:</span> {data.transferInfo.banco}</li>
-                <li><span className="text-subtle">CLABE:</span> <strong>{data.transferInfo.clabe}</strong></li>
-                {data.transferInfo.cuenta ? (
-                  <li><span className="text-subtle">Cuenta:</span> {data.transferInfo.cuenta}</li>
-                ) : null}
-                <li>
-                  <span className="text-subtle">Concepto:</span>{" "}
-                  <strong>{data.patient.firstName} {data.patient.lastName}</strong>
-                </li>
-              </ul>
+              {data.transferInfo.clabe || data.transferInfo.titular ? (
+                <ul className="space-y-1">
+                  {data.transferInfo.titular ? (
+                    <li><span className="text-subtle">Titular:</span> <strong>{data.transferInfo.titular}</strong></li>
+                  ) : null}
+                  {data.transferInfo.banco ? (
+                    <li><span className="text-subtle">Banco:</span> {data.transferInfo.banco}</li>
+                  ) : null}
+                  {data.transferInfo.clabe ? (
+                    <li><span className="text-subtle">CLABE:</span> <strong>{data.transferInfo.clabe}</strong></li>
+                  ) : null}
+                  {data.transferInfo.cuenta ? (
+                    <li><span className="text-subtle">Cuenta:</span> {data.transferInfo.cuenta}</li>
+                  ) : null}
+                  <li>
+                    <span className="text-subtle">Concepto:</span>{" "}
+                    <strong>{data.patient.firstName} {data.patient.lastName}</strong>
+                  </li>
+                </ul>
+              ) : (
+                <p className="text-subtle">
+                  Los datos bancarios de esta sede aún no están configurados. Contacte a administración.
+                </p>
+              )}
               <p className="text-xs text-subtle">
                 Después de pagar, sube tu comprobante en el mes correspondiente.
               </p>

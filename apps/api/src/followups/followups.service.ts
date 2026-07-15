@@ -450,10 +450,19 @@ export class FollowUpsService {
   }
 
   async deleteFollowUp(user: AuthUser, id: string) {
-    if (!this.access.isAdmin(user)) {
-      throw new ForbiddenException("Solo administradores pueden eliminar seguimientos");
+    const fu = await this.access.getFollowUpForAccess(id);
+
+    if (fu.status === FollowUpStatus.CLOSED) {
+      if (!this.access.isOfficeStaff(user)) {
+        throw new ForbiddenException(
+          "Solo administradores o secretaria pueden eliminar seguimientos publicados",
+        );
+      }
+    } else {
+      // Borradores: quien pueda editarlos puede borrarlos
+      await this.access.assertCanEditFollowUp(user, id);
     }
-    await this.access.getFollowUpForAccess(id);
+
     await this.prisma.followUp.delete({ where: { id } });
     return { ok: true };
   }

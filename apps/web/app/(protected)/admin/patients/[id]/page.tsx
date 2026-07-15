@@ -8,6 +8,7 @@ import { PatientDocumentsPanel } from "@/components/patients/PatientDocumentsPan
 import { AdminPaymentsPanel } from "@/components/payments/AdminPaymentsPanel";
 import { SaveBanner } from "@/components/ui/SaveBanner";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
 
 type MiniUser = { id: string; fullName: string; email: string; status: "ACTIVE" | "INACTIVE" };
 
@@ -18,7 +19,7 @@ type FullPatient = {
     lastName: string;
     birthDate?: string | null;
     notes?: string | null;
-    center?: "SAN_AGUSTIN" | "VALLARTA";
+    center?: GidiCenterKey;
   };
   guardians: {
     parentId: string;
@@ -65,7 +66,7 @@ export default function AdminPatientDetail() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [notes, setNotes] = useState("");
-  const [center, setCenter] = useState<"SAN_AGUSTIN" | "VALLARTA">("SAN_AGUSTIN");
+  const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
 
   // add guardian form
   const [guardianMode, setGuardianMode] = useState<"existing" | "new">("existing");
@@ -308,6 +309,30 @@ export default function AdminPatientDetail() {
     }
   }
 
+  async function onDeletePatient() {
+    const fullName = `${data?.patient.firstName ?? ""} ${data?.patient.lastName ?? ""}`.trim();
+    if (
+      !confirm(
+        `¿BORRAR permanentemente a «${fullName}»?\n\nSe eliminarán seguimientos, documentos, pagos y vínculos. No se puede deshacer.`,
+      )
+    ) {
+      return;
+    }
+    const typed = window.prompt(`Para confirmar, escriba el nombre completo del paciente:\n${fullName}`);
+    if (typed === null) return;
+    if (typed.trim().toLowerCase() !== fullName.toLowerCase()) {
+      setMsg("El nombre no coincide. No se borró el paciente.");
+      return;
+    }
+    setMsg("");
+    try {
+      await apiFetch(`/admin/patients/${id}`, { method: "DELETE" });
+      router.push("/admin/patients");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error al borrar paciente");
+    }
+  }
+
   if (!data) return <p style={{ padding: 20 }}>Cargando...</p>;
 
   return (
@@ -338,9 +363,10 @@ export default function AdminPatientDetail() {
           </label>
           <label className="grid gap-1 text-sm">
             <span className="font-medium">Centro GiDi</span>
-            <select className="select" value={center} onChange={(e) => setCenter(e.target.value as "SAN_AGUSTIN" | "VALLARTA")}>
-              <option value="SAN_AGUSTIN">San Agustín</option>
-              <option value="VALLARTA">Vallarta</option>
+            <select className="select" value={center} onChange={(e) => setCenter(e.target.value as GidiCenterKey)}>
+              {GIDI_CENTER_OPTIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
             </select>
           </label>
           <label className="grid gap-1 text-sm">
@@ -586,6 +612,17 @@ export default function AdminPatientDetail() {
         </p>
         <button type="button" className="btn rounded-xl px-4 py-2 text-sm text-danger" onClick={() => void onDischarge()}>
           Dar de baja paciente
+        </button>
+      </section>
+
+      <section className="card mt-6 space-y-3 border-l-4 border-l-danger">
+        <h2 className="text-lg font-semibold">Borrar paciente</h2>
+        <p className="text-sm text-subtle">
+          Eliminación permanente (útil para duplicados creados por error). Borra seguimientos, documentos, pagos y vínculos.
+          Solo administrador o secretaria.
+        </p>
+        <button type="button" className="btn rounded-xl px-4 py-2 text-sm font-semibold text-danger" onClick={() => void onDeletePatient()}>
+          Borrar paciente definitivamente
         </button>
       </section>
 

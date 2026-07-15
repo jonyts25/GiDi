@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
+import { labelForCenter } from "@/lib/centers";
 
 type PatientRow = {
   id: string;
@@ -64,7 +65,7 @@ export default function SchoolPatientsPage() {
               <li key={p.id} className="flex items-center justify-between py-3">
                 <span className="font-medium">
                   {p.lastName}, {p.firstName}
-                  {p.center ? <span className="ml-2 text-xs text-subtle">· {p.center === "VALLARTA" ? "Vallarta" : "San Agustín"}</span> : null}
+                  {p.center ? <span className="ml-2 text-xs text-subtle">· {labelForCenter(p.center)}</span> : null}
                 </span>
                 <Link className="btn rounded-lg px-3 py-1.5 text-sm" href={`/school/patients/${p.id}`}>
                   Ver

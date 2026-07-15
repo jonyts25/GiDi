@@ -85,4 +85,18 @@ export const AREA_CATALOG: AreaCatalogEntry[] = [
     sortOrder: 50,
     trackingMode: AreaTrackingMode.MONTHLY_GRID,
   },
+  {
+    key: "ATENCION_DISPOSITIVOS_APRENDIZAJE",
+    name: "Atención - Dispositivos básicos del aprendizaje",
+    category: "Aprendizaje",
+    sortOrder: 51,
+    trackingMode: AreaTrackingMode.MONTHLY_GRID,
+  },
+  {
+    key: "MOTIVACION_DISPOSITIVOS_APRENDIZAJE",
+    name: "Motivación - Dispositivos básicos del aprendizaje",
+    category: "Aprendizaje",
+    sortOrder: 52,
+    trackingMode: AreaTrackingMode.MONTHLY_GRID,
+  },
 ];

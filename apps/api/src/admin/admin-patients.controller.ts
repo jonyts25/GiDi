@@ -62,6 +62,11 @@ export class AdminPatientsController {
     return this.svc.reactivatePatient(id);
   }
 
+  @Delete(":id")
+  deletePatient(@Param("id") id: string) {
+    return this.svc.deletePatient(id);
+  }
+
   // -------- therapists assignment ----------
   @Post(":id/therapists")
   assignTherapist(@Param("id") id: string, @Body() body: { therapistId: string }) {

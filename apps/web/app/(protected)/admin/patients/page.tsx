@@ -8,6 +8,7 @@ import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
 import { ListPagination } from "@/components/ui/ListPagination";
 import { paginate, sortByFullName, type SortDir } from "@/lib/list-utils";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { GIDI_CENTER_OPTIONS, labelForCenter, type GidiCenterKey } from "@/lib/centers";
 
 type Patient = {
   id: string;
@@ -18,11 +19,6 @@ type Patient = {
   createdAt: string;
 };
 
-const CENTER_LABEL: Record<string, string> = {
-  SAN_AGUSTIN: "San Agustín",
-  VALLARTA: "Vallarta",
-};
-
 export default function AdminPatientsPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -30,7 +26,7 @@ export default function AdminPatientsPage() {
   const [msg, setMsg] = useState("");
 
   const [query, setQuery] = useState("");
-  const [centerFilter, setCenterFilter] = useState<"" | "SAN_AGUSTIN" | "VALLARTA">("");
+  const [centerFilter, setCenterFilter] = useState<"" | GidiCenterKey>("");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -97,11 +93,14 @@ export default function AdminPatientsPage() {
         <select
           className="input"
           value={centerFilter}
-          onChange={(e) => setCenterFilter(e.target.value as "" | "SAN_AGUSTIN" | "VALLARTA")}
+          onChange={(e) => setCenterFilter(e.target.value as "" | GidiCenterKey)}
         >
           <option value="">Todos los centros</option>
-          <option value="SAN_AGUSTIN">San Agustín</option>
-          <option value="VALLARTA">Vallarta</option>
+          {GIDI_CENTER_OPTIONS.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -171,7 +170,7 @@ export default function AdminPatientsPage() {
                           </Link>
                         </td>
                         <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
-                          {p.center ? (CENTER_LABEL[p.center] ?? p.center) : "—"}
+                          {labelForCenter(p.center)}
                         </td>
                         <td style={{ color: "var(--muted)" }}>{p.notes ?? ""}</td>
                         <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>

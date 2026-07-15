@@ -33,6 +33,7 @@ const REL_LABELS: Record<string, string> = {
 function centerLabel(center?: string) {
   if (center === "VALLARTA") return "GiDi Vallarta";
   if (center === "SAN_AGUSTIN") return "GiDi San Agustín";
+  if (center === "COLEGIOS") return "GiDi Colegios";
   return "—";
 }
 

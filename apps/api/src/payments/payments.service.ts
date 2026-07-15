@@ -230,7 +230,7 @@ export class PaymentsService {
   async exportRows(filters: {
     year?: number;
     month?: number;
-    center?: "SAN_AGUSTIN" | "VALLARTA";
+    center?: "SAN_AGUSTIN" | "VALLARTA" | "COLEGIOS";
     patientId?: string;
   }) {
     const where: Record<string, unknown> = {};
@@ -256,9 +256,15 @@ export class PaymentsService {
       },
     });
 
+    const sedeLabel: Record<string, string> = {
+      SAN_AGUSTIN: "San Agustín",
+      VALLARTA: "Vallarta",
+      COLEGIOS: "Colegios",
+    };
+
     return rows.map((r) => ({
       paciente: `${r.patient.firstName} ${r.patient.lastName}`.trim(),
-      sede: r.patient.center === "VALLARTA" ? "Vallarta" : "San Agustín",
+      sede: sedeLabel[r.patient.center] ?? r.patient.center,
       anio: r.periodYear,
       mes: r.periodMonth,
       monto_a_pagar: r.amountDue,

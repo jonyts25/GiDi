@@ -6,6 +6,7 @@ import Link from "next/link";
 import { apiFetch } from "../../../../../lib/api";
 import { SaveBanner } from "@/components/ui/SaveBanner";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { labelForCenter } from "@/lib/centers";
 
 type UserDetail = {
   id: string;
@@ -141,7 +142,7 @@ export default function AdminSchoolDetailPage() {
             {patients.map((p) => (
               <li key={p.patientId}>
                 {p.lastName}, {p.firstName}
-                {p.center ? ` · ${p.center === "VALLARTA" ? "Vallarta" : "San Agustín"}` : ""}
+                {p.center ? ` · ${labelForCenter(p.center)}` : ""}
               </li>
             ))}
           </ul>
