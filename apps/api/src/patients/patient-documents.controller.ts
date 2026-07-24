@@ -17,14 +17,14 @@ export class PatientDocumentsController {
   ) {}
 
   @Get()
-  @Roles("ADMIN", "THERAPIST", "PARENT", "SCHOOL")
+  @Roles("ADMIN", "SECRETARY", "THERAPIST", "PARENT", "SCHOOL")
   async list(@CurrentUser() user: AuthUser, @Param("patientId") patientId: string) {
     await this.access.assertCanViewPatient(user, patientId);
     return this.svc.list(patientId);
   }
 
   @Post()
-  @Roles("ADMIN", "THERAPIST", "PARENT")
+  @Roles("ADMIN", "SECRETARY", "THERAPIST", "PARENT")
   async upload(
     @CurrentUser() user: AuthUser,
     @Param("patientId") patientId: string,
@@ -35,7 +35,7 @@ export class PatientDocumentsController {
   }
 
   @Get(":docId/file")
-  @Roles("ADMIN", "THERAPIST", "PARENT", "SCHOOL")
+  @Roles("ADMIN", "SECRETARY", "THERAPIST", "PARENT", "SCHOOL")
   async file(
     @CurrentUser() user: AuthUser,
     @Param("patientId") patientId: string,

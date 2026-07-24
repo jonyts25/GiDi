@@ -74,14 +74,16 @@ export default function AdminPatientsPage() {
     <main style={{ paddingTop: 18 }}>
       <div className="row">
         <div>
-          <div className="h1">Pacientes</div>
-          <p className="sub">Admin · listado y alta</p>
+          <div className="h1">Lista de pacientes o agregar nuevo paciente</div>
+          <p className="sub">
+            Aquí ves el listado y das de alta pacientes. La pestaña «Altas» es para pacientes que ya terminaron su proceso, no para registrar nuevos.
+          </p>
         </div>
         <Link className="btn" href="/dashboard">
           ← Volver
         </Link>
         <Link className="btn" href="/admin/patients/altas">
-          Altas
+          Altas (terminaron)
         </Link>
         <Link className="btn" href="/admin/patients/discharged">
           Bajas
@@ -109,22 +111,32 @@ export default function AdminPatientsPage() {
 
       <div className="grid2" style={{ marginTop: 14 }}>
         <section className="card">
-          <h3 style={{ marginTop: 0 }}>Alta completa</h3>
+          <h3 style={{ marginTop: 0 }}>Nuevo paciente, registro completo</h3>
           <p className="sub" style={{ marginTop: 6 }}>
             Registra paciente + padres/tutores + escuela + terapeuta(s). Al final te muestra credenciales generadas
             para copiar y enviar.
           </p>
           <div style={{ marginTop: 12 }}>
             <Link href="/admin/patients/new">
-              <button className="btn">Ir a alta completa</button>
+              <button className="btn">Ir a registro completo</button>
             </Link>
           </div>
-          <p className="sub" style={{ marginTop: 12 }}>
-            (Si luego quieres, dejamos también “alta rápida”, pero para demo es mejor un solo flujo.)
-          </p>
         </section>
 
         <section className="card">
+          <h3 style={{ marginTop: 0 }}>Nuevo paciente, registro rápido</h3>
+          <p className="sub" style={{ marginTop: 6 }}>
+            Solo nombre, fecha de nacimiento, notas, centro, documentos iniciales (evaluación y revaloración) y terapeuta.
+          </p>
+          <div style={{ marginTop: 12 }}>
+            <Link href="/admin/patients/quick">
+              <button className="btn">Ir a registro rápido</button>
+            </Link>
+          </div>
+        </section>
+      </div>
+
+      <section className="card" style={{ marginTop: 14 }}>
           <div className="row" style={{ alignItems: "baseline" }}>
             <h3 style={{ marginTop: 0 }}>Listado</h3>
             <span className="sub">Click en un nombre para abrir la ficha</span>
@@ -197,8 +209,7 @@ export default function AdminPatientsPage() {
               />
             </>
           )}
-        </section>
-      </div>
+      </section>
     </main>
   );
 }

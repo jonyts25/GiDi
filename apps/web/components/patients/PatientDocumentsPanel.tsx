@@ -37,7 +37,7 @@ type DocRow = {
 
 export function PatientDocumentsPanel({ patientId, canUpload = true }: { patientId: string; canUpload?: boolean }) {
   const roles = getRoles();
-  const isAdmin = roles.includes("ADMIN") || roles.includes("SUPERADMIN");
+  const isAdmin = roles.includes("ADMIN") || roles.includes("SUPERADMIN") || roles.includes("SECRETARY");
   // Las terapeutas (que no son admin/papá) solo suben en "Seguimiento con papás".
   const therapistOnly = !isAdmin && roles.includes("THERAPIST") && !roles.includes("PARENT");
   const uploadCategories = therapistOnly ? (["SEGUIMIENTO_PADRES"] as const) : (["EVALUACION", "REVALUACION", "SEGUIMIENTO_PADRES"] as const);

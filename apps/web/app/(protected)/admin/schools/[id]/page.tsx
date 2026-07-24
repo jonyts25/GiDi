@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "../../../../../lib/api";
 import { SaveBanner } from "@/components/ui/SaveBanner";
-import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { hasOfficeStaffRole, STATUS_LABELS } from "@/lib/role-permissions";
+import ResetPasswordButton from "@/components/admin/ResetPasswordButton";
 import { labelForCenter } from "@/lib/centers";
 
 type UserDetail = {
@@ -73,8 +74,6 @@ export default function AdminSchoolDetailPage() {
     })();
   }, [id, router]);
 
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
-
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
@@ -85,19 +84,6 @@ export default function AdminSchoolDetailPage() {
       });
       setU(updated);
       setMsg("✅ Guardado");
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : "Error");
-    }
-  }
-
-  async function onResetPassword() {
-    if (!confirm("¿Generar una nueva contraseña de una sola vez para esta escuela? La anterior dejará de funcionar.")) return;
-    setMsg("");
-    setTempPassword(null);
-    try {
-      const res = (await apiFetch(`/admin/users/${id}/reset-password`, { method: "POST" })) as { tempPassword: string };
-      setTempPassword(res.tempPassword);
-      setMsg("✅ Contraseña regenerada. Cópiala y compártela; deberá cambiarla al entrar.");
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error");
     }
@@ -139,10 +125,10 @@ export default function AdminSchoolDetailPage() {
           <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
           <label className="sub">Email</label>
           <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <label className="sub">Status</label>
+          <label className="sub">Estatus</label>
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value as "ACTIVE" | "INACTIVE")}>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="ACTIVE">{STATUS_LABELS.ACTIVE}</option>
+            <option value="INACTIVE">{STATUS_LABELS.INACTIVE}</option>
           </select>
           <button className="btn-primary" type="submit">Guardar</button>
         </form>
@@ -153,23 +139,9 @@ export default function AdminSchoolDetailPage() {
         <p className="sub">
           Genera una contraseña de una sola vez si la olvidaron. Al entrar, la escuela deberá cambiarla.
         </p>
-        <button className="btn" type="button" style={{ marginTop: 8 }} onClick={() => void onResetPassword()}>
-          Regenerar contraseña
-        </button>
-        {tempPassword ? (
-          <div className="card" style={{ marginTop: 12, background: "var(--surface-elevated, #f5f5f5)" }}>
-            <p className="sub" style={{ marginBottom: 4 }}>Contraseña temporal (cópiala ahora, no se vuelve a mostrar):</p>
-            <code style={{ fontSize: 16, fontWeight: 700, letterSpacing: 1 }}>{tempPassword}</code>
-            <button
-              className="btn"
-              type="button"
-              style={{ marginLeft: 12 }}
-              onClick={() => void navigator.clipboard.writeText(tempPassword)}
-            >
-              Copiar
-            </button>
-          </div>
-        ) : null}
+        <div style={{ marginTop: 10 }}>
+          <ResetPasswordButton userId={id} />
+        </div>
       </section>
 
       <section className="card" style={{ marginTop: 14 }}>

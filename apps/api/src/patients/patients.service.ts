@@ -9,6 +9,7 @@ type GuardianInput = {
   existingParentId?: string;
   email?: string;
   fullName?: string;
+  phone?: string;
   relationship?: GuardianRelationship;
   isPrimary?: boolean;
   notes?: string | null;
@@ -25,6 +26,7 @@ function collectGuardians(dto: CreatePatientBody): GuardianInput[] {
       {
         email: dto.parent.email,
         fullName: dto.parent.fullName,
+        phone: dto.parent.phone,
         relationship: dto.parent.relationship,
         isPrimary: dto.parent.isPrimary,
         notes: dto.parent.notes ?? null,
@@ -137,6 +139,7 @@ export class PatientsService {
             data: {
               email,
               fullName,
+              phone: g.phone?.trim() || null,
               password: passwordHash,
               mustChangePassword: true,
               status: "ACTIVE",

@@ -1,4 +1,4 @@
-export type PaymentStatus = "PENDIENTE" | "PAGADO" | "PARCIAL" | "DEUDA";
+export type PaymentStatus = "PENDIENTE" | "PAGADO" | "PARCIAL" | "DEUDA" | "PAUSA_VACACIONES";
 
 export type PaymentRow = {
   id: string;
@@ -29,6 +29,7 @@ export const STATUS_LABEL: Record<PaymentStatus, string> = {
   PAGADO: "Pagado",
   PARCIAL: "Parcial",
   DEUDA: "Deuda",
+  PAUSA_VACACIONES: "Pauso/Vacaciones",
 };
 
 export function statusClasses(status: PaymentStatus): string {
@@ -39,6 +40,8 @@ export function statusClasses(status: PaymentStatus): string {
       return "bg-warning/15 text-warning border-warning/30";
     case "DEUDA":
       return "bg-danger/15 text-danger border-danger/30";
+    case "PAUSA_VACACIONES":
+      return "bg-info/15 text-info border-info/30";
     default:
       return "bg-surface text-subtle border-border";
   }

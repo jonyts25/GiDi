@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
+import { IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 import { RoleKey, UserStatus } from "@prisma/client";
 
 export class CreateUserDto {
@@ -7,6 +7,11 @@ export class CreateUserDto {
 
   @IsString()
   fullName!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 
   @IsEnum(RoleKey)
   role!: RoleKey; // THERAPIST | PARENT | SCHOOL | etc

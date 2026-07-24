@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "phone" TEXT;
+
+-- AlterEnum
+ALTER TYPE "PaymentStatus" ADD VALUE IF NOT EXISTS 'PAUSA_VACACIONES';
