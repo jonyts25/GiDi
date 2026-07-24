@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
-import { GuardianRelationship, RoleKey, UserStatus } from "@prisma/client";
+import { DischargeType, GuardianRelationship, Prisma, RoleKey, UserStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { AddGuardianDto } from "./dto/add-guardian.dto";
 import { SetGuardianMetaDto } from "./dto/set-guardian-meta.dto";
@@ -44,6 +44,7 @@ export class AdminPatientsService {
         status: true,
         dischargedAt: true,
         dischargeReason: true,
+        dischargeType: true,
         createdAt: true,
         updatedAt: true,
 
@@ -97,6 +98,7 @@ export class AdminPatientsService {
         status: patient.status,
         dischargedAt: patient.dischargedAt,
         dischargeReason: patient.dischargeReason,
+        dischargeType: patient.dischargeType,
         createdAt: patient.createdAt,
         updatedAt: patient.updatedAt,
       },
@@ -166,9 +168,17 @@ export class AdminPatientsService {
     });
   }
 
-  async listDischarged() {
+  /** type: "DROPPED" (bajas), "COMPLETED" (altas) o undefined (todos los inactivos). */
+  async listDischarged(type?: DischargeType) {
+    const where: Prisma.PatientWhereInput = { status: "DISCHARGED" };
+    if (type === "COMPLETED") {
+      where.dischargeType = "COMPLETED";
+    } else if (type === "DROPPED") {
+      // Baja: explícitamente DROPPED o registros antiguos sin tipo.
+      where.OR = [{ dischargeType: "DROPPED" }, { dischargeType: null }];
+    }
     return this.prisma.patient.findMany({
-      where: { status: "DISCHARGED" },
+      where,
       select: {
         id: true,
         firstName: true,
@@ -177,6 +187,7 @@ export class AdminPatientsService {
         notes: true,
         dischargedAt: true,
         dischargeReason: true,
+        dischargeType: true,
         updatedAt: true,
       },
       orderBy: [{ dischargedAt: "desc" }, { lastName: "asc" }],
@@ -210,7 +221,11 @@ export class AdminPatientsService {
     });
   }
 
-  async dischargePatient(patientId: string, reason?: string | null) {
+  async dischargePatient(
+    patientId: string,
+    reason?: string | null,
+    type: DischargeType = "DROPPED",
+  ) {
     await this.ensurePatient(patientId);
     return this.prisma.$transaction(async (tx) => {
       await tx.patientTherapist.deleteMany({ where: { patientId } });
@@ -220,6 +235,7 @@ export class AdminPatientsService {
           status: "DISCHARGED",
           dischargedAt: new Date(),
           dischargeReason: reason?.trim() || null,
+          dischargeType: type,
         },
         select: {
           id: true,
@@ -228,6 +244,7 @@ export class AdminPatientsService {
           status: true,
           dischargedAt: true,
           dischargeReason: true,
+          dischargeType: true,
         },
       });
     });
@@ -241,6 +258,7 @@ export class AdminPatientsService {
         status: "ACTIVE",
         dischargedAt: null,
         dischargeReason: null,
+        dischargeType: null,
       },
       select: {
         id: true,
@@ -249,6 +267,7 @@ export class AdminPatientsService {
         status: true,
         dischargedAt: true,
         dischargeReason: true,
+        dischargeType: true,
       },
     });
   }

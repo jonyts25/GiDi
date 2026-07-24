@@ -10,6 +10,22 @@ import { userHasOfficeStaffRole } from "../auth/role-permissions";
 
 const MAX_RECEIPT_BYTES = 20 * 1024 * 1024;
 
+/**
+ * Un paciente inactivo (alta/baja) deja de contar en ingresos desde el mes de
+ * inactivación en adelante. Los meses anteriores se conservan (ingresos reales).
+ */
+function isInactiveForPeriod(
+  patient: { status: string; dischargedAt: Date | null },
+  periodYear: number,
+  periodMonth: number,
+): boolean {
+  if (patient.status !== "DISCHARGED" || !patient.dischargedAt) return false;
+  const d = patient.dischargedAt;
+  const dischargeYm = d.getUTCFullYear() * 12 + d.getUTCMonth(); // 0-based month
+  const periodYm = periodYear * 12 + (periodMonth - 1);
+  return periodYm >= dischargeYm;
+}
+
 const paymentSelect = {
   id: true,
   periodYear: true,
@@ -239,7 +255,7 @@ export class PaymentsService {
     if (filters.month) where.periodMonth = filters.month;
     if (filters.center) where.patient = { center: filters.center };
 
-    const rows = await this.prisma.payment.findMany({
+    const allRows = await this.prisma.payment.findMany({
       where,
       orderBy: [{ periodYear: "asc" }, { periodMonth: "asc" }],
       select: {
@@ -252,9 +268,21 @@ export class PaymentsService {
         method: true,
         reference: true,
         notes: true,
-        patient: { select: { firstName: true, lastName: true, center: true } },
+        patient: {
+          select: {
+            firstName: true,
+            lastName: true,
+            center: true,
+            status: true,
+            dischargedAt: true,
+          },
+        },
       },
     });
+
+    const rows = allRows.filter(
+      (r) => !isInactiveForPeriod(r.patient, r.periodYear, r.periodMonth),
+    );
 
     const sedeLabel: Record<string, string> = {
       SAN_AGUSTIN: "San Agustín",
@@ -280,14 +308,36 @@ export class PaymentsService {
 
   /** Resumen de un mes para administración (control de ingresos). */
   async monthOverview(year: number, month: number) {
-    const payments = await this.prisma.payment.findMany({
+    const rows = await this.prisma.payment.findMany({
       where: { periodYear: year, periodMonth: month },
       orderBy: [{ status: "asc" }],
       select: {
         ...paymentSelect,
-        patient: { select: { id: true, firstName: true, lastName: true, center: true } },
+        patient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            center: true,
+            status: true,
+            dischargedAt: true,
+          },
+        },
       },
     });
+
+    // Excluir inactivos desde el mes en que se dieron de alta/baja en adelante.
+    const payments = rows
+      .filter((p) => !isInactiveForPeriod(p.patient, p.periodYear, p.periodMonth))
+      .map(({ patient, ...rest }) => ({
+        ...rest,
+        patient: {
+          id: patient.id,
+          firstName: patient.firstName,
+          lastName: patient.lastName,
+          center: patient.center,
+        },
+      }));
 
     const totalDue = payments.reduce((a, p) => a + p.amountDue, 0);
     const totalPaid = payments.reduce((a, p) => a + p.amountPaid, 0);

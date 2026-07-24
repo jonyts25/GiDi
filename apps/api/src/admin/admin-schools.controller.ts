@@ -42,7 +42,10 @@ export class AdminSchoolsController {
     });
     const linkedIds = linked.map((l) => l.patientId);
     return this.prisma.patient.findMany({
-      where: linkedIds.length ? { id: { notIn: linkedIds } } : {},
+      where: {
+        status: "ACTIVE",
+        ...(linkedIds.length ? { id: { notIn: linkedIds } } : {}),
+      },
       select: { id: true, firstName: true, lastName: true, center: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });

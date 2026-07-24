@@ -80,6 +80,9 @@ export default function AdminPatientsPage() {
         <Link className="btn" href="/dashboard">
           ← Volver
         </Link>
+        <Link className="btn" href="/admin/patients/altas">
+          Altas
+        </Link>
         <Link className="btn" href="/admin/patients/discharged">
           Bajas
         </Link>

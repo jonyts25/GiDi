@@ -73,6 +73,8 @@ export default function AdminSchoolDetailPage() {
     })();
   }, [id, router]);
 
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
@@ -83,6 +85,19 @@ export default function AdminSchoolDetailPage() {
       });
       setU(updated);
       setMsg("✅ Guardado");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error");
+    }
+  }
+
+  async function onResetPassword() {
+    if (!confirm("¿Generar una nueva contraseña de una sola vez para esta escuela? La anterior dejará de funcionar.")) return;
+    setMsg("");
+    setTempPassword(null);
+    try {
+      const res = (await apiFetch(`/admin/users/${id}/reset-password`, { method: "POST" })) as { tempPassword: string };
+      setTempPassword(res.tempPassword);
+      setMsg("✅ Contraseña regenerada. Cópiala y compártela; deberá cambiarla al entrar.");
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error");
     }
@@ -131,6 +146,30 @@ export default function AdminSchoolDetailPage() {
           </select>
           <button className="btn-primary" type="submit">Guardar</button>
         </form>
+      </section>
+
+      <section className="card" style={{ marginTop: 14 }}>
+        <h2 className="h2">Contraseña</h2>
+        <p className="sub">
+          Genera una contraseña de una sola vez si la olvidaron. Al entrar, la escuela deberá cambiarla.
+        </p>
+        <button className="btn" type="button" style={{ marginTop: 8 }} onClick={() => void onResetPassword()}>
+          Regenerar contraseña
+        </button>
+        {tempPassword ? (
+          <div className="card" style={{ marginTop: 12, background: "var(--surface-elevated, #f5f5f5)" }}>
+            <p className="sub" style={{ marginBottom: 4 }}>Contraseña temporal (cópiala ahora, no se vuelve a mostrar):</p>
+            <code style={{ fontSize: 16, fontWeight: 700, letterSpacing: 1 }}>{tempPassword}</code>
+            <button
+              className="btn"
+              type="button"
+              style={{ marginLeft: 12 }}
+              onClick={() => void navigator.clipboard.writeText(tempPassword)}
+            >
+              Copiar
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="card" style={{ marginTop: 14 }}>

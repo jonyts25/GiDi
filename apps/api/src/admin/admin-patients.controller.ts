@@ -32,7 +32,12 @@ export class AdminPatientsController {
 
   @Get("discharged")
   listDischarged() {
-    return this.svc.listDischarged();
+    return this.svc.listDischarged("DROPPED");
+  }
+
+  @Get("completed")
+  listCompleted() {
+    return this.svc.listDischarged("COMPLETED");
   }
 
   // ✅ FULL patient view
@@ -53,8 +58,11 @@ export class AdminPatientsController {
   }
 
   @Post(":id/discharge")
-  dischargePatient(@Param("id") id: string, @Body() body: { reason?: string }) {
-    return this.svc.dischargePatient(id, body.reason);
+  dischargePatient(
+    @Param("id") id: string,
+    @Body() body: { reason?: string; type?: "COMPLETED" | "DROPPED" },
+  ) {
+    return this.svc.dischargePatient(id, body.reason, body.type === "COMPLETED" ? "COMPLETED" : "DROPPED");
   }
 
   @Post(":id/reactivate")

@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "../../../../../lib/api";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { TherapistScheduleEditor } from "@/components/therapists/TherapistScheduleEditor";
 
 type UserDetail = {
   id: string;
@@ -97,6 +98,12 @@ export default function AdminTherapistDetailPage() {
 
         {msg && <p className="sub" style={{ marginTop: 12 }}>{msg}</p>}
       </section>
+
+      <TherapistScheduleEditor
+        loadEndpoint={`/admin/therapists/${id}/schedule`}
+        saveEndpoint={`/admin/therapists/${id}/schedule`}
+        canEdit
+      />
     </main>
   );
 }

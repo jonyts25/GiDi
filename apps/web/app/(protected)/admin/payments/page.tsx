@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/csv-download";
+import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
 import { canViewRevenueOverview } from "@/lib/role-permissions";
 import {
   formatMoney,
@@ -39,8 +40,17 @@ export default function AdminPaymentsOverviewPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [center, setCenter] = useState("");
+  const [query, setQuery] = useState("");
   const [data, setData] = useState<Overview | null>(null);
   const [msg, setMsg] = useState("");
+
+  const filteredPayments = useMemo(
+    () =>
+      data
+        ? filterByQuery(data.payments, query, (p) => `${p.patient.firstName} ${p.patient.lastName}`)
+        : [],
+    [data, query],
+  );
 
   async function exportCsv(scope: "month" | "all" | "center") {
     setMsg("");
@@ -149,7 +159,8 @@ export default function AdminPaymentsOverviewPage() {
             </div>
           </section>
 
-          <section className="card overflow-x-auto">
+          <section className="card space-y-3 overflow-x-auto">
+            <SearchInput value={query} onChange={setQuery} placeholder="Buscar paciente por nombre…" />
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-subtle">
@@ -162,10 +173,10 @@ export default function AdminPaymentsOverviewPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.payments.length === 0 ? (
-                  <tr><td colSpan={6} className="py-3 text-subtle">Sin mensualidades este mes.</td></tr>
+                {filteredPayments.length === 0 ? (
+                  <tr><td colSpan={6} className="py-3 text-subtle">{data.payments.length === 0 ? "Sin mensualidades este mes." : "Sin coincidencias."}</td></tr>
                 ) : (
-                  data.payments.map((p) => (
+                  filteredPayments.map((p) => (
                     <tr key={p.id} className="border-b border-border/60">
                       <td className="py-2 pr-3">
                         <Link className="text-info hover:underline" href={`/admin/patients/${p.patient.id}`}>

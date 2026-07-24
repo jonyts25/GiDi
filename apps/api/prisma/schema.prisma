@@ -24,6 +24,9 @@ model User {
   therapistAssignments PatientTherapist[]
   schoolAssignments    SchoolPatient[]
 
+  scheduleSlots TherapistScheduleSlot[]
+  schedule      TherapistSchedule?
+
   followUpsAsTherapist FollowUp[]
 
   objectivesCreated ObjectiveBank[]
@@ -68,6 +71,12 @@ enum PatientStatus {
   DISCHARGED
 }
 
+/// Tipo de inactivación: alta (terminó su proceso) vs baja (abandono).
+enum DischargeType {
+  COMPLETED
+  DROPPED
+}
+
 enum RoleKey {
   SUPERADMIN
   ADMIN
@@ -88,6 +97,7 @@ model Patient {
   status    PatientStatus @default(ACTIVE)
   dischargedAt DateTime?
   dischargeReason String?
+  dischargeType DischargeType?
 
   // Configuración de cobro (mensualidad por frecuencia + descuento opcional).
   sessionsPerWeek Int?
@@ -480,4 +490,33 @@ model AppSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+/// Encabezado del horario semanal de una terapeuta (sede + notas).
+model TherapistSchedule {
+  therapistId String   @id @db.Uuid
+  location    String?
+  notes       String?  @db.Text
+  updatedAt   DateTime @updatedAt
+
+  therapist User @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+}
+
+/// Franja del horario semanal recurrente de una terapeuta.
+/// dayOfWeek: 0=Lunes … 5=Sábado. label = texto libre (nombre del niño / nota); vacío = libre.
+model TherapistScheduleSlot {
+  id          String   @id @default(uuid()) @db.Uuid
+  therapistId String   @db.Uuid
+  dayOfWeek   Int
+  startTime   String
+  endTime     String?
+  label       String
+  sortOrder   Int      @default(0)
+
+  therapist User @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([therapistId])
 }
