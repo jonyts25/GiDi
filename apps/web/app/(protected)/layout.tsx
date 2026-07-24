@@ -49,7 +49,9 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
   const nav = hasOfficeStaffRole(roles)
     ? [
         { href: "/admin/patients", label: "Pacientes" },
+        { href: "/admin/patients/altas", label: "Altas" },
         { href: "/admin/patients/discharged", label: "Bajas" },
+        { href: "/admin/therapists", label: "Terapeutas" },
         { href: "/admin/announcements", label: "Avisos" },
         ...(canViewRevenueOverview(roles) ? [{ href: "/admin/payments", label: "Ingresos" }] : []),
         ...(hasFullAdminRole(roles) ? [{ href: "/admin/branding", label: "Logo" }] : []),
@@ -58,6 +60,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
       ? [
           { href: "/therapist/followups", label: "Seguimientos" },
           { href: "/therapist/patients", label: "Mis pacientes" },
+          { href: "/therapist/schedule", label: "Mi horario" },
           { href: "/therapist/objective-bank", label: "Banco de objetivos" },
         ]
       : roles.includes("PARENT")

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
 import { prepareFileForUpload } from "@/lib/compress-upload";
 import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
+import { FilePickerButton } from "@/components/ui/FilePickerButton";
 
 type DocCategory = "EVALUACION" | "REVALUACION" | "SEGUIMIENTO_PADRES";
 
@@ -384,19 +385,10 @@ export default function AdminNewPatientPage() {
 
       <section className="card" style={{ marginTop: 12 }}>
         <h3 style={{ marginTop: 0 }}>Documentos iniciales (opcional)</h3>
-        <div className="grid gap-3 text-sm">
-          <label className="grid gap-1">
-            <span>Evaluación</span>
-            <input type="file" accept="image/*,.pdf" onChange={(e) => setDocEval(e.target.files?.[0] ?? null)} />
-          </label>
-          <label className="grid gap-1">
-            <span>Revaloración</span>
-            <input type="file" accept="image/*,.pdf" onChange={(e) => setDocReval(e.target.files?.[0] ?? null)} />
-          </label>
-          <label className="grid gap-1">
-            <span>Seguimiento con papás</span>
-            <input type="file" accept="image/*,.pdf" onChange={(e) => setDocSeg(e.target.files?.[0] ?? null)} />
-          </label>
+        <div className="grid gap-4">
+          <FilePickerButton label="Evaluación" file={docEval} onPick={setDocEval} />
+          <FilePickerButton label="Revaloración" file={docReval} onPick={setDocReval} />
+          <FilePickerButton label="Seguimiento con papás" file={docSeg} onPick={setDocSeg} />
         </div>
       </section>
 

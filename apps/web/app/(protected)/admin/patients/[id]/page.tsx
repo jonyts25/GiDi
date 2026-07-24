@@ -294,18 +294,19 @@ export default function AdminPatientDetail() {
     }
   }
 
-  async function onDischarge() {
-    const reason = window.prompt("Motivo de baja (opcional):");
+  async function onDischarge(type: "COMPLETED" | "DROPPED") {
+    const label = type === "COMPLETED" ? "alta (terminó su proceso)" : "baja (abandono)";
+    const reason = window.prompt(`Motivo de ${label} (opcional):`);
     if (reason === null) return;
     setMsg("");
     try {
       await apiFetch(`/admin/patients/${id}/discharge`, {
         method: "POST",
-        body: JSON.stringify({ reason: reason.trim() || undefined }),
+        body: JSON.stringify({ reason: reason.trim() || undefined, type }),
       });
-      router.push("/admin/patients/discharged");
+      router.push(type === "COMPLETED" ? "/admin/patients/altas" : "/admin/patients/discharged");
     } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : "Error al dar de baja");
+      setMsg(e instanceof Error ? e.message : "Error al inactivar paciente");
     }
   }
 
@@ -605,14 +606,20 @@ export default function AdminPatientDetail() {
         </div>
       </section>
 
-      <section className="card mt-6 space-y-3 border-l-4 border-l-danger">
-        <h2 className="text-lg font-semibold">Dar de baja</h2>
+      <section className="card mt-6 space-y-3 border-l-4 border-l-warning">
+        <h2 className="text-lg font-semibold">Alta / Baja</h2>
         <p className="text-sm text-subtle">
-          Desvincula al paciente de sus terapeutas y lo mueve a la lista de Bajas. Papás, escuela e historial se conservan.
+          Desvincula al paciente de sus terapeutas y lo mueve a la lista correspondiente. Papás, escuela e historial se conservan.
+          Deja de contar en ingresos desde el mes de alta/baja en adelante.
         </p>
-        <button type="button" className="btn rounded-xl px-4 py-2 text-sm text-danger" onClick={() => void onDischarge()}>
-          Dar de baja paciente
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn rounded-xl px-4 py-2 text-sm text-success" onClick={() => void onDischarge("COMPLETED")}>
+            Dar de alta (terminó)
+          </button>
+          <button type="button" className="btn rounded-xl px-4 py-2 text-sm text-danger" onClick={() => void onDischarge("DROPPED")}>
+            Dar de baja (abandono)
+          </button>
+        </div>
       </section>
 
       <section className="card mt-6 space-y-3 border-l-4 border-l-danger">

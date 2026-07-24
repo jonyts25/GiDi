@@ -17,6 +17,7 @@ import { MetaWhatsappModule } from "./meta-whatsapp/meta-whatsapp.module";
 import { AnnouncementsModule } from "./announcements/announcements.module";
 import { PaymentsModule } from "./payments/payments.module";
 import { SettingsModule } from "./settings/settings.module";
+import { TherapistScheduleModule } from "./therapist-schedule/therapist-schedule.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { SettingsModule } from "./settings/settings.module";
     AnnouncementsModule,
     PaymentsModule,
     SettingsModule,
+    TherapistScheduleModule,
   ],
   controllers: [AppController,],
   providers : [AppService],
