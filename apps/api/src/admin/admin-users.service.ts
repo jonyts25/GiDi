@@ -18,10 +18,11 @@ function randomPassword(len = 12) {
 export class AdminUsersService {
   constructor(private prisma: PrismaService) {}
 
-  async listByRole(role: RoleKey) {
+  async listByRole(role: RoleKey, status?: UserStatus) {
     return this.prisma.user.findMany({
       where: {
         roles: { some: { role: { key: role } } },
+        ...(status ? { status } : {}),
       },
       select: {
         id: true,

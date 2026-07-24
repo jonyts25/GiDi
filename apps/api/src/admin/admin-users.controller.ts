@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtGuard } from "../auth/jwt.guard";
 import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
@@ -16,9 +16,11 @@ export class AdminUsersController {
   constructor(private svc: AdminUsersService) {}
 
   // ✅ Listar por rol (THERAPIST / PARENT / SCHOOL / etc)
+  // ?status=ACTIVE filtra solo perfiles activos (usado en selectores de asignación).
   @Get("role/:role")
-  listByRole(@Param("role") role: RoleKey) {
-    return this.svc.listByRole(role);
+  listByRole(@Param("role") role: RoleKey, @Query("status") status?: string) {
+    const onlyActive = (status ?? "").toUpperCase() === "ACTIVE";
+    return this.svc.listByRole(role, onlyActive ? "ACTIVE" : undefined);
   }
 
   // ✅ Detalle por id (para la pantalla Editar)

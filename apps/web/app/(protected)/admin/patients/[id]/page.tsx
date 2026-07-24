@@ -99,9 +99,9 @@ export default function AdminPatientDetail() {
         setMsg("");
         const [full, therapists, schools, parents] = await Promise.all([
           apiFetch(`/admin/patients/${id}`),
-          apiFetch(`/admin/users/role/THERAPIST`),
-          apiFetch(`/admin/users/role/SCHOOL`),
-          apiFetch(`/admin/users/role/PARENT`),
+          apiFetch(`/admin/users/role/THERAPIST?status=ACTIVE`),
+          apiFetch(`/admin/users/role/SCHOOL?status=ACTIVE`),
+          apiFetch(`/admin/users/role/PARENT?status=ACTIVE`),
         ]);
 
         setData(full);
@@ -125,7 +125,7 @@ export default function AdminPatientDetail() {
   async function reload() {
     const [full, parents] = await Promise.all([
       apiFetch(`/admin/patients/${id}`),
-      apiFetch(`/admin/users/role/PARENT`),
+      apiFetch(`/admin/users/role/PARENT?status=ACTIVE`),
     ]);
     setData(full);
     setAllParents(parents);

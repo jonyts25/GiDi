@@ -104,8 +104,8 @@ export default function AdminNewPatientPage() {
       try {
         const [t, p, s] = await Promise.all([
           apiFetch("/users/therapists"),
-          apiFetch("/admin/users/role/PARENT"),
-          apiFetch("/admin/users/role/SCHOOL"),
+          apiFetch("/admin/users/role/PARENT?status=ACTIVE"),
+          apiFetch("/admin/users/role/SCHOOL?status=ACTIVE"),
         ]);
         setTherapists(t);
         setParents(p);
