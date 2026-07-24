@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "../../../../../lib/api";
-import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { hasOfficeStaffRole, STATUS_LABELS } from "@/lib/role-permissions";
+import ResetPasswordButton from "@/components/admin/ResetPasswordButton";
 
 type UserDetail = {
   id: string;
   fullName: string;
   email: string;
+  phone?: string | null;
   status: "ACTIVE" | "INACTIVE";
   roles?: { role: { key: string; name: string } }[];
 };
@@ -25,6 +27,7 @@ export default function AdminParentDetailPage() {
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
 
   useEffect(() => {
@@ -41,6 +44,7 @@ export default function AdminParentDetailPage() {
         setU(data);
         setFullName(data.fullName);
         setEmail(data.email);
+        setPhone(data.phone ?? "");
         setStatus(data.status);
       } catch (e: any) {
         setMsg(e.message);
@@ -57,7 +61,7 @@ export default function AdminParentDetailPage() {
     try {
       const updated = await apiFetch(`/admin/users/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ fullName, email, status }),
+        body: JSON.stringify({ fullName, email, phone: phone.trim() || null, status }),
       });
       setU(updated);
       setMsg("✅ Guardado");
@@ -75,7 +79,7 @@ export default function AdminParentDetailPage() {
           <div className="h1">Editar padres</div>
           <p className="sub">{u ? `${u.fullName} · ${u.email}` : ""}</p>
         </div>
-        <Link className="btn" href="/dashboard">← Volver</Link>
+        <Link className="btn" href="/admin/parents">← Volver</Link>
       </div>
 
       <section className="card" style={{ marginTop: 14 }}>
@@ -86,16 +90,27 @@ export default function AdminParentDetailPage() {
           <label className="sub">Email</label>
           <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
 
-          <label className="sub">Status</label>
+          <label className="sub">Teléfono</label>
+          <input className="input" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+
+          <label className="sub">Estatus</label>
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="ACTIVE">{STATUS_LABELS.ACTIVE}</option>
+            <option value="INACTIVE">{STATUS_LABELS.INACTIVE}</option>
           </select>
 
           <button className="btn" type="submit">Guardar</button>
         </form>
 
         {msg && <p className="sub" style={{ marginTop: 12 }}>{msg}</p>}
+      </section>
+
+      <section className="card" style={{ marginTop: 14 }}>
+        <h2 className="h2" style={{ marginTop: 0 }}>Contraseña</h2>
+        <p className="sub">Genera una contraseña temporal si la olvidaron. Deberán cambiarla al entrar.</p>
+        <div style={{ marginTop: 10 }}>
+          <ResetPasswordButton userId={id} />
+        </div>
       </section>
     </main>
   );

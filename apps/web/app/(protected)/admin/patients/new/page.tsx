@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../../../../lib/api";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
 import { prepareFileForUpload } from "@/lib/compress-upload";
 import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
-import { FilePickerButton } from "@/components/ui/FilePickerButton";
+import { FilePickerButton, MultiFilePickerButton } from "@/components/ui/FilePickerButton";
+import { suggestedMonthly } from "@/lib/payment-rates";
 
 type DocCategory = "EVALUACION" | "REVALUACION" | "SEGUIMIENTO_PADRES";
 
@@ -19,6 +21,7 @@ type GuardianRow =
       kind: "new";
       fullName: string;
       email: string;
+      phone?: string;
       relationship: Rel;
       isPrimary: boolean;
       notes?: string;
@@ -28,6 +31,7 @@ type GuardianRow =
       parentId: string;
       fullName: string;
       email: string;
+      phone?: string;
       relationship: Rel;
       isPrimary: boolean;
       notes?: string;
@@ -49,7 +53,7 @@ export default function AdminNewPatientPage() {
   const [payAmountDue, setPayAmountDue] = useState("");
   const [payAmountPaid, setPayAmountPaid] = useState("");
   const [docEval, setDocEval] = useState<File | null>(null);
-  const [docReval, setDocReval] = useState<File | null>(null);
+  const [docRevals, setDocRevals] = useState<File[]>([]);
   const [docSeg, setDocSeg] = useState<File | null>(null);
 
   // guardians
@@ -59,6 +63,7 @@ export default function AdminNewPatientPage() {
   const [pickedParentId, setPickedParentId] = useState("");
   const [gFullName, setGFullName] = useState("");
   const [gEmail, setGEmail] = useState("");
+  const [gPhone, setGPhone] = useState("");
   const [gRel, setGRel] = useState<Rel>("MOTHER");
   const [gPrimary, setGPrimary] = useState(true);
   const [gNotes, setGNotes] = useState("");
@@ -77,6 +82,8 @@ export default function AdminNewPatientPage() {
 
   // result
   const [msg, setMsg] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [createdPatientId, setCreatedPatientId] = useState<string | null>(null);
   const [createdCreds, setCreatedCreds] = useState<
     Array<{ email: string; fullName: string; role: string; temporaryPassword: string }>
   >([]);
@@ -115,6 +122,16 @@ export default function AdminNewPatientPage() {
       }
     })();
   }, [router]);
+
+  // Recalcular monto a pagar al cambiar frecuencia / descuento
+  useEffect(() => {
+    if (sessionsPerWeek === "" || sessionsPerWeek === "0") {
+      if (sessionsPerWeek === "0") setPayAmountDue("");
+      return;
+    }
+    const suggested = suggestedMonthly(Number(sessionsPerWeek), Number(discountPercent) || 0);
+    if (suggested != null) setPayAmountDue(String(suggested));
+  }, [sessionsPerWeek, discountPercent]);
 
   function addGuardianFromExisting() {
     if (!pickedParentId) {
@@ -161,6 +178,7 @@ export default function AdminNewPatientPage() {
       kind: "new",
       fullName: gFullName.trim(),
       email,
+      phone: gPhone.trim() || undefined,
       relationship: gRel,
       isPrimary: gPrimary,
       notes: gNotes.trim() ? gNotes.trim() : undefined,
@@ -168,6 +186,7 @@ export default function AdminNewPatientPage() {
     setGuardians((prev) => [...prev, newG]);
     setGFullName("");
     setGEmail("");
+    setGPhone("");
     setGRel("MOTHER");
     setGPrimary(false);
     setGNotes("");
@@ -198,7 +217,15 @@ export default function AdminNewPatientPage() {
   }
 
   async function onSave() {
+    if (!canSave || saving || createdPatientId) return;
+
+    const ok = window.confirm(
+      `¿Confirmar registro completo de «${firstName.trim()} ${lastName.trim()}»?\n\nSe creará el paciente y no se podrá deshacer fácilmente.`,
+    );
+    if (!ok) return;
+
     setMsg("Guardando...");
+    setSaving(true);
     setCreatedCreds([]);
 
     try {
@@ -213,6 +240,7 @@ export default function AdminNewPatientPage() {
           : {
               email: g.email,
               fullName: g.fullName,
+              phone: g.phone,
               relationship: g.relationship,
               isPrimary: g.isPrimary,
               notes: g.notes,
@@ -225,7 +253,7 @@ export default function AdminNewPatientPage() {
         birthDate: birthDate ? new Date(birthDate).toISOString() : undefined,
         notes: notes.trim() || undefined,
         center,
-        sessionsPerWeek: sessionsPerWeek ? Number(sessionsPerWeek) : undefined,
+        sessionsPerWeek: sessionsPerWeek === "" ? undefined : Number(sessionsPerWeek),
         discountPercent: Number(discountPercent) || 0,
         therapistIds: selectedTherapistIds.length ? selectedTherapistIds : undefined,
       };
@@ -242,6 +270,7 @@ export default function AdminNewPatientPage() {
       } else if (schoolMode === "new") {
         if (!schoolFullName.trim() || !schoolEmail.trim()) {
           setMsg("Para registrar una escuela nueva indique nombre y email.");
+          setSaving(false);
           return;
         }
         payload.school = {
@@ -271,16 +300,11 @@ export default function AdminNewPatientPage() {
         });
       }
 
-      const uploads: Array<[DocCategory, File | null]> = [
-        ["EVALUACION", docEval],
-        ["REVALUACION", docReval],
-        ["SEGUIMIENTO_PADRES", docSeg],
-      ];
-      for (const [cat, file] of uploads) {
-        if (file) await uploadDoc(patientId, cat, file);
+      if (docEval) await uploadDoc(patientId, "EVALUACION", docEval);
+      for (const file of docRevals) {
+        await uploadDoc(patientId, "REVALUACION", file);
       }
-
-      setMsg("✅ Paciente creado");
+      if (docSeg) await uploadDoc(patientId, "SEGUIMIENTO_PADRES", docSeg);
 
       const fromList = Array.isArray(res?.parentCredentials) ? res.parentCredentials : [];
       const creds: Array<{ email: string; fullName: string; role: string; temporaryPassword: string }> =
@@ -309,10 +333,13 @@ export default function AdminNewPatientPage() {
         });
       }
 
+      setCreatedPatientId(patientId);
       setCreatedCreds(creds);
-      router.push(`/admin/patients/${patientId}`);
+      setMsg("✅ Paciente creado. Revisa las contraseñas abajo antes de continuar.");
     } catch (e: any) {
       setMsg(e.message);
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -324,10 +351,13 @@ export default function AdminNewPatientPage() {
     setMsg("✅ Credenciales copiadas al portapapeles");
   }
 
+  const parentCreds = createdCreds.filter((c) => c.role === "PARENT");
+  const otherCreds = createdCreds.filter((c) => c.role !== "PARENT");
+
   return (
     <main style={{ paddingTop: 18 }}>
       <div className="card">
-        <div className="h1">Alta de paciente (Admin)</div>
+        <div className="h1">Nuevo paciente, registro completo</div>
         <p className="sub">Crea paciente + asigna tutores, terapeuta(s) y escuela.</p>
         {msg ? <p className="sub">{msg}</p> : null}
       </div>
@@ -337,18 +367,18 @@ export default function AdminNewPatientPage() {
         <h3 style={{ marginTop: 0 }}>Paciente</h3>
 
         <div className="row">
-          <input className="input" placeholder="Nombre" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          <input className="input" placeholder="Apellido" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          <input className="input" placeholder="Nombre" value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={!!createdPatientId} />
+          <input className="input" placeholder="Apellido" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={!!createdPatientId} />
         </div>
 
         <div className="row">
-          <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-          <input className="input" placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} disabled={!!createdPatientId} />
+          <input className="input" placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={!!createdPatientId} />
         </div>
         <div className="row">
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Centro GiDi</span>
-            <select className="select" value={center} onChange={(e) => setCenter(e.target.value as GidiCenterKey)}>
+            <select className="select" value={center} onChange={(e) => setCenter(e.target.value as GidiCenterKey)} disabled={!!createdPatientId}>
               {GIDI_CENTER_OPTIONS.map((c) => (
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
@@ -362,24 +392,40 @@ export default function AdminNewPatientPage() {
         <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Frecuencia</span>
-            <select className="select" value={sessionsPerWeek} onChange={(e) => setSessionsPerWeek(e.target.value)}>
+            <select className="select" value={sessionsPerWeek} onChange={(e) => setSessionsPerWeek(e.target.value)} disabled={!!createdPatientId}>
               <option value="">Sin definir</option>
               <option value="1">1 vez/semana</option>
               <option value="2">2 veces/semana</option>
               <option value="3">3 veces/semana</option>
+              <option value="0">Pago por sesión (variable)</option>
             </select>
           </label>
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Descuento (%)</span>
-            <input className="input w-24" type="number" min={0} max={100} value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} />
+            <input
+              className="input w-24"
+              type="number"
+              min={0}
+              max={100}
+              value={discountPercent}
+              onChange={(e) => setDiscountPercent(e.target.value)}
+              disabled={!!createdPatientId || sessionsPerWeek === "0"}
+            />
           </label>
         </div>
         <p className="sub" style={{ marginTop: 8 }}>Primer mes registrado (opcional):</p>
         <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>
-          <input className="input w-24" type="number" placeholder="Año" value={payYear} onChange={(e) => setPayYear(e.target.value)} />
-          <input className="input w-24" type="number" placeholder="Mes" min={1} max={12} value={payMonth} onChange={(e) => setPayMonth(e.target.value)} />
-          <input className="input w-32" type="number" placeholder="Monto a pagar" value={payAmountDue} onChange={(e) => setPayAmountDue(e.target.value)} />
-          <input className="input w-32" type="number" placeholder="Monto pagado" value={payAmountPaid} onChange={(e) => setPayAmountPaid(e.target.value)} />
+          <input className="input w-24" type="number" placeholder="Año" value={payYear} onChange={(e) => setPayYear(e.target.value)} disabled={!!createdPatientId} />
+          <input className="input w-24" type="number" placeholder="Mes" min={1} max={12} value={payMonth} onChange={(e) => setPayMonth(e.target.value)} disabled={!!createdPatientId} />
+          <input
+            className="input w-32"
+            type="number"
+            placeholder={sessionsPerWeek === "0" ? "Variable / por sesión" : "Monto a pagar"}
+            value={payAmountDue}
+            onChange={(e) => setPayAmountDue(e.target.value)}
+            disabled={!!createdPatientId}
+          />
+          <input className="input w-32" type="number" placeholder="Monto pagado" value={payAmountPaid} onChange={(e) => setPayAmountPaid(e.target.value)} disabled={!!createdPatientId} />
         </div>
       </section>
 
@@ -387,7 +433,7 @@ export default function AdminNewPatientPage() {
         <h3 style={{ marginTop: 0 }}>Documentos iniciales (opcional)</h3>
         <div className="grid gap-4">
           <FilePickerButton label="Evaluación" file={docEval} onPick={setDocEval} />
-          <FilePickerButton label="Revaloración" file={docReval} onPick={setDocReval} />
+          <MultiFilePickerButton label="Revaloración (puedes subir varios)" files={docRevals} onPick={setDocRevals} />
           <FilePickerButton label="Seguimiento con papás" file={docSeg} onPick={setDocSeg} />
         </div>
       </section>
@@ -396,7 +442,7 @@ export default function AdminNewPatientPage() {
       <section className="card" style={{ marginTop: 12 }}>
         <h3 style={{ marginTop: 0 }}>Padres / Tutores</h3>
         <p className="sub" style={{ marginBottom: 12 }}>
-          Elige un padre ya registrado (misma lista que en Admin → Padres) o registra uno nuevo con nombre y email.
+          Elige un padre ya registrado (misma lista que en Admin → Padres) o registra uno nuevo con nombre, email y teléfono.
         </p>
 
         <div className="row" style={{ marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
@@ -405,6 +451,7 @@ export default function AdminNewPatientPage() {
             className="btn"
             style={{ fontWeight: guardianMode === "existing" ? 800 : 400, opacity: guardianMode === "existing" ? 1 : 0.75 }}
             onClick={() => setGuardianMode("existing")}
+            disabled={!!createdPatientId}
           >
             Elegir de la lista
           </button>
@@ -413,6 +460,7 @@ export default function AdminNewPatientPage() {
             className="btn"
             style={{ fontWeight: guardianMode === "new" ? 800 : 400, opacity: guardianMode === "new" ? 1 : 0.75 }}
             onClick={() => setGuardianMode("new")}
+            disabled={!!createdPatientId}
           >
             Registrar nuevo
           </button>
@@ -425,6 +473,7 @@ export default function AdminNewPatientPage() {
               style={{ minWidth: 220 }}
               value={pickedParentId}
               onChange={(e) => setPickedParentId(e.target.value)}
+              disabled={!!createdPatientId}
             >
               <option value="">— Padre / tutor —</option>
               {parents.map((p) => (
@@ -434,7 +483,7 @@ export default function AdminNewPatientPage() {
               ))}
             </select>
 
-            <select className="input" value={gRel} onChange={(e) => setGRel(e.target.value as Rel)}>
+            <select className="input" value={gRel} onChange={(e) => setGRel(e.target.value as Rel)} disabled={!!createdPatientId}>
               <option value="MOTHER">Mamá</option>
               <option value="FATHER">Papá</option>
               <option value="TUTOR">Tutor</option>
@@ -442,24 +491,25 @@ export default function AdminNewPatientPage() {
             </select>
 
             <label className="sub" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input type="checkbox" checked={gPrimary} onChange={(e) => setGPrimary(e.target.checked)} />
+              <input type="checkbox" checked={gPrimary} onChange={(e) => setGPrimary(e.target.checked)} disabled={!!createdPatientId} />
               Principal
             </label>
 
-            <input className="input" placeholder="Notas (opcional)" value={gNotes} onChange={(e) => setGNotes(e.target.value)} />
-            <button type="button" className="btn" onClick={addGuardianFromExisting}>
+            <input className="input" placeholder="Notas (opcional)" value={gNotes} onChange={(e) => setGNotes(e.target.value)} disabled={!!createdPatientId} />
+            <button type="button" className="btn" onClick={addGuardianFromExisting} disabled={!!createdPatientId}>
               + Añadir
             </button>
           </div>
         ) : (
           <>
             <div className="row">
-              <input className="input" placeholder="Nombre completo" value={gFullName} onChange={(e) => setGFullName(e.target.value)} />
-              <input className="input" placeholder="Email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} />
+              <input className="input" placeholder="Nombre completo" value={gFullName} onChange={(e) => setGFullName(e.target.value)} disabled={!!createdPatientId} />
+              <input className="input" placeholder="Email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} disabled={!!createdPatientId} />
+              <input className="input" placeholder="Teléfono" value={gPhone} onChange={(e) => setGPhone(e.target.value)} disabled={!!createdPatientId} />
             </div>
 
             <div className="row">
-              <select className="input" value={gRel} onChange={(e) => setGRel(e.target.value as Rel)}>
+              <select className="input" value={gRel} onChange={(e) => setGRel(e.target.value as Rel)} disabled={!!createdPatientId}>
                 <option value="MOTHER">Mamá</option>
                 <option value="FATHER">Papá</option>
                 <option value="TUTOR">Tutor</option>
@@ -467,12 +517,12 @@ export default function AdminNewPatientPage() {
               </select>
 
               <label className="sub" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input type="checkbox" checked={gPrimary} onChange={(e) => setGPrimary(e.target.checked)} />
+                <input type="checkbox" checked={gPrimary} onChange={(e) => setGPrimary(e.target.checked)} disabled={!!createdPatientId} />
                 Principal
               </label>
 
-              <input className="input" placeholder="Notas (opcional)" value={gNotes} onChange={(e) => setGNotes(e.target.value)} />
-              <button type="button" className="btn" onClick={addGuardianNew}>
+              <input className="input" placeholder="Notas (opcional)" value={gNotes} onChange={(e) => setGNotes(e.target.value)} disabled={!!createdPatientId} />
+              <button type="button" className="btn" onClick={addGuardianNew} disabled={!!createdPatientId}>
                 + Añadir
               </button>
             </div>
@@ -483,12 +533,15 @@ export default function AdminNewPatientPage() {
           <ul style={{ paddingLeft: 18, marginTop: 14 }}>
             {guardians.map((g, i) => (
               <li key={i} style={{ marginBottom: 8 }}>
-                <b>{g.fullName}</b> — {g.email} — {g.relationship} {g.isPrimary ? "(Principal)" : ""}
+                <b>{g.fullName}</b> — {g.email}
+                {g.phone ? ` — ${g.phone}` : ""} — {g.relationship} {g.isPrimary ? "(Principal)" : ""}
                 {g.kind === "existing" ? " · ya registrado" : " · nuevo"}
                 {g.notes ? ` — ${g.notes}` : ""}
-                <button className="btn" style={{ marginLeft: 10 }} onClick={() => removeGuardian(i)}>
-                  Quitar
-                </button>
+                {!createdPatientId ? (
+                  <button className="btn" style={{ marginLeft: 10 }} onClick={() => removeGuardian(i)}>
+                    Quitar
+                  </button>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -497,6 +550,31 @@ export default function AdminNewPatientPage() {
             Aún no agregas padres/tutores. (Opcional, pero recomendado)
           </p>
         )}
+
+        {parentCreds.length ? (
+          <div
+            style={{
+              marginTop: 16,
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid var(--border, #ccc)",
+              background: "var(--surface-elevated, #f7f7f7)",
+            }}
+          >
+            <h4 style={{ margin: "0 0 8px" }}>Contraseñas de papás / tutores</h4>
+            <p className="sub" style={{ marginTop: 0 }}>
+              Se muestran solo una vez. Cópialas antes de salir de esta pantalla.
+            </p>
+            <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+              {parentCreds
+                .map((c) => `${c.fullName} | ${c.email} | PASS: ${c.temporaryPassword}`)
+                .join("\n")}
+            </pre>
+            <button className="btn" style={{ marginTop: 8 }} type="button" onClick={copyCreds}>
+              Copiar credenciales
+            </button>
+          </div>
+        ) : null}
       </section>
 
       {/* Terapeutas */}
@@ -513,6 +591,7 @@ export default function AdminNewPatientPage() {
                     type="checkbox"
                     checked={selectedTherapistIds.includes(t.id)}
                     onChange={() => toggleTherapist(t.id)}
+                    disabled={!!createdPatientId}
                   />
                   <span>
                     <b>{t.fullName}</b> — {t.email}
@@ -537,6 +616,7 @@ export default function AdminNewPatientPage() {
             className="btn"
             style={{ fontWeight: schoolMode === "existing" ? 800 : 400, opacity: schoolMode === "existing" ? 1 : 0.75 }}
             onClick={() => setSchoolMode("existing")}
+            disabled={!!createdPatientId}
           >
             Elegir de la lista
           </button>
@@ -545,6 +625,7 @@ export default function AdminNewPatientPage() {
             className="btn"
             style={{ fontWeight: schoolMode === "new" ? 800 : 400, opacity: schoolMode === "new" ? 1 : 0.75 }}
             onClick={() => setSchoolMode("new")}
+            disabled={!!createdPatientId}
           >
             Registrar nueva
           </button>
@@ -553,6 +634,7 @@ export default function AdminNewPatientPage() {
             className="btn"
             style={{ fontWeight: schoolMode === "none" ? 800 : 400, opacity: schoolMode === "none" ? 1 : 0.75 }}
             onClick={() => setSchoolMode("none")}
+            disabled={!!createdPatientId}
           >
             Sin escuela
           </button>
@@ -565,6 +647,7 @@ export default function AdminNewPatientPage() {
               style={{ minWidth: 260 }}
               value={pickedSchoolId}
               onChange={(e) => setPickedSchoolId(e.target.value)}
+              disabled={!!createdPatientId}
             >
               <option value="">— Escuela —</option>
               {schools.map((s) => (
@@ -578,6 +661,7 @@ export default function AdminNewPatientPage() {
               placeholder="Notas escuela (opcional)"
               value={schoolNotes}
               onChange={(e) => setSchoolNotes(e.target.value)}
+              disabled={!!createdPatientId}
             />
           </div>
         ) : null}
@@ -590,12 +674,14 @@ export default function AdminNewPatientPage() {
                 placeholder="Nombre escuela / contacto"
                 value={schoolFullName}
                 onChange={(e) => setSchoolFullName(e.target.value)}
+                disabled={!!createdPatientId}
               />
               <input
                 className="input"
                 placeholder="Email escuela"
                 value={schoolEmail}
                 onChange={(e) => setSchoolEmail(e.target.value)}
+                disabled={!!createdPatientId}
               />
             </div>
             <input
@@ -603,6 +689,7 @@ export default function AdminNewPatientPage() {
               placeholder="Notas escuela (opcional)"
               value={schoolNotes}
               onChange={(e) => setSchoolNotes(e.target.value)}
+              disabled={!!createdPatientId}
             />
           </>
         ) : null}
@@ -610,28 +697,36 @@ export default function AdminNewPatientPage() {
         {schoolMode === "none" ? (
           <p className="sub">Este paciente se dará de alta sin escuela vinculada.</p>
         ) : null}
+
+        {otherCreds.length ? (
+          <div style={{ marginTop: 16, padding: 12, borderRadius: 10, border: "1px solid var(--border, #ccc)" }}>
+            <h4 style={{ margin: "0 0 8px" }}>Contraseña de escuela</h4>
+            <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+              {otherCreds
+                .map((c) => `${c.fullName} | ${c.email} | PASS: ${c.temporaryPassword}`)
+                .join("\n")}
+            </pre>
+          </div>
+        ) : null}
       </section>
 
       {/* Guardar */}
       <section className="card" style={{ marginTop: 12 }}>
-        <button className="btn" disabled={!canSave} onClick={onSave}>
-          Guardar alta completa
-        </button>
-
-        {createdCreds.length ? (
-          <div style={{ marginTop: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Credenciales generadas (copiar y mandar)</h3>
-            <p className="sub">Estas contraseñas se muestran solo una vez. Si se pierden, después haremos “Reset password”.</p>
-            <pre style={{ whiteSpace: "pre-wrap" }}>
-              {createdCreds
-                .map((c) => `${c.role} | ${c.fullName} | ${c.email} | PASS: ${c.temporaryPassword}`)
-                .join("\n")}
-            </pre>
-            <button className="btn" onClick={copyCreds}>
-              Copiar credenciales
-            </button>
+        {!createdPatientId ? (
+          <button className="btn" disabled={!canSave || saving} onClick={() => void onSave()}>
+            {saving ? "Guardando…" : "Guardar registro completo"}
+          </button>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+            <span className="sub">✅ Guardado. Puedes ir a la ficha del paciente.</span>
+            <Link className="btn" href={`/admin/patients/${createdPatientId}`}>
+              Abrir ficha del paciente
+            </Link>
+            <Link className="btn" href="/admin/patients">
+              Volver al listado
+            </Link>
           </div>
-        ) : null}
+        )}
       </section>
     </main>
   );

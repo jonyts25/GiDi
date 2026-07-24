@@ -36,7 +36,7 @@ export default function Dashboard() {
         <p style={{ opacity: 0.8 }}>Elige un módulo:</p>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
-          <Link className="btn" href="/admin/patients">Pacientes</Link>
+          <Link className="btn" href="/admin/patients">Lista de pacientes</Link>
           <Link className="btn" href="/admin/therapists">Terapeutas</Link>
           <Link className="btn" href="/admin/parents">Padres</Link>
           <Link className="btn" href="/admin/schools">Escuelas</Link>

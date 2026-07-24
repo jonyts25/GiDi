@@ -12,6 +12,7 @@ model User {
   id                 String     @id @default(uuid()) @db.Uuid
   email              String     @unique
   fullName           String
+  phone              String?
   password           String
   mustChangePassword Boolean    @default(false)
   status             UserStatus @default(ACTIVE)
@@ -420,6 +421,7 @@ enum PaymentStatus {
   PAGADO
   PARCIAL
   DEUDA
+  PAUSA_VACACIONES
 }
 
 /// Mensualidad de un paciente por mes.

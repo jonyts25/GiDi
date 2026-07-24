@@ -25,6 +25,7 @@ type FullPatient = {
     parentId: string;
     fullName: string;
     email: string;
+    phone?: string | null;
     status: "ACTIVE" | "INACTIVE";
     relationship: "MOTHER" | "FATHER" | "TUTOR" | "OTHER";
     isPrimary: boolean;
@@ -65,6 +66,7 @@ export default function AdminPatientDetail() {
   // patient edit fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [notes, setNotes] = useState("");
   const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
 
@@ -72,9 +74,11 @@ export default function AdminPatientDetail() {
   const [guardianMode, setGuardianMode] = useState<"existing" | "new">("existing");
   const [gFullName, setGFullName] = useState("");
   const [gEmail, setGEmail] = useState("");
+  const [gPhone, setGPhone] = useState("");
   const [gRel, setGRel] = useState<"MOTHER" | "FATHER" | "TUTOR" | "OTHER">("OTHER");
   const [gPrimary, setGPrimary] = useState(false);
   const [gNotes, setGNotes] = useState("");
+  const [guardianPasswordMsg, setGuardianPasswordMsg] = useState("");
 
   const assignedTherapistIds = useMemo(
     () => new Set((data?.therapists ?? []).map((t) => t.therapistId)),
@@ -108,6 +112,7 @@ export default function AdminPatientDetail() {
 
         setFirstName(full.patient.firstName ?? "");
         setLastName(full.patient.lastName ?? "");
+        setBirthDate(full.patient.birthDate ? String(full.patient.birthDate).slice(0, 10) : "");
         setNotes(full.patient.notes ?? "");
         setCenter(full.patient.center ?? "SAN_AGUSTIN");
 
@@ -138,7 +143,13 @@ export default function AdminPatientDetail() {
     try {
       await apiFetch(`/admin/patients/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ firstName, lastName, notes, center }),
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          ...(birthDate ? { birthDate: new Date(birthDate).toISOString() } : {}),
+          notes,
+          center,
+        }),
       });
       await reload();
       setMsg("✅ Paciente guardado");
@@ -198,6 +209,7 @@ export default function AdminPatientDetail() {
 
   async function onLinkExistingGuardian() {
     setMsg("");
+    setGuardianPasswordMsg("");
     if (!pickedParentId) {
       setMsg("Elige un padre/tutor de la lista.");
       return;
@@ -219,7 +231,8 @@ export default function AdminPatientDetail() {
       });
 
       if (resp?.generatedPassword) {
-        setMsg(`✅ Padre vinculado. Password generado: ${resp.generatedPassword}`);
+        setGuardianPasswordMsg(`Password generado: ${resp.generatedPassword}`);
+        setMsg("✅ Padre vinculado (contraseña abajo, junto a papás)");
       } else {
         setMsg("✅ Padre vinculado");
       }
@@ -238,6 +251,7 @@ export default function AdminPatientDetail() {
   async function onAddGuardian(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
+    setGuardianPasswordMsg("");
 
     try {
       const resp = await apiFetch(`/admin/patients/${id}/guardians`, {
@@ -245,6 +259,7 @@ export default function AdminPatientDetail() {
         body: JSON.stringify({
           fullName: gFullName,
           email: gEmail,
+          phone: gPhone.trim() || undefined,
           relationship: gRel,
           isPrimary: gPrimary,
           notes: gNotes || undefined,
@@ -252,13 +267,15 @@ export default function AdminPatientDetail() {
       });
 
       if (resp?.generatedPassword) {
-        setMsg(`✅ Padre agregado. Password generado: ${resp.generatedPassword}`);
+        setGuardianPasswordMsg(`Password generado: ${resp.generatedPassword}`);
+        setMsg("✅ Padre agregado (contraseña abajo, junto a papás)");
       } else {
         setMsg("✅ Padre agregado");
       }
 
       setGFullName("");
       setGEmail("");
+      setGPhone("");
       setGRel("OTHER");
       setGPrimary(false);
       setGNotes("");
@@ -361,6 +378,10 @@ export default function AdminPatientDetail() {
           <label className="grid gap-1 text-sm">
             <span className="font-medium">Apellido</span>
             <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Fecha de nacimiento</span>
+            <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
           </label>
           <label className="grid gap-1 text-sm">
             <span className="font-medium">Centro GiDi</span>
@@ -466,6 +487,12 @@ export default function AdminPatientDetail() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <strong>{g.fullName}</strong> · <span className="text-subtle">{g.email}</span>
+                    {g.phone ? (
+                      <>
+                        <br />
+                        <span className="text-subtle">Tel: {g.phone}</span>
+                      </>
+                    ) : null}
                     <br />
                     <span className="text-subtle">
                       {g.relationship}{g.isPrimary ? " · principal" : ""}
@@ -579,6 +606,11 @@ export default function AdminPatientDetail() {
               </label>
 
               <label className="grid gap-1 text-sm">
+                <span className="font-medium">Teléfono</span>
+                <input className="input" type="tel" value={gPhone} onChange={(e) => setGPhone(e.target.value)} placeholder="Para contactarlo" />
+              </label>
+
+              <label className="grid gap-1 text-sm">
                 <span className="font-medium">Relación</span>
                 <select className="select" value={gRel} onChange={(e) => setGRel(e.target.value as any)}>
                   <option value="MOTHER">Madre</option>
@@ -603,6 +635,26 @@ export default function AdminPatientDetail() {
               </button>
             </form>
           )}
+
+          {guardianPasswordMsg ? (
+            <div
+              className="mt-4 rounded-xl border border-border px-3 py-3 text-sm"
+              style={{ background: "var(--surface-elevated, #f7f7f7)" }}
+            >
+              <strong>Contraseña del papá/tutor</strong>
+              <p className="mt-1 text-subtle">Cópiala ahora; se muestra solo una vez.</p>
+              <code style={{ fontSize: 15, fontWeight: 700 }}>{guardianPasswordMsg.replace(/^Password generado:\s*/, "")}</code>
+              <button
+                type="button"
+                className="btn ml-2 rounded-lg px-3 py-1 text-xs"
+                onClick={() =>
+                  void navigator.clipboard.writeText(guardianPasswordMsg.replace(/^Password generado:\s*/, ""))
+                }
+              >
+                Copiar
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
 

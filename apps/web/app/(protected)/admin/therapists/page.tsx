@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../../lib/api"; // <-- AJUSTA si tu lib/api está en otra ruta
-import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { hasOfficeStaffRole, STATUS_LABELS } from "@/lib/role-permissions";
 
 type Row = {
   id: string;
@@ -27,6 +27,7 @@ export default function AdminTherapistsPage() {
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
   const [password, setPassword] = useState("");
   const [formKey, setFormKey] = useState(0);
+  const [lastGeneratedPassword, setLastGeneratedPassword] = useState<string | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -52,9 +53,9 @@ export default function AdminTherapistsPage() {
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
     setMsg("");
+    setLastGeneratedPassword(null);
 
     try {
-      // ✅ endpoint correcto para crear
       const created = await apiFetch(`/admin/users`, {
         method: "POST",
         body: JSON.stringify({
@@ -66,7 +67,6 @@ export default function AdminTherapistsPage() {
         }),
       });
 
-      // tu backend probablemente regresa { user, generatedPassword }
       const user = created?.user ?? created;
 
       setRows((prev) => [user, ...prev]);
@@ -77,7 +77,12 @@ export default function AdminTherapistsPage() {
       setFormKey((k) => k + 1);
 
       const gp = created?.generatedPassword;
-      setMsg(gp ? `✅ Creado. Password: ${gp}` : "✅ Creado");
+      if (gp) {
+        setLastGeneratedPassword(gp);
+        setMsg("✅ Creado. Contraseña generada abajo.");
+      } else {
+        setMsg("✅ Creado");
+      }
     } catch (e: any) {
       setMsg(e.message);
     }
@@ -108,10 +113,10 @@ export default function AdminTherapistsPage() {
             <label className="sub">Email</label>
             <input className="input" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
-            <label className="sub">Status</label>
+            <label className="sub">Estatus</label>
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="INACTIVE">INACTIVE</option>
+              <option value="ACTIVE">{STATUS_LABELS.ACTIVE}</option>
+              <option value="INACTIVE">{STATUS_LABELS.INACTIVE}</option>
             </select>
 
             <label className="sub">Password (opcional)</label>
@@ -128,6 +133,15 @@ export default function AdminTherapistsPage() {
           </form>
 
           {msg && <p className="sub" style={{ marginTop: 12 }}>{msg}</p>}
+          {lastGeneratedPassword ? (
+            <div className="card" style={{ marginTop: 12, background: "var(--surface-elevated, #f5f5f5)" }}>
+              <p className="sub" style={{ marginBottom: 4 }}>Contraseña temporal (cópiala ahora):</p>
+              <code style={{ fontSize: 16, fontWeight: 700 }}>{lastGeneratedPassword}</code>
+              <button className="btn" type="button" style={{ marginLeft: 12 }} onClick={() => void navigator.clipboard.writeText(lastGeneratedPassword)}>
+                Copiar
+              </button>
+            </div>
+          ) : null}
         </section>
 
         <section className="card">
@@ -147,7 +161,7 @@ export default function AdminTherapistsPage() {
                   <tr style={{ textAlign: "left" }}>
                     <th>Nombre</th>
                     <th>Email</th>
-                    <th>Status</th>
+                    <th>Estatus</th>
                     <th>Creado</th>
                   </tr>
                 </thead>
@@ -163,7 +177,7 @@ export default function AdminTherapistsPage() {
                         </div>
                       </td>
                       <td style={{ color: "var(--muted)" }}>{u.email}</td>
-                      <td style={{ color: "var(--muted)" }}>{u.status}</td>
+                      <td style={{ color: "var(--muted)" }}>{STATUS_LABELS[u.status] ?? u.status}</td>
                       <td style={{ color: "var(--muted)" }}>{new Date(u.createdAt).toLocaleString()}</td>
                     </tr>
                   ))}

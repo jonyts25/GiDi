@@ -28,6 +28,7 @@ export class AdminUsersService {
         id: true,
         email: true,
         fullName: true,
+        phone: true,
         status: true,
         roles: { select: { role: { select: { key: true, name: true } } } },
         createdAt: true,
@@ -49,6 +50,7 @@ export class AdminUsersService {
       data: {
         email: dto.email.toLowerCase(),
         fullName: dto.fullName,
+        phone: dto.phone?.trim() || null,
         password: passwordHash,
         status: dto.status ?? UserStatus.ACTIVE,
         roles: {
@@ -59,6 +61,7 @@ export class AdminUsersService {
         id: true,
         email: true,
         fullName: true,
+        phone: true,
         status: true,
         createdAt: true,
       },
@@ -100,6 +103,7 @@ export class AdminUsersService {
         id: true,
         email: true,
         fullName: true,
+        phone: true,
         status: true,
         roles: { select: { role: { select: { key: true, name: true } } } },
         createdAt: true,
@@ -128,9 +132,10 @@ export class AdminUsersService {
         data: {
           email: dto.email?.toLowerCase(),
           fullName: dto.fullName,
+          phone: dto.phone === undefined ? undefined : (dto.phone?.trim() || null),
           status: dto.status,
         },
-        select: { id: true, email: true, fullName: true, status: true, createdAt: true },
+        select: { id: true, email: true, fullName: true, phone: true, status: true, createdAt: true },
       });
 
       if (dto.roles?.length) {

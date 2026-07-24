@@ -13,6 +13,7 @@ import {
   type PaymentStatus,
 } from "@/components/payments/payment-helpers";
 import { GIDI_CENTER_OPTIONS } from "@/lib/centers";
+import { suggestedMonthly } from "@/lib/payment-rates";
 
 type PaymentsView = {
   patient: { id: string; firstName: string; lastName: string; center: string };
@@ -21,7 +22,7 @@ type PaymentsView = {
   payments: PaymentRow[];
 };
 
-const STATUS_OPTIONS: PaymentStatus[] = ["PENDIENTE", "PAGADO", "PARCIAL", "DEUDA"];
+const STATUS_OPTIONS: PaymentStatus[] = ["PENDIENTE", "PAGADO", "PARCIAL", "DEUDA", "PAUSA_VACACIONES"];
 
 const now = new Date();
 
@@ -46,16 +47,31 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
   const reload = useCallback(async () => {
     const res = (await apiFetch(`/patients/${patientId}/payments`)) as PaymentsView;
     setData(res);
-    setSessionsPerWeek(res.billing.sessionsPerWeek ? String(res.billing.sessionsPerWeek) : "");
+    setSessionsPerWeek(
+      res.billing.sessionsPerWeek === 0
+        ? "0"
+        : res.billing.sessionsPerWeek
+          ? String(res.billing.sessionsPerWeek)
+          : "",
+    );
     setDiscountPercent(String(res.billing.discountPercent ?? 0));
     setCenter(res.patient.center);
-    if (!amountDue) setAmountDue(res.billing.suggestedMonthly != null ? String(res.billing.suggestedMonthly) : "");
-  }, [patientId, amountDue]);
+  }, [patientId]);
 
   useEffect(() => {
     void reload().catch((e: unknown) => setMsg(e instanceof Error ? e.message : "Error"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [patientId]);
+  }, [patientId, reload]);
+
+  // Recalcular monto a pagar al cambiar frecuencia o descuento (no en pago por sesión).
+  useEffect(() => {
+    if (status === "PAUSA_VACACIONES") return;
+    if (sessionsPerWeek === "" || sessionsPerWeek === "0") {
+      if (sessionsPerWeek === "0") setAmountDue("");
+      return;
+    }
+    const suggested = suggestedMonthly(Number(sessionsPerWeek), Number(discountPercent) || 0);
+    if (suggested != null) setAmountDue(String(suggested));
+  }, [sessionsPerWeek, discountPercent, status]);
 
   async function onSaveBilling() {
     setMsg("");
@@ -63,15 +79,27 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
       const res = await apiFetch(`/admin/patients/${patientId}/billing`, {
         method: "PATCH",
         body: JSON.stringify({
-          sessionsPerWeek: sessionsPerWeek ? Number(sessionsPerWeek) : 0,
+          sessionsPerWeek: sessionsPerWeek === "" ? null : Number(sessionsPerWeek),
           discountPercent: Number(discountPercent) || 0,
           center,
         }),
       });
-      setMsg(`✅ Cobro guardado · Mensualidad sugerida: ${res.suggestedMonthly != null ? formatMoney(res.suggestedMonthly) : "—"}`);
+      setMsg(
+        `✅ Cobro guardado · Mensualidad sugerida: ${
+          res.suggestedMonthly != null ? formatMoney(res.suggestedMonthly) : sessionsPerWeek === "0" ? "pago por sesión (variable)" : "—"
+        }`,
+      );
       await reload();
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error");
+    }
+  }
+
+  function onStatusChange(next: PaymentStatus) {
+    setStatus(next);
+    if (next === "PAUSA_VACACIONES") {
+      setAmountDue("0");
+      setAmountPaid("0");
     }
   }
 
@@ -90,11 +118,12 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
   async function onSaveMonth() {
     setMsg("");
     try {
+      const pause = status === "PAUSA_VACACIONES";
       await apiFetch(`/admin/patients/${patientId}/payments/${year}/${month}`, {
         method: "PUT",
         body: JSON.stringify({
-          amountDue: amountDue === "" ? undefined : Number(amountDue),
-          amountPaid: amountPaid === "" ? undefined : Number(amountPaid),
+          amountDue: pause ? 0 : amountDue === "" ? undefined : Number(amountDue),
+          amountPaid: pause ? 0 : amountPaid === "" ? undefined : Number(amountPaid),
           status,
           paidAt: paidAt || undefined,
           method: method || undefined,
@@ -148,6 +177,11 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
     }
   }
 
+  const liveSuggested =
+    sessionsPerWeek && sessionsPerWeek !== "0"
+      ? suggestedMonthly(Number(sessionsPerWeek), Number(discountPercent) || 0)
+      : null;
+
   return (
     <section className="card space-y-5 border-l-4 border-l-accent-green">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -178,6 +212,7 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
               <option value="1">1 vez/semana</option>
               <option value="2">2 veces/semana</option>
               <option value="3">3 veces/semana</option>
+              <option value="0">Pago por sesión (variable)</option>
             </select>
           </label>
           <label className="grid gap-1 text-sm">
@@ -189,12 +224,19 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
               max={100}
               value={discountPercent}
               onChange={(e) => setDiscountPercent(e.target.value)}
+              disabled={sessionsPerWeek === "0"}
             />
           </label>
           <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onSaveBilling()}>
             Guardar cobro
           </button>
-          {data?.billing.suggestedMonthly != null ? (
+          {sessionsPerWeek === "0" ? (
+            <span className="text-sm text-subtle">Monto variable por sesión (déjalo en blanco al registrar el mes).</span>
+          ) : liveSuggested != null ? (
+            <span className="text-sm text-subtle">
+              Mensualidad sugerida: <strong className="text-ink">{formatMoney(liveSuggested)}</strong>
+            </span>
+          ) : data?.billing.suggestedMonthly != null ? (
             <span className="text-sm text-subtle">
               Mensualidad sugerida: <strong className="text-ink">{formatMoney(data.billing.suggestedMonthly)}</strong>
             </span>
@@ -222,15 +264,28 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
           </label>
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Monto a pagar</span>
-            <input className="input" type="number" value={amountDue} onChange={(e) => setAmountDue(e.target.value)} placeholder="Proporcional o mensualidad" />
+            <input
+              className="input"
+              type="number"
+              value={amountDue}
+              onChange={(e) => setAmountDue(e.target.value)}
+              placeholder={sessionsPerWeek === "0" ? "Variable / por sesión" : "Proporcional o mensualidad"}
+              disabled={status === "PAUSA_VACACIONES"}
+            />
           </label>
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Monto pagado</span>
-            <input className="input" type="number" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
+            <input
+              className="input"
+              type="number"
+              value={amountPaid}
+              onChange={(e) => setAmountPaid(e.target.value)}
+              disabled={status === "PAUSA_VACACIONES"}
+            />
           </label>
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Estado</span>
-            <select className="select" value={status} onChange={(e) => setStatus(e.target.value as PaymentStatus)}>
+            <select className="select" value={status} onChange={(e) => onStatusChange(e.target.value as PaymentStatus)}>
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>{STATUS_LABEL[s]}</option>
               ))}
@@ -253,6 +308,9 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
             <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej. proporcional por enfermedad" />
           </label>
         </div>
+        {status === "PAUSA_VACACIONES" ? (
+          <p className="text-sm text-subtle">Pauso/Vacaciones: se registra con debe 0 y paga 0.</p>
+        ) : null}
         <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onSaveMonth()}>
           Guardar mensualidad
         </button>
@@ -285,7 +343,7 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
                         Ver comprobante
                       </button>
                     ) : null}
-                    {p.status !== "PAGADO" ? (
+                    {p.status !== "PAGADO" && p.status !== "PAUSA_VACACIONES" ? (
                       <button type="button" className="rounded-lg border border-success/40 px-2 py-1 text-xs text-success hover:bg-success/10" onClick={() => void quickPaid(p)}>
                         Marcar pagado
                       </button>

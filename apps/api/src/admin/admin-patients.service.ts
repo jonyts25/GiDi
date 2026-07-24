@@ -21,7 +21,7 @@ function randomPassword(len = 12) {
   return out;
 }
 
-type MiniUser = { id: string; email: string; fullName: string; status: UserStatus };
+type MiniUser = { id: string; email: string; fullName: string; status: UserStatus; phone?: string | null };
 
 @Injectable()
 export class AdminPatientsService {
@@ -54,7 +54,7 @@ export class AdminPatientsService {
             relationship: true,
             isPrimary: true,
             notes: true,
-            parent: { select: { id: true, fullName: true, email: true, status: true } },
+            parent: { select: { id: true, fullName: true, email: true, phone: true, status: true } },
           },
           // ✅ NO hay createdAt en ParentPatient -> ordenamos por isPrimary y luego por parent.fullName
           orderBy: [{ isPrimary: "desc" }, { parent: { fullName: "asc" } }],
@@ -106,6 +106,7 @@ export class AdminPatientsService {
         parentId: pp.parentId,
         fullName: pp.parent.fullName,
         email: pp.parent.email,
+        phone: pp.parent.phone,
         status: pp.parent.status,
         relationship: pp.relationship,
         isPrimary: pp.isPrimary,
@@ -302,6 +303,7 @@ export class AdminPatientsService {
           id: true,
           email: true,
           fullName: true,
+          phone: true,
           status: true,
           roles: { include: { role: true } },
         },
@@ -311,7 +313,7 @@ export class AdminPatientsService {
       if (!hasParent) {
         throw new BadRequestException("El usuario seleccionado no tiene rol de padre/tutor");
       }
-      parent = { id: u.id, email: u.email, fullName: u.fullName, status: u.status };
+      parent = { id: u.id, email: u.email, fullName: u.fullName, status: u.status, phone: u.phone };
     } else {
       const email = (dto.email ?? "").toLowerCase().trim();
       if (!email || !dto.fullName?.trim()) {
@@ -320,7 +322,7 @@ export class AdminPatientsService {
 
       parent = await this.prisma.user.findUnique({
         where: { email },
-        select: { id: true, email: true, fullName: true, status: true },
+        select: { id: true, email: true, fullName: true, phone: true, status: true },
       });
 
       if (!parent) {
@@ -336,13 +338,21 @@ export class AdminPatientsService {
           data: {
             email,
             fullName: dto.fullName.trim(),
+            phone: dto.phone?.trim() || null,
             password: passwordHash,
             status: UserStatus.ACTIVE,
             roles: { create: [{ roleId: parentRole.id }] },
           },
-          select: { id: true, email: true, fullName: true, status: true },
+          select: { id: true, email: true, fullName: true, phone: true, status: true },
         });
       } else {
+        if (dto.phone?.trim() && !parent.phone) {
+          parent = await this.prisma.user.update({
+            where: { id: parent.id },
+            data: { phone: dto.phone.trim() },
+            select: { id: true, email: true, fullName: true, phone: true, status: true },
+          });
+        }
         const parentRole = await this.prisma.role.findUnique({ where: { key: RoleKey.PARENT } });
         if (!parentRole) throw new Error("Role PARENT no existe (corre seed)");
         const hasRole = await this.prisma.userRole.findFirst({

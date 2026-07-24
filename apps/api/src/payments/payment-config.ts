@@ -42,12 +42,13 @@ export const CENTER_PAYMENT_INFO: Record<GidiCenter, CenterPaymentInfo> = {
   },
 };
 
-/** Mensualidad sugerida a partir de frecuencia y descuento (%). */
+/** Mensualidad sugerida a partir de frecuencia y descuento (%).
+ * `sessionsPerWeek === 0` = pago por sesión (sin monto fijo). */
 export function suggestedMonthly(
   sessionsPerWeek: number | null | undefined,
   discountPercent: number | null | undefined,
 ): number | null {
-  if (!sessionsPerWeek) return null;
+  if (sessionsPerWeek == null || sessionsPerWeek <= 0) return null;
   const base = MONTHLY_RATES[sessionsPerWeek];
   if (base == null) return null;
   const disc = Math.min(Math.max(discountPercent ?? 0, 0), 100);

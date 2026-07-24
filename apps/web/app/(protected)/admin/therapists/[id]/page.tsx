@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "../../../../../lib/api";
-import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { hasOfficeStaffRole, STATUS_LABELS } from "@/lib/role-permissions";
+import ResetPasswordButton from "@/components/admin/ResetPasswordButton";
 import { TherapistScheduleEditor } from "@/components/therapists/TherapistScheduleEditor";
 
 type UserDetail = {
@@ -87,16 +88,24 @@ export default function AdminTherapistDetailPage() {
           <label className="sub">Email</label>
           <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
 
-          <label className="sub">Status</label>
+          <label className="sub">Estatus</label>
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
+            <option value="ACTIVE">{STATUS_LABELS.ACTIVE}</option>
+            <option value="INACTIVE">{STATUS_LABELS.INACTIVE}</option>
           </select>
 
           <button className="btn" type="submit">Guardar</button>
         </form>
 
         {msg && <p className="sub" style={{ marginTop: 12 }}>{msg}</p>}
+      </section>
+
+      <section className="card" style={{ marginTop: 14 }}>
+        <h2 className="h2" style={{ marginTop: 0 }}>Contraseña</h2>
+        <p className="sub">Genera una contraseña temporal si la olvidaron. Deberán cambiarla al entrar.</p>
+        <div style={{ marginTop: 10 }}>
+          <ResetPasswordButton userId={id} />
+        </div>
       </section>
 
       <TherapistScheduleEditor

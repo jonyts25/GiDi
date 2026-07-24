@@ -48,7 +48,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   const nav = hasOfficeStaffRole(roles)
     ? [
-        { href: "/admin/patients", label: "Pacientes" },
+        { href: "/admin/patients", label: "Lista de pacientes" },
         { href: "/admin/patients/altas", label: "Altas" },
         { href: "/admin/patients/discharged", label: "Bajas" },
         { href: "/admin/therapists", label: "Terapeutas" },

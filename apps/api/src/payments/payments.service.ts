@@ -119,7 +119,7 @@ export class PaymentsService {
     const updated = await this.prisma.patient.update({
       where: { id: patientId },
       data: {
-        sessionsPerWeek: dto.sessionsPerWeek ?? undefined,
+        sessionsPerWeek: dto.sessionsPerWeek === undefined ? undefined : dto.sessionsPerWeek,
         discountPercent: dto.discountPercent ?? undefined,
         center: dto.center ?? undefined,
       },
@@ -149,10 +149,19 @@ export class PaymentsService {
     const defaultDue =
       suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent) ?? 0;
 
+    let amountDue = dto.amountDue ?? existing?.amountDue ?? defaultDue;
+    let amountPaid = dto.amountPaid ?? existing?.amountPaid ?? 0;
+    const status = dto.status ?? existing?.status ?? PaymentStatus.PENDIENTE;
+
+    if (status === PaymentStatus.PAUSA_VACACIONES) {
+      amountDue = 0;
+      amountPaid = 0;
+    }
+
     const data = {
-      amountDue: dto.amountDue ?? existing?.amountDue ?? defaultDue,
-      amountPaid: dto.amountPaid ?? existing?.amountPaid ?? 0,
-      status: dto.status ?? existing?.status ?? PaymentStatus.PENDIENTE,
+      amountDue,
+      amountPaid,
+      status,
       paidAt: dto.paidAt ? new Date(dto.paidAt) : existing?.paidAt ?? undefined,
       method: dto.method ?? undefined,
       reference: dto.reference ?? undefined,
