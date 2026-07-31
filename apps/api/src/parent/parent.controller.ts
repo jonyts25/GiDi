@@ -1,13 +1,14 @@
 import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { JwtGuard } from "../auth/jwt.guard";
 import { RolesGuard } from "../auth/roles.guard";
+import { ParentPortalGuard } from "../auth/parent-portal.guard";
 import { Roles } from "../auth/roles.decorator";
 import { ParentService } from "./parent.service";
 import { CurrentUser } from "../auth/current-user.decorator";
 import { FollowUpsService } from "../followups/followups.service";
 import { AuthUser } from "../auth/auth-user";
 
-@UseGuards(JwtGuard, RolesGuard)
+@UseGuards(JwtGuard, RolesGuard, ParentPortalGuard)
 @Roles("PARENT")
 @Controller("parent")
 export class ParentController {

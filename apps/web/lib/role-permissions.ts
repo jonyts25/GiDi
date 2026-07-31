@@ -21,6 +21,17 @@ export function hasOfficeStaffRole(roles: string[] = []): boolean {
   return hasFullAdminRole(roles) || roles.includes("SECRETARY");
 }
 
+const STAFF_ROLE_KEYS = ["SUPERADMIN", "ADMIN", "SECRETARY", "THERAPIST", "FINANCE"] as const;
+
+export function hasStaffRole(roles: string[] = []): boolean {
+  return roles.some((r) => (STAFF_ROLE_KEYS as readonly string[]).includes(r));
+}
+
+/** Papá/Mamá portal — excludes users who also have internal staff profiles. */
+export function hasParentPortalAccess(roles: string[] = []): boolean {
+  return roles.includes("PARENT") && !hasStaffRole(roles);
+}
+
 export function canViewRevenueOverview(roles: string[] = []): boolean {
   return hasFullAdminRole(roles);
 }

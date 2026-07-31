@@ -5,7 +5,7 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 import { Prisma, RoleKey, UserStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { AuthUser } from "../auth/auth-user";
-import { userHasFullAdminRole } from "../auth/role-permissions";
+import { userHasFullAdminRole, assertRoleSetCompatible } from "../auth/role-permissions";
 
 function randomPassword(len = 12) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
@@ -45,6 +45,8 @@ export class AdminUsersService {
   if (!role) {
     throw new BadRequestException(`Role ${dto.role} no existe`);
   }
+
+    assertRoleSetCompatible([dto.role]);
 
     const created = await this.prisma.user.create({
       data: {
@@ -139,6 +141,7 @@ export class AdminUsersService {
       });
 
       if (dto.roles?.length) {
+        assertRoleSetCompatible(dto.roles);
         const roles = await this.prisma.role.findMany({ where: { key: { in: dto.roles } } });
 
         await this.prisma.userRole.deleteMany({ where: { userId: id } });

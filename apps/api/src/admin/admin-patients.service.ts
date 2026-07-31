@@ -12,6 +12,7 @@ import { SetGuardianMetaDto } from "./dto/set-guardian-meta.dto";
 import { UpdatePatientDto } from "./dto/update-patient.dto";
 import { CreatePatientDto } from "./dto/create-patient.dto";
 import { FollowUpsService } from "../followups/followups.service";
+import { assertCanBeParent } from "../auth/role-permissions";
 
 function randomPassword(len = 12) {
   const chars =
@@ -309,6 +310,7 @@ export class AdminPatientsService {
         },
       });
       if (!u) throw new NotFoundException("Usuario no encontrado");
+      assertCanBeParent(u.roles.map((r) => r.role.key));
       const hasParent = u.roles.some((r) => r.role.key === RoleKey.PARENT);
       if (!hasParent) {
         throw new BadRequestException("El usuario seleccionado no tiene rol de padre/tutor");
@@ -320,12 +322,19 @@ export class AdminPatientsService {
         throw new BadRequestException("Nombre y email son obligatorios si no eliges un padre existente");
       }
 
-      parent = await this.prisma.user.findUnique({
+      const existing = await this.prisma.user.findUnique({
         where: { email },
-        select: { id: true, email: true, fullName: true, phone: true, status: true },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          phone: true,
+          status: true,
+          roles: { include: { role: true } },
+        },
       });
 
-      if (!parent) {
+      if (!existing) {
         const plain = dto.password ?? randomPassword();
         generatedPassword = plain;
 
@@ -346,6 +355,8 @@ export class AdminPatientsService {
           select: { id: true, email: true, fullName: true, phone: true, status: true },
         });
       } else {
+        assertCanBeParent(existing.roles.map((r) => r.role.key));
+        parent = existing;
         if (dto.phone?.trim() && !parent.phone) {
           parent = await this.prisma.user.update({
             where: { id: parent.id },
