@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { PatientGeneralProfile, type PatientProfileData } from "@/components/patients/PatientGeneralProfile";
+import { hasOfficeStaffRole, hasParentPortalAccess } from "@/lib/role-permissions";
 
 export default function ParentPatientDetailPage() {
   const router = useRouter();
@@ -19,7 +20,8 @@ export default function ParentPatientDetailPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("PARENT")) return router.replace("/dashboard");
+    if (hasOfficeStaffRole(roles)) return router.replace("/admin/patients");
+    if (!hasParentPortalAccess(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {

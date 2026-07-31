@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { prepareFileForUpload } from "@/lib/compress-upload";
+import { hasOfficeStaffRole, hasParentPortalAccess } from "@/lib/role-permissions";
 import {
   formatMoney,
   monthLabel,
@@ -42,7 +43,8 @@ export default function ParentPaymentsPage() {
     const userRaw = localStorage.getItem("gidi_user");
     if (!token || !userRaw) return router.replace("/");
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("PARENT")) return router.replace("/dashboard");
+    if (hasOfficeStaffRole(roles)) return router.replace("/admin/patients");
+    if (!hasParentPortalAccess(roles)) return router.replace("/dashboard");
     void reload().catch((e: unknown) => setMsg(e instanceof Error ? e.message : "Error"));
   }, [router, reload]);
 

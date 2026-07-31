@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { AnnouncementBanner } from "@/components/announcements/AnnouncementBanner";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
-import { canViewRevenueOverview, hasFullAdminRole, hasOfficeStaffRole, primaryRoleLabel } from "@/lib/role-permissions";
+import { canViewRevenueOverview, hasFullAdminRole, hasOfficeStaffRole, hasParentPortalAccess, primaryRoleLabel } from "@/lib/role-permissions";
 
 function getUser() {
   if (typeof window === "undefined") return null;
@@ -63,7 +63,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           { href: "/therapist/schedule", label: "Mi horario" },
           { href: "/therapist/objective-bank", label: "Banco de objetivos" },
         ]
-      : roles.includes("PARENT")
+      : hasParentPortalAccess(roles)
         ? [{ href: "/parent/patients", label: "Mis hijos" }]
         : roles.includes("SCHOOL")
           ? [{ href: "/school/patients", label: "Pacientes" }]

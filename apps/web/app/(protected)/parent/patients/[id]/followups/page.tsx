@@ -9,6 +9,7 @@ import {
   type ParentFollowUpCardData,
 } from "@/components/followups/ParentFollowUpSummaryCard";
 import { SaveBanner } from "@/components/ui/SaveBanner";
+import { hasOfficeStaffRole, hasParentPortalAccess } from "@/lib/role-permissions";
 
 type SummaryResponse = {
   patient: { id: string; firstName: string; lastName: string };
@@ -44,7 +45,8 @@ export default function ParentPatientFollowUpsPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("PARENT")) return router.replace("/dashboard");
+    if (hasOfficeStaffRole(roles)) return router.replace("/admin/patients");
+    if (!hasParentPortalAccess(roles)) return router.replace("/dashboard");
     const user = JSON.parse(userRaw);
     setParentId(user.id ?? "");
 

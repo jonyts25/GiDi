@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../../../lib/api";
 import { useRouter } from "next/navigation";
+import { hasOfficeStaffRole, hasParentPortalAccess } from "@/lib/role-permissions";
 
 type Patient = {
   id: string;
@@ -24,7 +25,8 @@ export default function ParentPatientsPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (!roles.includes("PARENT")) return router.replace("/dashboard");
+    if (hasOfficeStaffRole(roles)) return router.replace("/admin/patients");
+    if (!hasParentPortalAccess(roles)) return router.replace("/dashboard");
 
     (async () => {
       try {

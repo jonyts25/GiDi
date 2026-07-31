@@ -4,6 +4,7 @@ import { CreatePatientDto } from "./dto/create-patient.dto";
 import { generateTempPassword } from "src/common/security/temp-password";
 import { GuardianRelationship, RoleKey } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { assertCanBeParent } from "../auth/role-permissions";
 
 type GuardianInput = {
   existingParentId?: string;
@@ -110,6 +111,7 @@ export class PatientsService {
           if (!user) {
             throw new BadRequestException(`Padre/tutor no encontrado: ${g.existingParentId}`);
           }
+          assertCanBeParent(user.roles.map((r) => r.role.key));
           const hasParent = user.roles.some((r) => r.role.key === RoleKey.PARENT);
           if (!hasParent) {
             await tx.userRole.create({
@@ -149,6 +151,11 @@ export class PatientsService {
             data: { userId: user.id, roleId: parentRole.id },
           });
         } else {
+          const roleRows = await tx.userRole.findMany({
+            where: { userId: user.id },
+            include: { role: true },
+          });
+          assertCanBeParent(roleRows.map((r) => r.role.key));
           const hasRole = await tx.userRole.findFirst({
             where: { userId: user.id, roleId: parentRole.id },
           });

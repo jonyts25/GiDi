@@ -2,7 +2,7 @@
 import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { canViewRevenueOverview, hasFullAdminRole, hasOfficeStaffRole, primaryRoleLabel } from "@/lib/role-permissions";
+import { canViewRevenueOverview, hasFullAdminRole, hasOfficeStaffRole, hasParentPortalAccess, primaryRoleLabel } from "@/lib/role-permissions";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -20,10 +20,11 @@ export default function Dashboard() {
 
   const roles: string[] = user?.roles ?? [];
 
-  // si no es admin, redirigimos como antes
+  // Redirigir según rol principal (personal de oficina tiene prioridad sobre PARENT)
   useEffect(() => {
+    if (hasOfficeStaffRole(roles)) return;
     if (roles.includes("THERAPIST")) router.replace("/therapist/patients");
-    else if (roles.includes("PARENT")) router.replace("/parent/patients");
+    else if (hasParentPortalAccess(roles)) router.replace("/parent/patients");
     else if (roles.includes("SCHOOL")) router.replace("/school/patients");
   }, [roles, router]);
 
