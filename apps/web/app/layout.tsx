@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import SWRegister from "./sw-register";
 import { getApiBaseUrlForScript } from "../lib/get-api-base-url";
 import BrandingShell from "@/components/branding/BrandingShell";
+import { Providers } from "@/components/ui/Providers";
 
 /** Lee `NEXT_PUBLIC_*` en el servidor en cada request (Railway), no solo en el build. */
 export const dynamic = "force-dynamic";
@@ -30,8 +31,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <BrandingShell>
-          <SWRegister />
-          {children}
+          <Providers>
+            <SWRegister />
+            {children}
+          </Providers>
         </BrandingShell>
       </body>
     </html>

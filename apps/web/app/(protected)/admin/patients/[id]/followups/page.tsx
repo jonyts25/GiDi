@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { filterAreasForUserRoles } from "@/lib/area-permissions";
+import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
@@ -36,6 +37,7 @@ export default function AdminPatientFollowUpsPage() {
 
   const [pickedAreaId, setPickedAreaId] = useState("");
   const [pickedTherapistId, setPickedTherapistId] = useState("");
+  const [areaFilter, setAreaFilter] = useState("");
 
   const canCreate = useMemo(() => pickedAreaId && pickedTherapistId, [pickedAreaId, pickedTherapistId]);
 
@@ -160,42 +162,14 @@ export default function AdminPatientFollowUpsPage() {
 
       <section className="card" style={{ marginTop: 14 }}>
         <div className="h2">Seguimientos del periodo</div>
-        {rows.length === 0 ? (
-          <p className="sub">No hay seguimientos para {allMonths ? "mostrar" : "este mes"}.</p>
-        ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left" }}>
-                <th style={{ padding: 8 }}>Área</th>
-                {allMonths ? <th style={{ padding: 8 }}>Mes</th> : null}
-                <th style={{ padding: 8 }}>Terapeuta</th>
-                <th style={{ padding: 8 }}>Estado</th>
-                <th style={{ padding: 8 }}>Creado</th>
-                <th style={{ padding: 8 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} style={{ borderTop: "1px solid #eee" }}>
-                  <td style={{ padding: 8 }}>{r.area?.name}</td>
-                  {allMonths ? (
-                    <td style={{ padding: 8 }}>
-                      {new Date(r.periodYear, r.periodMonth - 1, 1).toLocaleDateString("es-MX", { month: "short", year: "numeric" })}
-                    </td>
-                  ) : null}
-                  <td style={{ padding: 8 }}>{r.therapist?.fullName}</td>
-                  <td style={{ padding: 8 }}>{r.status === "CLOSED" ? "Enviado" : "Borrador"}</td>
-                  <td style={{ padding: 8, color: "var(--muted)", fontSize: 13 }}>
-                    {new Date(r.createdAt).toLocaleString("es-MX")}
-                  </td>
-                  <td style={{ padding: 8 }}>
-                    <Link className="btn" href={`/admin/followups/${r.id}`}>Abrir</Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <PatientFollowUpsExportTable
+          rows={rows}
+          allMonths={allMonths}
+          openHref={(fid) => `/admin/followups/${fid}`}
+          areas={areas}
+          areaFilter={areaFilter}
+          onAreaFilterChange={setAreaFilter}
+        />
       </section>
     </main>
   );

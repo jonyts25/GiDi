@@ -10,6 +10,7 @@ import { MonthlyFollowUpGrid } from "@/components/followups/MonthlyFollowUpGrid"
 import { NewFollowUpSessionForm } from "@/components/followups/NewFollowUpSessionForm";
 import { FollowUpReportPrint } from "@/components/followups/FollowUpReportPrint";
 import { SaveBanner } from "@/components/ui/SaveBanner";
+import { useToast } from "@/components/ui/Toast";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { hasFullAdminRole, hasOfficeStaffRole } from "@/lib/role-permissions";
 import type { FollowUpReport } from "@/lib/followup-report.types";
@@ -111,6 +112,7 @@ export function FollowUpDetailEditor(props: {
 }) {
   const { followUpId, backHref, patientFollowUpsPrefix, loadTherapists = false, showReportExport = false } = props;
   const router = useRouter();
+  const { showToast } = useToast();
 
   const [fu, setFu] = useState<FollowUpDetail | null>(null);
   const [msg, setMsg] = useState("");
@@ -272,6 +274,7 @@ export function FollowUpDetailEditor(props: {
       await reload({ skipObjectives: true, skipAudience: true });
       setMsgType("success");
       setMsg("✅ Borrador guardado correctamente");
+      showToast("✅ Borrador guardado correctamente");
     } catch (e: unknown) {
       setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");
@@ -296,6 +299,7 @@ export function FollowUpDetailEditor(props: {
       await reload({ skipObjectives: true, skipAudience: true });
       setMsgType("success");
       setMsg("✅ Borrador guardado correctamente");
+      showToast("✅ Borrador guardado correctamente");
     } catch (e: unknown) {
       setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");
@@ -349,6 +353,7 @@ export function FollowUpDetailEditor(props: {
       await reload({ skipHeader: true, skipAudience: true });
       setMsgType("success");
       setMsg("✅ Objetivos actualizados");
+      showToast("✅ Objetivos guardados correctamente");
     } catch (e: unknown) {
       setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");

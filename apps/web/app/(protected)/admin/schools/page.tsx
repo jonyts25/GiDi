@@ -1,4 +1,5 @@
 "use client";
+import { USERNAME_LABEL } from "@/lib/user-labels";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -110,7 +111,7 @@ export default function AdminSchoolsPage() {
             <label className="sub">Nombre</label>
             <input className="input" autoComplete="off" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
 
-            <label className="sub">Email</label>
+            <label className="sub">{USERNAME_LABEL}</label>
             <input className="input" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
             <label className="sub">Estatus</label>

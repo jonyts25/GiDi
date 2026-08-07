@@ -52,11 +52,16 @@ export class AdminPaymentsController {
 
   @Get("payments")
   @Roles("ADMIN")
-  monthOverview(@Query("year") year: string, @Query("month") month: string) {
+  monthOverview(
+    @Query("year") year: string,
+    @Query("month") month: string,
+    @Query("center") center: string,
+  ) {
     const now = new Date();
     return this.svc.monthOverview(
       year ? Number(year) : now.getFullYear(),
       month ? Number(month) : now.getMonth() + 1,
+      center === "SAN_AGUSTIN" || center === "VALLARTA" || center === "COLEGIOS" ? center : undefined,
     );
   }
 }

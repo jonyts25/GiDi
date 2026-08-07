@@ -1,4 +1,5 @@
 "use client";
+import { USERNAME_LABEL } from "@/lib/user-labels";
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -123,7 +124,7 @@ export default function AdminSchoolDetailPage() {
         <form onSubmit={(e) => void onSave(e)} style={{ display: "grid", gap: 10 }}>
           <label className="sub">Nombre</label>
           <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <label className="sub">Email</label>
+          <label className="sub">{USERNAME_LABEL}</label>
           <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
           <label className="sub">Estatus</label>
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value as "ACTIVE" | "INACTIVE")}>

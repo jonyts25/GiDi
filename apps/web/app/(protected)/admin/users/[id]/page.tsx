@@ -1,4 +1,5 @@
 "use client";
+import { USERNAME_LABEL } from "@/lib/user-labels";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -98,7 +99,7 @@ export default function AdminUserDetailPage() {
           <label className="sub">Nombre</label>
           <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
 
-          <label className="sub">Email</label>
+          <label className="sub">{USERNAME_LABEL}</label>
           <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
 
           <label className="sub">Estado</label>

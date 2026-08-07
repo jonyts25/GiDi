@@ -22,6 +22,11 @@ export class ParentController {
     return this.svc.listMyPatients(user.sub);
   }
 
+  @Get("patients/:id/dossier")
+  getDossier(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.followUps.buildParentPatientDossier(user, id);
+  }
+
   @Get("patients/:id")
   getMyPatient(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.svc.getMyPatient(user.sub, id);

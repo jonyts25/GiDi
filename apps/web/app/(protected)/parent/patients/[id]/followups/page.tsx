@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -8,7 +8,7 @@ import {
   ParentFollowUpSummaryCard,
   type ParentFollowUpCardData,
 } from "@/components/followups/ParentFollowUpSummaryCard";
-import { SaveBanner } from "@/components/ui/SaveBanner";
+import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { hasOfficeStaffRole, hasParentPortalAccess } from "@/lib/role-permissions";
 
 type SummaryResponse = {
@@ -21,7 +21,10 @@ type SummaryResponse = {
 type FollowUpRow = {
   id: string;
   status: string;
-  area: { name: string; key: string };
+  periodYear: number;
+  periodMonth: number;
+  area: { id: string; name: string; key: string };
+  therapist?: { fullName: string };
 };
 
 export default function ParentPatientFollowUpsPage() {
@@ -34,6 +37,9 @@ export default function ParentPatientFollowUpsPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [allMonths, setAllMonths] = useState(false);
   const [data, setData] = useState<SummaryResponse | null>(null);
+  const [exportRows, setExportRows] = useState<FollowUpRow[]>([]);
+  const [areas, setAreas] = useState<{ id: string; name: string }[]>([]);
+  const [areaFilter, setAreaFilter] = useState("");
   const [myRows, setMyRows] = useState<FollowUpRow[]>([]);
   const [familiarAreaId, setFamiliarAreaId] = useState("");
   const [msg, setMsg] = useState("");
@@ -56,18 +62,22 @@ export default function ParentPatientFollowUpsPage() {
         const summaryUrl = allMonths
           ? `/parent/patients/${patientId}/followups/summary`
           : `/parent/patients/${patientId}/followups/summary?year=${year}&month=${month}`;
-        const mineUrl = allMonths
+        const listUrl = allMonths
           ? `/patients/${patientId}/followups`
           : `/patients/${patientId}/followups?year=${year}&month=${month}`;
-        const [res, areas, mine] = await Promise.all([
+        const [res, areasRes, list] = await Promise.all([
           apiFetch(summaryUrl),
           apiFetch("/areas"),
-          apiFetch(mineUrl),
+          apiFetch(listUrl),
         ]);
         setData(res);
-        const fam = (areas as { id: string; key: string }[]).find((a) => a.key === "FAMILIAR");
+        const areaList = areasRes as { id: string; key: string; name: string }[];
+        setAreas(areaList.map((a) => ({ id: a.id, name: a.name })));
+        const fam = areaList.find((a) => a.key === "FAMILIAR");
         if (fam) setFamiliarAreaId(fam.id);
-        setMyRows((mine as FollowUpRow[]).filter((r) => r.area.key === "FAMILIAR"));
+        const rows = list as FollowUpRow[];
+        setMyRows(rows.filter((r) => r.area.key === "FAMILIAR"));
+        setExportRows(rows.filter((r) => r.status === "CLOSED"));
       } catch (e: unknown) {
         setMsg(e instanceof Error ? e.message : "Error");
         setData(null);
@@ -100,7 +110,7 @@ export default function ParentPatientFollowUpsPage() {
     : "Todos los meses";
 
   return (
-    <main className="max-w-[720px] space-y-6 py-6">
+    <main className="max-w-[820px] space-y-6 py-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Progreso del mes</h1>
@@ -137,6 +147,19 @@ export default function ParentPatientFollowUpsPage() {
       </section>
 
       <section className="card space-y-3 border-l-4 border-l-info">
+        <h2 className="text-lg font-semibold">Exportar seguimientos</h2>
+        <p className="text-sm text-subtle">Seleccione seguimientos publicados para exportar en un solo PDF.</p>
+        <PatientFollowUpsExportTable
+          rows={exportRows}
+          allMonths={allMonths}
+          openHref={(fid) => `/parent/followups/${fid}`}
+          areas={areas}
+          areaFilter={areaFilter}
+          onAreaFilterChange={setAreaFilter}
+        />
+      </section>
+
+      <section className="card space-y-3 border-l-4 border-l-info">
         <h2 className="text-lg font-semibold">Mi seguimiento familiar</h2>
         <p className="text-sm text-subtle">Registre observaciones del mes. Guarde borrador y publíquelo cuando esté listo.</p>
         {myRows.length ? (
@@ -156,7 +179,7 @@ export default function ParentPatientFollowUpsPage() {
         </button>
       </section>
 
-      <SaveBanner message={msg} type={msg.includes("✅") ? "success" : "error"} />
+      {msg ? <p className="text-sm text-danger">{msg}</p> : null}
 
       {!data && !msg ? <p className="text-subtle">Cargando resumen…</p> : null}
 

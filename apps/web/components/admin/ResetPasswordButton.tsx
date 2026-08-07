@@ -29,7 +29,7 @@ export default function ResetPasswordButton({ userId }: { userId: string }) {
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       <button className="btn" type="button" onClick={onReset} disabled={loading}>
-        {loading ? "Reseteando..." : "Reset password"}
+        {loading ? "Restableciendo…" : "Restablecer contraseña"}
       </button>
 
       {tempPassword && (

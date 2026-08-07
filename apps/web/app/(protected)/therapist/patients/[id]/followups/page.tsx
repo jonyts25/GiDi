@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { filterAreasForUserRoles } from "@/lib/area-permissions";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
@@ -30,6 +31,7 @@ export default function TherapistPatientFollowUpsPage() {
   const [msg, setMsg] = useState("");
   const [pickedAreaId, setPickedAreaId] = useState("");
   const [therapistId, setTherapistId] = useState("");
+  const [areaFilter, setAreaFilter] = useState("");
 
   const canCreate = useMemo(() => pickedAreaId && therapistId, [pickedAreaId, therapistId]);
 
@@ -142,30 +144,14 @@ export default function TherapistPatientFollowUpsPage() {
       </section>
 
       <section className="card">
-        {rows.length === 0 ? (
-          <p className="text-sm text-subtle">No hay seguimientos para {allMonths ? "mostrar" : "este mes"}.</p>
-        ) : (
-          <ul className="space-y-2">
-            {rows.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
-                <span>
-                  <b>{r.area.name}</b> · {r.status === "CLOSED" ? "Enviado" : "Borrador"}
-                  {allMonths ? (
-                    <span className="ml-2 text-xs text-primary">
-                      {new Date(r.periodYear, r.periodMonth - 1, 1).toLocaleDateString("es-MX", { month: "short", year: "numeric" })}
-                    </span>
-                  ) : null}
-                  <span className="ml-2 text-xs text-subtle">
-                    {new Date(r.createdAt).toLocaleString("es-MX")}
-                  </span>
-                </span>
-                <Link className="btn rounded-lg px-3 py-1.5 text-xs" href={`/therapist/followups/${r.id}`}>
-                  Abrir
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <PatientFollowUpsExportTable
+          rows={rows}
+          allMonths={allMonths}
+          openHref={(id) => `/therapist/followups/${id}`}
+          areas={allowedAreas}
+          areaFilter={areaFilter}
+          onAreaFilterChange={setAreaFilter}
+        />
       </section>
     </main>
   );

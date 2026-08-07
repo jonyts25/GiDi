@@ -5,7 +5,19 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "../../../../../lib/api";
 import { hasOfficeStaffRole, STATUS_LABELS } from "@/lib/role-permissions";
+import { USERNAME_LABEL } from "@/lib/user-labels";
+import { labelForCenter } from "@/lib/centers";
 import ResetPasswordButton from "@/components/admin/ResetPasswordButton";
+
+type ChildLink = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  center: string;
+  status: string;
+  relationship: string;
+  isPrimary: boolean;
+};
 
 type UserDetail = {
   id: string;
@@ -14,6 +26,7 @@ type UserDetail = {
   phone?: string | null;
   status: "ACTIVE" | "INACTIVE";
   roles?: { role: { key: string; name: string } }[];
+  children?: ChildLink[];
 };
 
 export default function AdminParentDetailPage() {
@@ -87,7 +100,7 @@ export default function AdminParentDetailPage() {
           <label className="sub">Nombre</label>
           <input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} />
 
-          <label className="sub">Email</label>
+          <label className="sub">{USERNAME_LABEL}</label>
           <input className="input" value={email} onChange={(e) => setEmail(e.target.value)} />
 
           <label className="sub">Teléfono</label>
@@ -103,6 +116,28 @@ export default function AdminParentDetailPage() {
         </form>
 
         {msg && <p className="sub" style={{ marginTop: 12 }}>{msg}</p>}
+      </section>
+
+      <section className="card" style={{ marginTop: 14 }}>
+        <h2 className="h2" style={{ marginTop: 0 }}>Hijos asignados</h2>
+        {u?.children?.length ? (
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {u.children.map((c) => (
+              <li key={c.id} style={{ marginBottom: 8 }}>
+                <Link href={`/admin/patients/${c.id}`} style={{ fontWeight: 700 }}>
+                  {c.firstName} {c.lastName}
+                </Link>
+                <span className="sub">
+                  {" "}
+                  · {labelForCenter(c.center as any)} · {c.status === "ACTIVE" ? "Activo" : "Inactivo"}
+                  {c.isPrimary ? " · Principal" : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="sub">Este padre no tiene hijos vinculados. Asigne tutores desde la ficha de cada paciente.</p>
+        )}
       </section>
 
       <section className="card" style={{ marginTop: 14 }}>

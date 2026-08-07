@@ -576,12 +576,15 @@ a {
 
   #follow-up-report-print,
   #follow-up-report-print *,
+  #follow-up-bulk-report-print,
+  #follow-up-bulk-report-print *,
   #patient-dossier-print,
   #patient-dossier-print * {
     visibility: visible;
   }
 
   #follow-up-report-print,
+  #follow-up-bulk-report-print,
   #patient-dossier-print {
     display: block !important;
     position: absolute;

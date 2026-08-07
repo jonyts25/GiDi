@@ -197,7 +197,8 @@ export default function AdminQuickPatientPage() {
             {saving ? "Guardando…" : "Guardar registro rápido"}
           </button>
         ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+            <span className="sub">✅ Guardado. Puedes ir a la ficha del paciente.</span>
             <Link className="btn" href={`/admin/patients/${createdId}`}>
               Abrir ficha del paciente
             </Link>
