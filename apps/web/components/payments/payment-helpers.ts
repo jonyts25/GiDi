@@ -1,5 +1,7 @@
 export type PaymentStatus = "PENDIENTE" | "PAGADO" | "PARCIAL" | "DEUDA" | "PAUSA_VACACIONES";
 
+export type MonthlyBillingStatus = "NORMAL" | "NO_INTEGRADO";
+
 export type PaymentRow = {
   id: string;
   periodYear: number;
@@ -30,6 +32,11 @@ export const STATUS_LABEL: Record<PaymentStatus, string> = {
   PARCIAL: "Parcial",
   DEUDA: "Deuda",
   PAUSA_VACACIONES: "Pauso/Vacaciones",
+};
+
+export const MONTHLY_BILLING_LABEL: Record<MonthlyBillingStatus, string> = {
+  NORMAL: "Cobra mensualidad",
+  NO_INTEGRADO: "No se integró a terapia",
 };
 
 export function statusClasses(status: PaymentStatus): string {

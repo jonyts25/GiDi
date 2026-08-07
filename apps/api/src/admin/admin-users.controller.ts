@@ -23,6 +23,11 @@ export class AdminUsersController {
     return this.svc.listByRole(role, onlyActive ? "ACTIVE" : undefined);
   }
 
+  @Get("inactive")
+  listInactive() {
+    return this.svc.listInactive();
+  }
+
   // ✅ Detalle por id (para la pantalla Editar)
   @Get(":id")
   get(@Param("id") id: string) {

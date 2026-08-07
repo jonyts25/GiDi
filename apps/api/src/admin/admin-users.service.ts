@@ -37,6 +37,22 @@ export class AdminUsersService {
     });
   }
 
+  async listInactive() {
+    return this.prisma.user.findMany({
+      where: { status: UserStatus.INACTIVE },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        phone: true,
+        status: true,
+        roles: { select: { role: { select: { key: true, name: true } } } },
+        createdAt: true,
+      },
+      orderBy: { fullName: "asc" },
+    });
+  }
+
   async create(dto: CreateUserDto) {
     const plain = dto.password ?? randomPassword();
     const passwordHash = await bcrypt.hash(plain, 10);

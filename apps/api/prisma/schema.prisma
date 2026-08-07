@@ -111,6 +111,9 @@ model Patient {
   /// Motivo cuando se omite la alerta de revaloración.
   revaluationSkipReason String?
 
+  /// Excluye al paciente de mensualidades sin darlo de baja clínica.
+  monthlyBillingStatus MonthlyBillingStatus @default(NORMAL)
+
   parents     ParentPatient[]
   assignments PatientTherapist[]
   schools     SchoolPatient[]
@@ -429,6 +432,11 @@ enum PaymentStatus {
   PARCIAL
   DEUDA
   PAUSA_VACACIONES
+}
+
+enum MonthlyBillingStatus {
+  NORMAL
+  NO_INTEGRADO
 }
 
 /// Mensualidad de un paciente por mes.

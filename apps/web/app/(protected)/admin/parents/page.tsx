@@ -45,7 +45,7 @@ export default function AdminParentsPage() {
 
     (async () => {
       try {
-        const data = await apiFetch(`/admin/users/role/PARENT`);
+        const data = await apiFetch(`/admin/users/role/PARENT?status=ACTIVE`);
         setRows(data);
       } catch (e: any) {
         setMsg(e.message);
@@ -105,7 +105,7 @@ export default function AdminParentsPage() {
         <Link className="btn" href="/dashboard">
           ← Volver
         </Link>
-        <span className="badge">{rows.length} registrados</span>
+        <span className="badge">{filteredRows.length} activos</span>
       </div>
 
       <div className="grid2" style={{ marginTop: 14 }}>
@@ -167,7 +167,7 @@ export default function AdminParentsPage() {
           {loading ? (
             <p className="sub">Cargando...</p>
           ) : rows.length === 0 ? (
-            <p className="sub">Aún no hay padres.</p>
+            <p className="sub">Aún no hay padres activos.</p>
           ) : filteredRows.length === 0 ? (
             <p className="sub">Sin coincidencias.</p>
           ) : (

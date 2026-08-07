@@ -28,7 +28,7 @@ export function BulkFollowUpReportPrint(props: {
       : "Paciente");
 
   return (
-    <div id="follow-up-bulk-report-print" className="gidi-report-root" aria-hidden="true">
+    <div id="follow-up-bulk-report-print" className="gidi-report-root">
       <header className="gidi-report-header gidi-report-avoid-break">
         <div className="gidi-report-brand">
           <GiDiLogo variant="print" />

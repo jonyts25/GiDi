@@ -328,6 +328,18 @@ export class FollowUpsService {
       include: followUpInclude,
     });
 
+    const documents = await this.prisma.patientDocument.findMany({
+      where: { patientId },
+      select: {
+        id: true,
+        category: true,
+        fileName: true,
+        mimeType: true,
+        createdAt: true,
+      },
+      orderBy: [{ category: "asc" }, { createdAt: "desc" }],
+    });
+
     const reports = followUps.map((fu) => this.buildFollowUpReport(fu));
 
     const monthBuckets = new Map<string, typeof reports>();
@@ -352,6 +364,7 @@ export class FollowUpsService {
     return {
       generatedAt: new Date().toISOString(),
       patient,
+      documents,
       months,
       totalFollowUps: followUps.length,
       totalMonths: months.length,

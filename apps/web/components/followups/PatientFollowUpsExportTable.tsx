@@ -85,8 +85,18 @@ export function PatientFollowUpsExportTable(props: {
         method: "POST",
         body: JSON.stringify({ ids }),
       })) as { reports: FollowUpReport[]; generatedAt: string };
+
+      if (!data.reports?.length) {
+        showToast("No se pudieron cargar los seguimientos seleccionados", "error");
+        return;
+      }
+
       setPrintData(data);
-      await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 200)));
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setTimeout(resolve, 350));
+        });
+      });
       window.print();
       showToast(`✅ ${ids.length} seguimiento(s) exportado(s)`);
     } catch (e: unknown) {

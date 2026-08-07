@@ -76,6 +76,7 @@ export default function AdminPatientDetail() {
   const [notes, setNotes] = useState("");
   const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
   const [lastRevaluationDate, setLastRevaluationDate] = useState("");
+  const [reminderDate, setReminderDate] = useState("");
   const [skipReason, setSkipReason] = useState("");
 
   // add guardian form
@@ -126,6 +127,19 @@ export default function AdminPatientDetail() {
         setLastRevaluationDate(
           full.patient.lastRevaluationDate ? String(full.patient.lastRevaluationDate).slice(0, 10) : "",
         );
+        const lastRev = full.patient.lastRevaluationDate ? String(full.patient.lastRevaluationDate).slice(0, 10) : "";
+        const snoozed = full.patient.revaluationAlertSnoozedUntil
+          ? String(full.patient.revaluationAlertSnoozedUntil).slice(0, 10)
+          : "";
+        if (snoozed) {
+          setReminderDate(snoozed);
+        } else if (lastRev) {
+          const d = new Date(lastRev);
+          d.setMonth(d.getMonth() + 6);
+          setReminderDate(d.toISOString().slice(0, 10));
+        } else {
+          setReminderDate("");
+        }
         setSkipReason(full.patient.revaluationSkipReason ?? "");
 
         setAllTherapists(therapists);
@@ -161,7 +175,6 @@ export default function AdminPatientDetail() {
           ...(birthDate ? { birthDate: new Date(birthDate).toISOString() } : {}),
           notes,
           center,
-          lastRevaluationDate: lastRevaluationDate ? new Date(lastRevaluationDate).toISOString() : null,
         }),
       });
       await reload();
@@ -172,9 +185,36 @@ export default function AdminPatientDetail() {
     }
   }
 
+  async function onSaveRevaluation() {
+    setMsg("");
+    try {
+      await apiFetch(`/admin/patients/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          lastRevaluationDate: lastRevaluationDate ? new Date(lastRevaluationDate).toISOString() : null,
+        }),
+      });
+      if (reminderDate) {
+        await apiFetch(`/admin/patients/${id}/revaluation/snooze`, {
+          method: "POST",
+          body: JSON.stringify({ until: new Date(reminderDate).toISOString() }),
+        });
+      }
+      await reload();
+      setMsg("✅ Revaloración guardada");
+      showToast("✅ Revaloración guardada");
+    } catch (e: any) {
+      setMsg(e.message);
+    }
+  }
+
   async function onSnoozeRevaluation(months: 6 | 12) {
     setMsg("");
     try {
+      const until = new Date();
+      until.setMonth(until.getMonth() + months);
+      const untilStr = until.toISOString().slice(0, 10);
+      setReminderDate(untilStr);
       await apiFetch(`/admin/patients/${id}/revaluation/snooze`, {
         method: "POST",
         body: JSON.stringify({ months }),
@@ -452,17 +492,43 @@ export default function AdminPatientDetail() {
       <section className="card mt-6 space-y-4 border-l-4 border-l-accent-yellow">
         <h2 className="text-lg font-semibold">Revaloración clínica</h2>
         <p className="text-sm text-subtle">
-          Registre la fecha de la última revaloración. A los 6 meses se generará un aviso para administración y secretaría.
+          Registre la fecha de la última revaloración o evaluación. Por defecto el recordatorio se programa a 6 meses,
+          pero puede ajustarlo según la familia.
         </p>
         <label className="grid max-w-xs gap-1 text-sm">
-          <span className="font-medium">Última revaloración</span>
+          <span className="font-medium">Última revaloración o evaluación</span>
           <input
             className="input"
             type="date"
             value={lastRevaluationDate}
-            onChange={(e) => setLastRevaluationDate(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setLastRevaluationDate(val);
+              if (val) {
+                const d = new Date(val);
+                d.setMonth(d.getMonth() + 6);
+                setReminderDate(d.toISOString().slice(0, 10));
+              }
+            }}
           />
         </label>
+        <label className="grid max-w-xs gap-1 text-sm">
+          <span className="font-medium">Próximo recordatorio</span>
+          <input
+            className="input"
+            type="date"
+            value={reminderDate}
+            onChange={(e) => setReminderDate(e.target.value)}
+          />
+          <span className="text-xs text-subtle">Por defecto: 6 meses después de la última revaloración.</span>
+        </label>
+        <button
+          type="button"
+          className="btn-primary w-fit rounded-xl px-5 py-2.5 text-sm font-semibold"
+          onClick={() => void onSaveRevaluation()}
+        >
+          Guardar revaloración
+        </button>
         {data.patient.revaluationAlertSnoozedUntil ? (
           <p className="text-sm text-subtle">
             Alerta pospuesta hasta:{" "}

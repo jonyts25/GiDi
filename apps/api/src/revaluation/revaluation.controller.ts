@@ -1,13 +1,18 @@
 import { Body, Controller, Param, Post, UseGuards } from "@nestjs/common";
-import { IsIn, IsString, MinLength } from "class-validator";
+import { IsDateString, IsIn, IsOptional, IsString, MinLength, ValidateIf } from "class-validator";
 import { JwtGuard } from "../auth/jwt.guard";
 import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
 import { RevaluationAlertsService } from "./revaluation-alerts.service";
 
 class SnoozeRevaluationDto {
+  @IsOptional()
   @IsIn([6, 12])
-  months!: 6 | 12;
+  months?: 6 | 12;
+
+  @ValidateIf((o) => !o.months)
+  @IsDateString()
+  until?: string;
 }
 
 class SkipRevaluationDto {
@@ -24,7 +29,10 @@ export class RevaluationController {
 
   @Post("snooze")
   snooze(@Param("patientId") patientId: string, @Body() dto: SnoozeRevaluationDto) {
-    return this.svc.snoozePatient(patientId, dto.months);
+    if (dto.until) {
+      return this.svc.setReminderUntil(patientId, new Date(dto.until), null);
+    }
+    return this.svc.snoozePatient(patientId, dto.months ?? 6);
   }
 
   @Post("skip")

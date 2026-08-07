@@ -76,6 +76,7 @@ export class PaymentsService {
         center: true,
         sessionsPerWeek: true,
         discountPercent: true,
+        monthlyBillingStatus: true,
       },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
@@ -105,6 +106,7 @@ export class PaymentsService {
         sessionsPerWeek: patient.sessionsPerWeek,
         discountPercent: patient.discountPercent ?? 0,
         suggestedMonthly: suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent),
+        monthlyBillingStatus: patient.monthlyBillingStatus,
       },
       transferInfo: CENTER_PAYMENT_INFO[patient.center],
       totals: { outstanding },
@@ -122,8 +124,15 @@ export class PaymentsService {
         sessionsPerWeek: dto.sessionsPerWeek === undefined ? undefined : dto.sessionsPerWeek,
         discountPercent: dto.discountPercent ?? undefined,
         center: dto.center ?? undefined,
+        monthlyBillingStatus: dto.monthlyBillingStatus ?? undefined,
       },
-      select: { id: true, sessionsPerWeek: true, discountPercent: true, center: true },
+      select: {
+        id: true,
+        sessionsPerWeek: true,
+        discountPercent: true,
+        center: true,
+        monthlyBillingStatus: true,
+      },
     });
 
     return {
@@ -334,23 +343,97 @@ export class PaymentsService {
             center: true,
             status: true,
             dischargedAt: true,
+            sessionsPerWeek: true,
+            discountPercent: true,
+            monthlyBillingStatus: true,
           },
         },
       },
     });
 
-    // Excluir inactivos desde el mes en que se dieron de alta/baja en adelante.
-    const payments = rows
-      .filter((p) => !isInactiveForPeriod(p.patient, p.periodYear, p.periodMonth))
-      .map(({ patient, ...rest }) => ({
-        ...rest,
-        patient: {
-          id: patient.id,
-          firstName: patient.firstName,
-          lastName: patient.lastName,
-          center: patient.center,
-        },
-      }));
+    const billablePatients = await this.prisma.patient.findMany({
+      where: {
+        status: "ACTIVE",
+        monthlyBillingStatus: "NORMAL",
+        sessionsPerWeek: { not: null },
+        ...(center ? { center } : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        center: true,
+        status: true,
+        dischargedAt: true,
+        sessionsPerWeek: true,
+        discountPercent: true,
+        monthlyBillingStatus: true,
+      },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    });
+
+    const paymentByPatientId = new Map(rows.map((r) => [r.patient.id, r]));
+    const merged: typeof rows = [];
+
+    for (const patient of billablePatients) {
+      if (isInactiveForPeriod(patient, year, month)) continue;
+      const existing = paymentByPatientId.get(patient.id);
+      if (existing) {
+        merged.push(existing);
+        paymentByPatientId.delete(patient.id);
+      } else {
+        const defaultDue = suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent) ?? 0;
+        merged.push({
+          id: `virtual-${patient.id}`,
+          periodYear: year,
+          periodMonth: month,
+          amountDue: defaultDue,
+          amountPaid: 0,
+          status: PaymentStatus.PENDIENTE,
+          paidAt: null,
+          method: null,
+          reference: null,
+          notes: null,
+          receiptName: null,
+          receiptUploadedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          patient,
+        });
+      }
+    }
+
+    for (const leftover of paymentByPatientId.values()) {
+      if (isInactiveForPeriod(leftover.patient, year, month)) continue;
+      if (leftover.patient.monthlyBillingStatus === "NO_INTEGRADO") continue;
+      merged.push(leftover);
+    }
+
+    merged.sort((a, b) => {
+      const statusOrder = (s: PaymentStatus) => {
+        if (s === PaymentStatus.PENDIENTE) return 0;
+        if (s === PaymentStatus.PARCIAL) return 1;
+        if (s === PaymentStatus.DEUDA) return 2;
+        if (s === PaymentStatus.PAGADO) return 3;
+        return 4;
+      };
+      const diff = statusOrder(a.status) - statusOrder(b.status);
+      if (diff !== 0) return diff;
+      return `${a.patient.lastName} ${a.patient.firstName}`.localeCompare(
+        `${b.patient.lastName} ${b.patient.firstName}`,
+        "es",
+      );
+    });
+
+    const payments = merged.map(({ patient, ...rest }) => ({
+      ...rest,
+      patient: {
+        id: patient.id,
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        center: patient.center,
+      },
+    }));
 
     const totalDue = payments.reduce((a, p) => a + p.amountDue, 0);
     const totalPaid = payments.reduce((a, p) => a + p.amountPaid, 0);

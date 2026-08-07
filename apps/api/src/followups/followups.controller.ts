@@ -36,11 +36,6 @@ export class FollowUpsController {
     return this.service.createOrGet(user, dto);
   }
 
-  @Get("/followups/:id")
-  get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
-    return this.service.get(user, id);
-  }
-
   @Get("/followups/:id/report")
   report(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.service.getReport(user, id);
@@ -49,6 +44,11 @@ export class FollowUpsController {
   @Post("/followups/bulk-report")
   bulkReport(@CurrentUser() user: AuthUser, @Body() dto: BulkFollowUpReportDto) {
     return this.service.getBulkReport(user, dto.ids);
+  }
+
+  @Get("/followups/:id")
+  get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.service.get(user, id);
   }
 
   @Patch("/followups/:id")
