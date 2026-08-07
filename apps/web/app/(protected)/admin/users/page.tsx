@@ -1,4 +1,5 @@
 "use client";
+import { USERNAME_LABEL } from "@/lib/user-labels";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -132,7 +133,8 @@ export default function AdminUsersPage() {
         <div className="h2">Crear usuario</div>
         <form key={formKey} onSubmit={(e) => void onCreate(e)} autoComplete="off" style={{ display: "grid", gap: 10, marginTop: 10, maxWidth: 520 }}>
           <input className="input" autoComplete="off" placeholder="Nombre completo" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-          <input className="input" type="email" autoComplete="off" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label className="sub">{USERNAME_LABEL}</label>
+          <input className="input" type="email" autoComplete="off" placeholder="usuario@gidi.org" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <input className="input" type="password" autoComplete="new-password" placeholder="Contraseña (opcional, se genera automática)" value={password} onChange={(e) => setPassword(e.target.value)} />
           <select className="input" value={createRole} onChange={(e) => setCreateRole(e.target.value as RoleKey)}>
             {roles.map((r) => (

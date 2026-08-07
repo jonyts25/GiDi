@@ -48,6 +48,12 @@ export default function ParentPatientDetailPage() {
           >
             Ver mensualidades y pagos →
           </Link>
+          <Link
+            className="btn inline-flex rounded-xl px-4 py-2 text-sm font-semibold"
+            href={`/parent/patients/${id}/dossier`}
+          >
+            Expediente integral (PDF) →
+          </Link>
           <PatientGeneralProfile
             profile={profile}
             followUpsHref={`/parent/patients/${id}/followups`}

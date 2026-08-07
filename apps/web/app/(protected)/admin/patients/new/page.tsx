@@ -1,4 +1,5 @@
 "use client";
+import { USERNAME_LABEL } from "@/lib/user-labels";
 
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../../../../lib/api";
@@ -504,7 +505,7 @@ export default function AdminNewPatientPage() {
           <>
             <div className="row">
               <input className="input" placeholder="Nombre completo" value={gFullName} onChange={(e) => setGFullName(e.target.value)} disabled={!!createdPatientId} />
-              <input className="input" placeholder="Email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} disabled={!!createdPatientId} />
+              <input className="input" placeholder={USERNAME_LABEL} value={gEmail} onChange={(e) => setGEmail(e.target.value)} disabled={!!createdPatientId} />
               <input className="input" placeholder="Teléfono" value={gPhone} onChange={(e) => setGPhone(e.target.value)} disabled={!!createdPatientId} />
             </div>
 

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../../lib/api";
+import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
+import { USERNAME_LABEL } from "@/lib/user-labels";
 import { hasOfficeStaffRole, STATUS_LABELS } from "@/lib/role-permissions";
 
 type Row = {
@@ -29,6 +31,9 @@ export default function AdminParentsPage() {
   const [password, setPassword] = useState("");
   const [formKey, setFormKey] = useState(0);
   const [lastGeneratedPassword, setLastGeneratedPassword] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const filteredRows = filterByQuery(rows, query, (r) => `${r.fullName} ${r.email} ${r.phone ?? ""}`);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -114,7 +119,7 @@ export default function AdminParentsPage() {
             <label className="sub">Nombre</label>
             <input className="input" autoComplete="off" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
 
-            <label className="sub">Email</label>
+            <label className="sub">{USERNAME_LABEL}</label>
             <input className="input" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} required />
 
             <label className="sub">Teléfono</label>
@@ -152,29 +157,33 @@ export default function AdminParentsPage() {
         </section>
 
         <section className="card">
-          <div className="row" style={{ alignItems: "baseline" }}>
+          <div className="row" style={{ alignItems: "baseline", marginBottom: 10 }}>
             <h3 style={{ marginTop: 0 }}>Listado</h3>
             <span className="sub">Click en un nombre para editar</span>
           </div>
+
+          <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre, usuario o teléfono…" />
 
           {loading ? (
             <p className="sub">Cargando...</p>
           ) : rows.length === 0 ? (
             <p className="sub">Aún no hay padres.</p>
+          ) : filteredRows.length === 0 ? (
+            <p className="sub">Sin coincidencias.</p>
           ) : (
-            <div style={{ overflowX: "auto" }}>
+            <div style={{ overflowX: "auto", marginTop: 10 }}>
               <table className="table">
                 <thead>
                   <tr style={{ textAlign: "left" }}>
                     <th>Nombre</th>
-                    <th>Email</th>
+                    <th>Usuario</th>
                     <th>Teléfono</th>
                     <th>Estatus</th>
                     <th>Creado</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((u) => (
+                  {filteredRows.map((u) => (
                     <tr key={u.id}>
                       <td>
                         <Link href={`/admin/parents/${u.id}`} style={{ fontWeight: 800 }}>

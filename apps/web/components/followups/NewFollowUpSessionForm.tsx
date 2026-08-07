@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { calendarDateToUtcIso, localDateInputValue } from "@/lib/date-utils";
+import { MultiDatePicker } from "@/components/ui/MultiDatePicker";
 
 type TherapistOption = { id: string; fullName: string };
 
@@ -22,16 +23,12 @@ export function NewFollowUpSessionForm(props: {
         : [];
 
   const [singleDate, setSingleDate] = useState(localDateInputValue());
-  const [multiDates, setMultiDates] = useState("");
+  const [multiDates, setMultiDates] = useState<string[]>([]);
   const [mode, setMode] = useState<"single" | "multi">("single");
   const [therapistId, setTherapistId] = useState(defaultTherapistId);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
-
-  function parseMultiDates(raw: string): string[] {
-    return [...new Set(raw.split(/[\n,;\s]+/).map((s) => s.trim()).filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s)))];
-  }
 
   async function createSessions(dates: string[]) {
     for (const d of dates) {
@@ -48,14 +45,14 @@ export function NewFollowUpSessionForm(props: {
     setErr("");
     setOk("");
     try {
-      const dates = mode === "single" ? [singleDate] : parseMultiDates(multiDates);
+      const dates = mode === "single" ? [singleDate] : multiDates;
       if (!dates.length) {
-        setErr("Indique al menos una fecha válida (AAAA-MM-DD)");
+        setErr("Indique al menos una fecha válida");
         return;
       }
       await createSessions(dates);
       setSingleDate(localDateInputValue());
-      setMultiDates("");
+      setMultiDates([]);
       setOk(`✅ ${dates.length} sesión(es) agregada(s)`);
       await onCreated();
     } catch (ex: unknown) {
@@ -102,16 +99,10 @@ export function NewFollowUpSessionForm(props: {
           />
         </label>
       ) : (
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium text-subtle">Fechas (una por línea o separadas por coma)</span>
-          <textarea
-            className="textarea min-h-[88px] font-mono text-sm"
-            placeholder={"2026-06-03\n2026-06-10\n2026-06-17"}
-            value={multiDates}
-            onChange={(e) => setMultiDates(e.target.value)}
-            disabled={disabled}
-          />
-        </label>
+        <div className="grid gap-1 text-sm">
+          <span className="font-medium text-subtle">Seleccione fechas en el calendario</span>
+          <MultiDatePicker selected={multiDates} onChange={setMultiDates} disabled={disabled} />
+        </div>
       )}
 
       <label className="grid min-w-[200px] flex-1 gap-1 text-sm">

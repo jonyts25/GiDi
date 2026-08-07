@@ -45,12 +45,31 @@ export default function AdminPaymentsOverviewPage() {
   const [msg, setMsg] = useState("");
 
   const filteredPayments = useMemo(
-    () =>
-      data
-        ? filterByQuery(data.payments, query, (p) => `${p.patient.firstName} ${p.patient.lastName}`)
-        : [],
-    [data, query],
+    () => {
+      const byCenter = center
+        ? data?.payments.filter((p) => p.patient.center === center) ?? []
+        : data?.payments ?? [];
+      return filterByQuery(byCenter, query, (p) => `${p.patient.firstName} ${p.patient.lastName}`);
+    },
+    [data, query, center],
   );
+
+  const displayTotals = useMemo(() => {
+    const payments = center
+      ? data?.payments.filter((p) => p.patient.center === center) ?? []
+      : data?.payments ?? [];
+    const totalDue = payments.reduce((a, p) => a + p.amountDue, 0);
+    const totalPaid = payments.reduce((a, p) => a + p.amountPaid, 0);
+    const byStatus: Record<string, number> = {};
+    for (const p of payments) byStatus[p.status] = (byStatus[p.status] ?? 0) + 1;
+    return {
+      totalDue,
+      totalPaid,
+      outstanding: Math.max(totalDue - totalPaid, 0),
+      count: payments.length,
+      byStatus,
+    };
+  }, [data, center]);
 
   async function exportCsv(scope: "month" | "all" | "center") {
     setMsg("");
@@ -77,12 +96,14 @@ export default function AdminPaymentsOverviewPage() {
   const reload = useCallback(async () => {
     setMsg("");
     try {
-      const res = (await apiFetch(`/admin/payments?year=${year}&month=${month}`)) as Overview;
+      const params = new URLSearchParams({ year: String(year), month: String(month) });
+      if (center) params.set("center", center);
+      const res = (await apiFetch(`/admin/payments?${params.toString()}`)) as Overview;
       setData(res);
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error");
     }
-  }, [year, month]);
+  }, [year, month, center]);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -119,7 +140,7 @@ export default function AdminPaymentsOverviewPage() {
           </select>
         </label>
         <label className="grid gap-1 text-sm">
-          <span className="text-subtle">Sede (para exportar)</span>
+          <span className="text-subtle">Sede</span>
           <select className="select w-40" value={center} onChange={(e) => setCenter(e.target.value)}>
             <option value="">Todas</option>
             {GIDI_CENTER_OPTIONS.map((c) => (
@@ -147,15 +168,15 @@ export default function AdminPaymentsOverviewPage() {
           <section className="grid gap-4 sm:grid-cols-3">
             <div className="card">
               <p className="text-xs uppercase tracking-wide text-subtle">Cobrado</p>
-              <p className="text-2xl font-bold text-success">{formatMoney(data.totals.totalPaid)}</p>
+              <p className="text-2xl font-bold text-success">{formatMoney(displayTotals.totalPaid)}</p>
             </div>
             <div className="card">
               <p className="text-xs uppercase tracking-wide text-subtle">Esperado</p>
-              <p className="text-2xl font-bold text-ink">{formatMoney(data.totals.totalDue)}</p>
+              <p className="text-2xl font-bold text-ink">{formatMoney(displayTotals.totalDue)}</p>
             </div>
             <div className="card">
               <p className="text-xs uppercase tracking-wide text-subtle">Pendiente</p>
-              <p className="text-2xl font-bold text-danger">{formatMoney(data.totals.outstanding)}</p>
+              <p className="text-2xl font-bold text-danger">{formatMoney(displayTotals.outstanding)}</p>
             </div>
           </section>
 

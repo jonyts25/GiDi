@@ -21,4 +21,16 @@ export class UpdatePatientDto {
   @IsOptional()
   @IsEnum(GidiCenter)
   center?: GidiCenter;
+
+  @IsOptional()
+  @IsDateString()
+  lastRevaluationDate?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  revaluationAlertSnoozedUntil?: string | null;
+
+  @IsOptional()
+  @IsString()
+  revaluationSkipReason?: string | null;
 }

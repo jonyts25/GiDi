@@ -104,6 +104,13 @@ model Patient {
   sessionsPerWeek Int?
   discountPercent Int? @default(0)
 
+  /// Fecha de la última revaloración clínica (manual).
+  lastRevaluationDate DateTime?
+  /// Hasta cuándo posponer alertas de revaloración (snooze u omisión temporal).
+  revaluationAlertSnoozedUntil DateTime?
+  /// Motivo cuando se omite la alerta de revaloración.
+  revaluationSkipReason String?
+
   parents     ParentPatient[]
   assignments PatientTherapist[]
   schools     SchoolPatient[]

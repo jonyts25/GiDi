@@ -23,6 +23,7 @@ const AUDIENCE_OPTIONS: { key: string; label: string }[] = [
   { key: "THERAPIST", label: "Terapeutas" },
   { key: "SCHOOL", label: "Escuelas" },
   { key: "ADMIN", label: "Administradores" },
+  { key: "SECRETARY", label: "Secretaría" },
 ];
 
 function audienceLabel(audience: string[]): string {

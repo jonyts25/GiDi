@@ -316,9 +316,13 @@ export class PaymentsService {
   }
 
   /** Resumen de un mes para administración (control de ingresos). */
-  async monthOverview(year: number, month: number) {
+  async monthOverview(year: number, month: number, center?: "SAN_AGUSTIN" | "VALLARTA" | "COLEGIOS") {
     const rows = await this.prisma.payment.findMany({
-      where: { periodYear: year, periodMonth: month },
+      where: {
+        periodYear: year,
+        periodMonth: month,
+        ...(center ? { patient: { center } } : {}),
+      },
       orderBy: [{ status: "asc" }],
       select: {
         ...paymentSelect,

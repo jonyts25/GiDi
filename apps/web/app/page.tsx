@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getApiBaseUrl } from "../lib/get-api-base-url";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
+import { USERNAME_LABEL } from "@/lib/user-labels";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -64,7 +65,7 @@ export default function Home() {
 
       <form className="card space-y-4 border-l-4 border-l-primary" onSubmit={onLogin} autoComplete="off">
         <label className="grid gap-1 text-sm">
-          <span className="text-subtle">Email</span>
+          <span className="text-subtle">{USERNAME_LABEL}</span>
           <input
             className="input"
             type="email"

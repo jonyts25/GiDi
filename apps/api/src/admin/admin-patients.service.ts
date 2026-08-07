@@ -46,6 +46,9 @@ export class AdminPatientsService {
         dischargedAt: true,
         dischargeReason: true,
         dischargeType: true,
+        lastRevaluationDate: true,
+        revaluationAlertSnoozedUntil: true,
+        revaluationSkipReason: true,
         createdAt: true,
         updatedAt: true,
 
@@ -100,6 +103,9 @@ export class AdminPatientsService {
         dischargedAt: patient.dischargedAt,
         dischargeReason: patient.dischargeReason,
         dischargeType: patient.dischargeType,
+        lastRevaluationDate: patient.lastRevaluationDate,
+        revaluationAlertSnoozedUntil: patient.revaluationAlertSnoozedUntil,
+        revaluationSkipReason: patient.revaluationSkipReason,
         createdAt: patient.createdAt,
         updatedAt: patient.updatedAt,
       },
@@ -209,6 +215,20 @@ export class AdminPatientsService {
         birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
         notes: dto.notes ?? undefined,
         center: dto.center ?? undefined,
+        lastRevaluationDate:
+          dto.lastRevaluationDate === undefined
+            ? undefined
+            : dto.lastRevaluationDate
+              ? new Date(dto.lastRevaluationDate)
+              : null,
+        revaluationAlertSnoozedUntil:
+          dto.revaluationAlertSnoozedUntil === undefined
+            ? undefined
+            : dto.revaluationAlertSnoozedUntil
+              ? new Date(dto.revaluationAlertSnoozedUntil)
+              : null,
+        revaluationSkipReason:
+          dto.revaluationSkipReason === undefined ? undefined : dto.revaluationSkipReason,
       },
       select: {
         id: true,
@@ -217,6 +237,9 @@ export class AdminPatientsService {
         birthDate: true,
         notes: true,
         center: true,
+        lastRevaluationDate: true,
+        revaluationAlertSnoozedUntil: true,
+        revaluationSkipReason: true,
         createdAt: true,
         updatedAt: true,
       },

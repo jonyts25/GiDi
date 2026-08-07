@@ -109,11 +109,46 @@ export class AdminUsersService {
         status: true,
         roles: { select: { role: { select: { key: true, name: true } } } },
         createdAt: true,
+        parentAssignments: {
+          select: {
+            relationship: true,
+            isPrimary: true,
+            patient: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                center: true,
+                status: true,
+              },
+            },
+          },
+          orderBy: [{ isPrimary: "desc" }, { patient: { lastName: "asc" } }],
+        },
       },
     });
 
     if (!u) throw new NotFoundException("User not found");
-    return u;
+
+    const isParent = u.roles.some((r) => r.role.key === "PARENT");
+    const { parentAssignments, ...rest } = u;
+
+    return {
+      ...rest,
+      ...(isParent
+        ? {
+            children: parentAssignments.map((pp) => ({
+              id: pp.patient.id,
+              firstName: pp.patient.firstName,
+              lastName: pp.patient.lastName,
+              center: pp.patient.center,
+              status: pp.patient.status,
+              relationship: pp.relationship,
+              isPrimary: pp.isPrimary,
+            })),
+          }
+        : {}),
+    };
   }
 
   async update(id: string, dto: UpdateUserDto, actor?: AuthUser) {

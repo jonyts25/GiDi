@@ -3,6 +3,7 @@ import { RoleKey } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { CreateAnnouncementDto } from "./dto/create-announcement.dto";
 import { UpdateAnnouncementDto } from "./dto/update-announcement.dto";
+import { RevaluationAlertsService } from "../revaluation/revaluation-alerts.service";
 
 const announcementSelect = {
   id: true,
@@ -17,7 +18,10 @@ const announcementSelect = {
 
 @Injectable()
 export class AnnouncementsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private revaluationAlerts: RevaluationAlertsService,
+  ) {}
 
   listAll() {
     return this.prisma.announcement.findMany({
@@ -28,6 +32,10 @@ export class AnnouncementsService {
 
   /** Avisos activos que le corresponden al usuario por su rol. */
   async activeForUser(roles: string[]) {
+    if (roles.includes("ADMIN") || roles.includes("SECRETARY")) {
+      await this.revaluationAlerts.syncAnnouncementAlerts();
+    }
+
     const items = await this.prisma.announcement.findMany({
       where: { isActive: true },
       orderBy: { createdAt: "desc" },

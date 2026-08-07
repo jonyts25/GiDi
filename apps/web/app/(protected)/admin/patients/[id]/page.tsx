@@ -7,7 +7,9 @@ import Link from "next/link";
 import { PatientDocumentsPanel } from "@/components/patients/PatientDocumentsPanel";
 import { AdminPaymentsPanel } from "@/components/payments/AdminPaymentsPanel";
 import { SaveBanner } from "@/components/ui/SaveBanner";
+import { useToast } from "@/components/ui/Toast";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { USERNAME_LABEL } from "@/lib/user-labels";
 import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
 
 type MiniUser = { id: string; fullName: string; email: string; status: "ACTIVE" | "INACTIVE" };
@@ -20,6 +22,9 @@ type FullPatient = {
     birthDate?: string | null;
     notes?: string | null;
     center?: GidiCenterKey;
+    lastRevaluationDate?: string | null;
+    revaluationAlertSnoozedUntil?: string | null;
+    revaluationSkipReason?: string | null;
   };
   guardians: {
     parentId: string;
@@ -50,6 +55,7 @@ export default function AdminPatientDetail() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id;
+  const { showToast } = useToast();
 
   const [data, setData] = useState<FullPatient | null>(null);
 
@@ -69,6 +75,8 @@ export default function AdminPatientDetail() {
   const [birthDate, setBirthDate] = useState("");
   const [notes, setNotes] = useState("");
   const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
+  const [lastRevaluationDate, setLastRevaluationDate] = useState("");
+  const [skipReason, setSkipReason] = useState("");
 
   // add guardian form
   const [guardianMode, setGuardianMode] = useState<"existing" | "new">("existing");
@@ -115,6 +123,10 @@ export default function AdminPatientDetail() {
         setBirthDate(full.patient.birthDate ? String(full.patient.birthDate).slice(0, 10) : "");
         setNotes(full.patient.notes ?? "");
         setCenter(full.patient.center ?? "SAN_AGUSTIN");
+        setLastRevaluationDate(
+          full.patient.lastRevaluationDate ? String(full.patient.lastRevaluationDate).slice(0, 10) : "",
+        );
+        setSkipReason(full.patient.revaluationSkipReason ?? "");
 
         setAllTherapists(therapists);
         setAllSchools(schools);
@@ -149,10 +161,46 @@ export default function AdminPatientDetail() {
           ...(birthDate ? { birthDate: new Date(birthDate).toISOString() } : {}),
           notes,
           center,
+          lastRevaluationDate: lastRevaluationDate ? new Date(lastRevaluationDate).toISOString() : null,
         }),
       });
       await reload();
       setMsg("✅ Paciente guardado");
+      showToast("✅ Paciente guardado");
+    } catch (e: any) {
+      setMsg(e.message);
+    }
+  }
+
+  async function onSnoozeRevaluation(months: 6 | 12) {
+    setMsg("");
+    try {
+      await apiFetch(`/admin/patients/${id}/revaluation/snooze`, {
+        method: "POST",
+        body: JSON.stringify({ months }),
+      });
+      await reload();
+      setMsg(`✅ Recordatorio pospuesto ${months} meses`);
+      showToast(`✅ Recordatorio pospuesto ${months} meses`);
+    } catch (e: any) {
+      setMsg(e.message);
+    }
+  }
+
+  async function onSkipRevaluation() {
+    if (!skipReason.trim()) {
+      setMsg("Indique el motivo para omitir la alerta");
+      return;
+    }
+    setMsg("");
+    try {
+      await apiFetch(`/admin/patients/${id}/revaluation/skip`, {
+        method: "POST",
+        body: JSON.stringify({ reason: skipReason.trim() }),
+      });
+      await reload();
+      setMsg("✅ Alerta omitida");
+      showToast("✅ Alerta de revaloración omitida");
     } catch (e: any) {
       setMsg(e.message);
     }
@@ -401,6 +449,54 @@ export default function AdminPatientDetail() {
         </form>
       </section>
 
+      <section className="card mt-6 space-y-4 border-l-4 border-l-accent-yellow">
+        <h2 className="text-lg font-semibold">Revaloración clínica</h2>
+        <p className="text-sm text-subtle">
+          Registre la fecha de la última revaloración. A los 6 meses se generará un aviso para administración y secretaría.
+        </p>
+        <label className="grid max-w-xs gap-1 text-sm">
+          <span className="font-medium">Última revaloración</span>
+          <input
+            className="input"
+            type="date"
+            value={lastRevaluationDate}
+            onChange={(e) => setLastRevaluationDate(e.target.value)}
+          />
+        </label>
+        {data.patient.revaluationAlertSnoozedUntil ? (
+          <p className="text-sm text-subtle">
+            Alerta pospuesta hasta:{" "}
+            {new Date(data.patient.revaluationAlertSnoozedUntil).toLocaleDateString("es-MX", { dateStyle: "long" })}
+          </p>
+        ) : null}
+        {data.patient.revaluationSkipReason ? (
+          <p className="text-sm text-subtle">Motivo de omisión: {data.patient.revaluationSkipReason}</p>
+        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn rounded-xl px-3 py-2 text-sm" onClick={() => void onSnoozeRevaluation(6)}>
+            Recordarme en 6 meses
+          </button>
+          <button type="button" className="btn rounded-xl px-3 py-2 text-sm" onClick={() => void onSnoozeRevaluation(12)}>
+            Posponer 12 meses
+          </button>
+        </div>
+        <div className="grid max-w-lg gap-2">
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Omitir alerta (motivo)</span>
+            <textarea
+              className="textarea"
+              rows={2}
+              placeholder="Ej. Los papás no desean revalorar por ahora"
+              value={skipReason}
+              onChange={(e) => setSkipReason(e.target.value)}
+            />
+          </label>
+          <button type="button" className="btn w-fit rounded-xl px-3 py-2 text-sm" onClick={() => void onSkipRevaluation()}>
+            Omitir alerta con motivo
+          </button>
+        </div>
+      </section>
+
       <SaveBanner message={msg} type={msg.includes("✅") ? "success" : "error"} />
 
       {/* -------- terapeutas -------- */}
@@ -601,7 +697,7 @@ export default function AdminPatientDetail() {
               </label>
 
               <label className="grid gap-1 text-sm">
-                <span className="font-medium">Email</span>
+                <span className="font-medium">{USERNAME_LABEL}</span>
                 <input className="input" type="email" value={gEmail} onChange={(e) => setGEmail(e.target.value)} required />
               </label>
 

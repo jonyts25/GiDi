@@ -6,6 +6,7 @@ import { ReplaceObjectivesDto } from "./dto/replace-objectives.dto";
 import { CreateFollowUpSessionDto } from "./dto/create-followup-session.dto";
 import { UpsertMarkDto } from "./dto/upsert-mark.dto";
 import { UpdateObjectiveNotesDto } from "./dto/update-objective-notes.dto";
+import { BulkFollowUpReportDto } from "./dto/bulk-followup-report.dto";
 import { JwtGuard } from "../auth/jwt.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import { AuthUser } from "../auth/auth-user";
@@ -43,6 +44,11 @@ export class FollowUpsController {
   @Get("/followups/:id/report")
   report(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.service.getReport(user, id);
+  }
+
+  @Post("/followups/bulk-report")
+  bulkReport(@CurrentUser() user: AuthUser, @Body() dto: BulkFollowUpReportDto) {
+    return this.service.getBulkReport(user, dto.ids);
   }
 
   @Patch("/followups/:id")

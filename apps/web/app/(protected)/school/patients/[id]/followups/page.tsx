@@ -8,12 +8,22 @@ import {
   ParentFollowUpSummaryCard,
   type ParentFollowUpCardData,
 } from "@/components/followups/ParentFollowUpSummaryCard";
+import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 
 type SummaryResponse = {
   patient: { id: string; firstName: string; lastName: string };
   periodYear: number | null;
   periodMonth: number | null;
   followUps: ParentFollowUpCardData[];
+};
+
+type FollowUpRow = {
+  id: string;
+  status: string;
+  periodYear: number;
+  periodMonth: number;
+  area: { id: string; name: string };
+  therapist?: { fullName: string };
 };
 
 export default function SchoolPatientFollowUpsPage() {
@@ -26,6 +36,9 @@ export default function SchoolPatientFollowUpsPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [allMonths, setAllMonths] = useState(false);
   const [data, setData] = useState<SummaryResponse | null>(null);
+  const [exportRows, setExportRows] = useState<FollowUpRow[]>([]);
+  const [areas, setAreas] = useState<{ id: string; name: string }[]>([]);
+  const [areaFilter, setAreaFilter] = useState("");
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
@@ -35,11 +48,20 @@ export default function SchoolPatientFollowUpsPage() {
     (async () => {
       setMsg("");
       try {
-        const url = allMonths
+        const summaryUrl = allMonths
           ? `/school/patients/${patientId}/followups/summary`
           : `/school/patients/${patientId}/followups/summary?year=${year}&month=${month}`;
-        const res = await apiFetch(url);
+        const listUrl = allMonths
+          ? `/patients/${patientId}/followups`
+          : `/patients/${patientId}/followups?year=${year}&month=${month}`;
+        const [res, areasRes, list] = await Promise.all([
+          apiFetch(summaryUrl),
+          apiFetch("/areas"),
+          apiFetch(listUrl),
+        ]);
         setData(res as SummaryResponse);
+        setAreas((areasRes as { id: string; name: string }[]).map((a) => ({ id: a.id, name: a.name })));
+        setExportRows((list as FollowUpRow[]).filter((r) => r.status === "CLOSED"));
       } catch (e: unknown) {
         setMsg(e instanceof Error ? e.message : "Error");
         setData(null);
@@ -52,7 +74,7 @@ export default function SchoolPatientFollowUpsPage() {
     : "Todos los meses";
 
   return (
-    <main className="container max-w-[720px] space-y-6 py-8">
+    <main className="container max-w-[820px] space-y-6 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Seguimientos mensuales</h1>
@@ -87,6 +109,18 @@ export default function SchoolPatientFollowUpsPage() {
           <input type="checkbox" checked={allMonths} onChange={(e) => setAllMonths(e.target.checked)} />
           Ver todos los meses
         </label>
+      </section>
+
+      <section className="card space-y-3">
+        <h2 className="text-lg font-semibold">Exportar seguimientos</h2>
+        <PatientFollowUpsExportTable
+          rows={exportRows}
+          allMonths={allMonths}
+          openHref={(fid) => `/school/patients/${patientId}/followups#${fid}`}
+          areas={areas}
+          areaFilter={areaFilter}
+          onAreaFilterChange={setAreaFilter}
+        />
       </section>
 
       {msg ? <p className="text-sm text-danger">{msg}</p> : null}
