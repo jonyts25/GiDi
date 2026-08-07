@@ -1,10 +1,11 @@
 "use client";
 import { USERNAME_LABEL } from "@/lib/user-labels";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../../../lib/api"; // <-- AJUSTA si tu lib/api está en otra ruta
+import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
 import { hasOfficeStaffRole, STATUS_LABELS } from "@/lib/role-permissions";
 
 type Row = {
@@ -29,6 +30,12 @@ export default function AdminTherapistsPage() {
   const [password, setPassword] = useState("");
   const [formKey, setFormKey] = useState(0);
   const [lastGeneratedPassword, setLastGeneratedPassword] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const filteredRows = useMemo(
+    () => filterByQuery(rows, query, (r) => `${r.fullName} ${r.email}`),
+    [rows, query],
+  );
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -41,7 +48,7 @@ export default function AdminTherapistsPage() {
     (async () => {
       try {
         // ✅ endpoint correcto para lista
-        const data = await apiFetch(`/admin/users/role/THERAPIST`);
+        const data = await apiFetch(`/admin/users/role/THERAPIST?status=ACTIVE`);
         setRows(data);
       } catch (e: any) {
         setMsg(e.message);
@@ -97,14 +104,14 @@ export default function AdminTherapistsPage() {
           <p className="sub">Admin · listado y alta</p>
         </div>
         <Link className="btn" href="/dashboard">← Volver</Link>
-        <span className="badge">{rows.length} registrados</span>
+        <span className="badge">{filteredRows.length} activos</span>
       </div>
 
       <div className="grid2" style={{ marginTop: 14 }}>
         <section className="card">
           <h3 style={{ marginTop: 0 }}>Nuevo terapeuta</h3>
           <p className="sub" style={{ marginTop: 6 }}>
-            Crea un terapeuta para asignarlo a pacientes.
+            Crea un terapeuta para asignarlo a pacientes. Los perfiles inactivos se gestionan en Usuarios.
           </p>
 
           <form key={formKey} onSubmit={onCreate} autoComplete="off" style={{ display: "grid", gap: 10, marginTop: 12 }}>
@@ -146,17 +153,21 @@ export default function AdminTherapistsPage() {
         </section>
 
         <section className="card">
-          <div className="row" style={{ alignItems: "baseline" }}>
+          <div className="row" style={{ alignItems: "baseline", marginBottom: 10 }}>
             <h3 style={{ marginTop: 0 }}>Listado</h3>
             <span className="sub">Click en un nombre para editar</span>
           </div>
 
+          <SearchInput value={query} onChange={setQuery} placeholder="Buscar por nombre o usuario…" />
+
           {loading ? (
             <p className="sub">Cargando...</p>
           ) : rows.length === 0 ? (
-            <p className="sub">Aún no hay terapeutas.</p>
+            <p className="sub">Aún no hay terapeutas activos.</p>
+          ) : filteredRows.length === 0 ? (
+            <p className="sub">Sin coincidencias.</p>
           ) : (
-            <div style={{ overflowX: "auto" }}>
+            <div style={{ overflowX: "auto", marginTop: 10 }}>
               <table className="table">
                 <thead>
                   <tr style={{ textAlign: "left" }}>
@@ -167,7 +178,7 @@ export default function AdminTherapistsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((u) => (
+                  {filteredRows.map((u) => (
                     <tr key={u.id}>
                       <td>
                         <Link href={`/admin/therapists/${u.id}`} style={{ fontWeight: 800 }}>

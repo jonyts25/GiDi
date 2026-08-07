@@ -18,7 +18,7 @@ type UserRow = {
 };
 
 const roles = ["ADMIN", "SECRETARY", "THERAPIST", "PARENT", "SCHOOL"] as const;
-type RoleKey = (typeof roles)[number];
+type RoleKey = (typeof roles)[number] | "ALL_INACTIVE";
 
 type StatusFilter = "ACTIVE" | "INACTIVE" | "ALL";
 
@@ -43,8 +43,13 @@ export default function AdminUsersPage() {
     setLoading(true);
     setMsg("");
     try {
-      const data = await apiFetch(`/admin/users/role/${role}`);
-      setItems(data ?? []);
+      if (statusFilter === "INACTIVE" && role === "ALL_INACTIVE") {
+        const data = await apiFetch(`/admin/users/inactive`);
+        setItems(data ?? []);
+      } else {
+        const data = await apiFetch(`/admin/users/role/${role}`);
+        setItems(data ?? []);
+      }
     } catch (e: unknown) {
       setMsgType("error");
       setMsg(e instanceof Error ? e.message : "Error");
@@ -63,7 +68,7 @@ export default function AdminUsersPage() {
     if (!hasOfficeStaffRole(rolesFromSession)) return router.replace("/dashboard");
 
     void loadUsers();
-  }, [role, router]);
+  }, [role, statusFilter, router]);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -148,13 +153,29 @@ export default function AdminUsersPage() {
       <section className="card" style={{ marginTop: 14 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <label className="sub">Filtrar por rol</label>
-          <select className="input" value={role} onChange={(e) => setRole(e.target.value as RoleKey)}>
+          <select
+            className="input"
+            value={role}
+            onChange={(e) => setRole(e.target.value as RoleKey)}
+          >
+            {statusFilter === "INACTIVE" ? (
+              <option value="ALL_INACTIVE">Todos los inactivos</option>
+            ) : null}
             {roles.map((r) => (
               <option key={r} value={r}>{labelForRole(r)}</option>
             ))}
           </select>
           <label className="sub">Estado</label>
-          <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}>
+          <select
+            className="input"
+            value={statusFilter}
+            onChange={(e) => {
+              const next = e.target.value as StatusFilter;
+              setStatusFilter(next);
+              if (next === "INACTIVE") setRole("ALL_INACTIVE");
+              else if (role === "ALL_INACTIVE") setRole("PARENT");
+            }}
+          >
             <option value="ACTIVE">Activos</option>
             <option value="INACTIVE">Inactivos</option>
             <option value="ALL">Todos</option>

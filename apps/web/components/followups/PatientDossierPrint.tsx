@@ -4,6 +4,12 @@ import type { PatientDossierReport } from "@/lib/followup-report.types";
 import { FollowUpReportBody } from "@/components/followups/FollowUpReportBody";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
 
+const DOC_LABELS: Record<string, string> = {
+  EVALUACION: "Evaluación",
+  REVALUACION: "Revaloración",
+  SEGUIMIENTO_PADRES: "Seguimiento padres",
+};
+
 function formatPeriod(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" });
 }
@@ -20,11 +26,18 @@ function formatGeneratedAt(iso: string) {
   });
 }
 
-export function PatientDossierPrint({ dossier }: { dossier: PatientDossierReport }) {
+export function PatientDossierPrint({
+  dossier,
+  documentIds,
+}: {
+  dossier: PatientDossierReport;
+  documentIds?: string[];
+}) {
   const patientName = `${dossier.patient.firstName} ${dossier.patient.lastName}`;
+  const docs = (dossier.documents ?? []).filter((d) => !documentIds || documentIds.includes(d.id));
 
   return (
-    <div id="patient-dossier-print" className="gidi-report-root" aria-hidden="true">
+    <div id="patient-dossier-print" className="gidi-report-root">
       <header className="gidi-report-header gidi-report-avoid-break">
         <div className="gidi-report-brand">
           <GiDiLogo variant="print" />
@@ -81,6 +94,32 @@ export function PatientDossierPrint({ dossier }: { dossier: PatientDossierReport
         <section className="gidi-report-section gidi-report-avoid-break">
           <h2 className="gidi-report-section-title">Escuela</h2>
           <p>{dossier.school.fullName}</p>
+        </section>
+      ) : null}
+
+      {docs.length ? (
+        <section className="gidi-report-section">
+          <h2 className="gidi-report-section-title gidi-report-avoid-break">Documentos clínicos</h2>
+          {docs.map((doc) => (
+            <article key={doc.id} className="gidi-report-avoid-break" style={{ marginBottom: 16 }}>
+              <p className="gidi-report-section-title" style={{ fontSize: "0.95rem", marginBottom: 6 }}>
+                {DOC_LABELS[doc.category] ?? doc.category}: {doc.fileName}
+              </p>
+              <p className="text-subtle" style={{ fontSize: "0.8rem", marginBottom: 8 }}>
+                {formatDate(doc.createdAt)}
+              </p>
+              {doc.dataUrl && doc.mimeType.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={doc.dataUrl}
+                  alt={doc.fileName}
+                  style={{ maxWidth: "100%", maxHeight: "480px", objectFit: "contain" }}
+                />
+              ) : doc.dataUrl && doc.mimeType === "application/pdf" ? (
+                <p style={{ fontSize: "0.85rem" }}>Documento PDF adjunto: {doc.fileName}</p>
+              ) : null}
+            </article>
+          ))}
         </section>
       ) : null}
 

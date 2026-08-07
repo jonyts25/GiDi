@@ -98,4 +98,12 @@ export type PatientDossierReport = {
   }[];
   totalFollowUps: number;
   totalMonths: number;
+  documents?: {
+    id: string;
+    category: string;
+    fileName: string;
+    mimeType: string;
+    createdAt: string;
+    dataUrl?: string;
+  }[];
 };

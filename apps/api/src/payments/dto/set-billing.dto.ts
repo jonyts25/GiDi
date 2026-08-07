@@ -1,5 +1,5 @@
 import { IsEnum, IsInt, IsOptional, Max, Min, ValidateIf } from "class-validator";
-import { GidiCenter } from "@prisma/client";
+import { GidiCenter, MonthlyBillingStatus } from "@prisma/client";
 
 export class SetBillingDto {
   /** `null` limpia; `0` = pago por sesión; `1|2|3` = frecuencia semanal. */
@@ -19,4 +19,8 @@ export class SetBillingDto {
   @IsOptional()
   @IsEnum(GidiCenter)
   center?: GidiCenter;
+
+  @IsOptional()
+  @IsEnum(MonthlyBillingStatus)
+  monthlyBillingStatus?: MonthlyBillingStatus;
 }

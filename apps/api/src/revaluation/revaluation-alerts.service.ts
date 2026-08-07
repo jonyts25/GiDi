@@ -46,11 +46,15 @@ export class RevaluationAlertsService {
 
   async snoozePatient(patientId: string, months: number) {
     const until = addMonths(new Date(), months);
+    return this.setReminderUntil(patientId, until, months >= 12 ? undefined : null);
+  }
+
+  async setReminderUntil(patientId: string, until: Date, clearSkipReason: string | null = null) {
     return this.prisma.patient.update({
       where: { id: patientId },
       data: {
         revaluationAlertSnoozedUntil: until,
-        ...(months >= 12 ? {} : { revaluationSkipReason: null }),
+        ...(clearSkipReason === undefined ? {} : { revaluationSkipReason: clearSkipReason }),
       },
       select: { id: true, revaluationAlertSnoozedUntil: true },
     });

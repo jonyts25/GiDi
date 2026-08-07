@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/csv-download";
 import { SearchInput, filterByQuery } from "@/components/ui/SearchInput";
-import { canViewRevenueOverview } from "@/lib/role-permissions";
+import { canViewRevenueOverview, hasFullAdminRole } from "@/lib/role-permissions";
 import {
   formatMoney,
   statusClasses,
@@ -33,16 +33,22 @@ type Overview = {
   payments: OverviewRow[];
 };
 
+const STATUS_OPTIONS: PaymentStatus[] = ["PENDIENTE", "PAGADO", "PARCIAL", "DEUDA", "PAUSA_VACACIONES"];
+
 const now = new Date();
 
 export default function AdminPaymentsOverviewPage() {
   const router = useRouter();
+  const [myRoles, setMyRoles] = useState<string[]>([]);
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [center, setCenter] = useState("");
   const [query, setQuery] = useState("");
   const [data, setData] = useState<Overview | null>(null);
   const [msg, setMsg] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const isAdmin = hasFullAdminRole(myRoles);
 
   const filteredPayments = useMemo(
     () => {
@@ -110,9 +116,32 @@ export default function AdminPaymentsOverviewPage() {
     const userRaw = localStorage.getItem("gidi_user");
     if (!token || !userRaw) return router.replace("/");
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
+    setMyRoles(roles);
     if (!canViewRevenueOverview(roles)) return router.replace("/dashboard");
     void reload();
   }, [router, reload]);
+
+  async function onChangeStatus(p: OverviewRow, next: PaymentStatus) {
+    if (!isAdmin) return;
+    setSavingId(p.id);
+    setMsg("");
+    try {
+      await apiFetch(`/admin/patients/${p.patient.id}/payments/${p.periodYear}/${p.periodMonth}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          status: next,
+          amountDue: p.amountDue,
+          amountPaid: next === "PAGADO" ? p.amountDue : next === "PAUSA_VACACIONES" ? 0 : p.amountPaid,
+          ...(next === "PAGADO" && !p.paidAt ? { paidAt: new Date().toISOString().slice(0, 10) } : {}),
+        }),
+      });
+      await reload();
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error al actualizar estado");
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   return (
     <main className="container max-w-[1000px] space-y-6 py-6">
@@ -206,9 +235,22 @@ export default function AdminPaymentsOverviewPage() {
                       </td>
                       <td className="py-2 pr-3 text-subtle">{labelForCenter(p.patient.center)}</td>
                       <td className="py-2 pr-3">
-                        <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClasses(p.status as PaymentStatus)}`}>
-                          {STATUS_LABEL[p.status as PaymentStatus]}
-                        </span>
+                        {isAdmin ? (
+                          <select
+                            className={`select text-xs ${statusClasses(p.status as PaymentStatus)}`}
+                            value={p.status}
+                            disabled={savingId === p.id}
+                            onChange={(e) => void onChangeStatus(p, e.target.value as PaymentStatus)}
+                          >
+                            {STATUS_OPTIONS.map((s) => (
+                              <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClasses(p.status as PaymentStatus)}`}>
+                            {STATUS_LABEL[p.status as PaymentStatus]}
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 pr-3">{formatMoney(p.amountPaid)}</td>
                       <td className="py-2 pr-3">{formatMoney(p.amountDue)}</td>

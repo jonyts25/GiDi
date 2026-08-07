@@ -149,6 +149,7 @@ export class AdminPatientsService {
       guardians: context.guardians,
       therapists: context.therapists,
       school: context.school,
+      documents: dossier.documents,
       months: dossier.months,
       totalFollowUps: dossier.totalFollowUps,
       totalMonths: dossier.totalMonths,
