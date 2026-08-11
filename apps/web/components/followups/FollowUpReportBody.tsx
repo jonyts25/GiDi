@@ -42,10 +42,12 @@ export function FollowUpReportBody({
   report,
   showSignature = true,
   showLegalFooter = false,
+  compact = false,
 }: {
   report: FollowUpReport;
   showSignature?: boolean;
   showLegalFooter?: boolean;
+  compact?: boolean;
 }) {
   const { followUp, summary, sessions } = report;
   const isTextOnly = resolveTrackingMode(followUp.area) === "TEXT_ONLY";
@@ -75,10 +77,12 @@ export function FollowUpReportBody({
           </p>
         </section>
         {showSignature ? (
-          <footer className="gidi-report-signature gidi-report-avoid-break">
+          <footer className={`gidi-report-signature${compact ? " gidi-report-signature--compact" : ""} gidi-report-avoid-break`}>
             <div className="gidi-report-signature-line" />
-            <p className="gidi-report-signature-name">{followUp.therapist.fullName}</p>
-            <p className="gidi-report-signature-role">Terapeuta titular · {followUp.area.name}</p>
+            <div className="gidi-report-signature-text">
+              <p className="gidi-report-signature-name">{followUp.therapist.fullName}</p>
+              <p className="gidi-report-signature-role">Terapeuta titular · {followUp.area.name}</p>
+            </div>
             {showLegalFooter ? (
               <p className="gidi-report-signature-legal">
                 Documento generado por GiDi con fines de seguimiento clínico. Uso confidencial conforme a la normativa
@@ -93,7 +97,7 @@ export function FollowUpReportBody({
 
   return (
     <>
-      <section className="gidi-report-kpis gidi-report-avoid-break">
+      <section className={`gidi-report-kpis${compact ? " gidi-report-kpis--compact" : ""} gidi-report-avoid-break`}>
         <div className="gidi-report-kpi">
           <span className="gidi-report-kpi-value">
             {summary.attendance.percent != null ? `${summary.attendance.percent}%` : "—"}
@@ -116,8 +120,8 @@ export function FollowUpReportBody({
         </div>
       </section>
 
-      <section className="gidi-report-section gidi-report-avoid-break">
-        <h2 className="gidi-report-section-title">Avance por objetivo</h2>
+      <section className="gidi-report-section">
+        <h2 className="gidi-report-section-title gidi-report-avoid-break">Avance por objetivo</h2>
         <table className="gidi-report-table">
           <thead>
             <tr>
@@ -153,8 +157,8 @@ export function FollowUpReportBody({
         </table>
       </section>
 
-      <section className="gidi-report-section gidi-report-avoid-break">
-        <h2 className="gidi-report-section-title">Bitácora de sesiones</h2>
+      <section className="gidi-report-section">
+        <h2 className="gidi-report-section-title gidi-report-avoid-break">Bitácora de sesiones</h2>
         {sessions.length === 0 ? (
           <p className="gidi-report-empty-block">No se registraron sesiones en este mes.</p>
         ) : (
@@ -201,8 +205,8 @@ export function FollowUpReportBody({
         )}
       </section>
 
-      <section className="gidi-report-closure gidi-report-avoid-break">
-        <h2 className="gidi-report-section-title">Cierre del periodo</h2>
+      <section className="gidi-report-closure">
+        <h2 className="gidi-report-section-title gidi-report-avoid-break">Cierre del periodo</h2>
         <div className="gidi-report-text-block">
           <h3>Observaciones generales</h3>
           <p>{followUp.generalNotes?.trim() || "Sin observaciones registradas."}</p>
@@ -218,10 +222,12 @@ export function FollowUpReportBody({
       </section>
 
       {showSignature ? (
-        <footer className="gidi-report-signature gidi-report-avoid-break">
+        <footer className={`gidi-report-signature${compact ? " gidi-report-signature--compact" : ""} gidi-report-avoid-break`}>
           <div className="gidi-report-signature-line" />
-          <p className="gidi-report-signature-name">{followUp.therapist.fullName}</p>
-          <p className="gidi-report-signature-role">Terapeuta titular · {followUp.area.name}</p>
+          <div className="gidi-report-signature-text">
+            <p className="gidi-report-signature-name">{followUp.therapist.fullName}</p>
+            <p className="gidi-report-signature-role">Terapeuta titular · {followUp.area.name}</p>
+          </div>
           {showLegalFooter ? (
             <p className="gidi-report-signature-legal">
               Documento generado por GiDi con fines de seguimiento clínico. Uso confidencial conforme a la normativa

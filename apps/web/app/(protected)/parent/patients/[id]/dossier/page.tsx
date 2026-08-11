@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { ParentPatientDossierPrint, type ParentPortalDossier } from "@/components/followups/ParentPatientDossierPrint";
 import { hasParentPortalAccess } from "@/lib/role-permissions";
+import { waitForPrintReady } from "@/lib/print-utils";
 
 export default function ParentPatientDossierPage() {
   const router = useRouter();
@@ -14,14 +15,34 @@ export default function ParentPatientDossierPage() {
 
   const [dossier, setDossier] = useState<ParentPortalDossier | null>(null);
   const [printDossier, setPrintDossier] = useState<ParentPortalDossier | null>(null);
+  const pendingPrintRef = useRef(false);
   const [msg, setMsg] = useState("");
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    const onAfterPrint = () => setPrintDossier(null);
+    const onAfterPrint = () => {
+      setPrintDossier(null);
+      pendingPrintRef.current = false;
+    };
     window.addEventListener("afterprint", onAfterPrint);
     return () => window.removeEventListener("afterprint", onAfterPrint);
   }, []);
+
+  useEffect(() => {
+    if (!printDossier || !pendingPrintRef.current) return;
+
+    let cancelled = false;
+    void (async () => {
+      await waitForPrintReady("#patient-dossier-print");
+      if (!cancelled && pendingPrintRef.current) {
+        window.print();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [printDossier]);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -45,9 +66,8 @@ export default function ParentPatientDossierPage() {
     if (!dossier) return;
     setExporting(true);
     try {
+      pendingPrintRef.current = true;
       setPrintDossier(dossier);
-      await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 200)));
-      window.print();
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error al generar expediente");
       setPrintDossier(null);

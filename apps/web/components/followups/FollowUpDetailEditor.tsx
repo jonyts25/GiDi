@@ -14,6 +14,7 @@ import { useToast } from "@/components/ui/Toast";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { hasFullAdminRole, hasOfficeStaffRole } from "@/lib/role-permissions";
 import type { FollowUpReport } from "@/lib/followup-report.types";
+import { waitForPrintReady } from "@/lib/print-utils";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type Objective = { id: string; idx: number; text: string; monthlyNotes?: string | null };
@@ -120,6 +121,7 @@ export function FollowUpDetailEditor(props: {
   const [loggedUser, setLoggedUser] = useState<{ id: string; fullName: string; roles: string[] } | null>(null);
   const [therapists, setTherapists] = useState<{ id: string; fullName: string }[]>([]);
   const [reportForPrint, setReportForPrint] = useState<FollowUpReport | null>(null);
+  const pendingPrintRef = useRef(false);
   const [exporting, setExporting] = useState(false);
 
   const [generalGoal, setGeneralGoal] = useState("");
@@ -209,10 +211,29 @@ export function FollowUpDetailEditor(props: {
   );
 
   useEffect(() => {
-    const onAfterPrint = () => setReportForPrint(null);
+    const onAfterPrint = () => {
+      setReportForPrint(null);
+      pendingPrintRef.current = false;
+    };
     window.addEventListener("afterprint", onAfterPrint);
     return () => window.removeEventListener("afterprint", onAfterPrint);
   }, []);
+
+  useEffect(() => {
+    if (!reportForPrint || !pendingPrintRef.current) return;
+
+    let cancelled = false;
+    void (async () => {
+      await waitForPrintReady("#follow-up-report-print");
+      if (!cancelled && pendingPrintRef.current) {
+        window.print();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reportForPrint]);
 
   useEffect(() => {
     setLoggedUser(readLoggedUser());
@@ -390,9 +411,8 @@ export function FollowUpDetailEditor(props: {
     setExporting(true);
     try {
       const report = (await apiFetch(`/followups/${followUpId}/report`)) as FollowUpReport;
+      pendingPrintRef.current = true;
       setReportForPrint(report);
-      await new Promise<void>((resolve) => requestAnimationFrame(() => setTimeout(resolve, 150)));
-      window.print();
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error al generar expediente");
       setReportForPrint(null);

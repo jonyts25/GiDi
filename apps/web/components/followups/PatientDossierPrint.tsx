@@ -3,6 +3,7 @@
 import type { PatientDossierReport } from "@/lib/followup-report.types";
 import { FollowUpReportBody } from "@/components/followups/FollowUpReportBody";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
+import { GiDiPrintPageLogo } from "@/components/branding/GiDiPrintPageLogo";
 
 const DOC_LABELS: Record<string, string> = {
   EVALUACION: "Evaluación",
@@ -37,7 +38,8 @@ export function PatientDossierPrint({
   const docs = (dossier.documents ?? []).filter((d) => !documentIds || documentIds.includes(d.id));
 
   return (
-    <div id="patient-dossier-print" className="gidi-report-root">
+    <div id="patient-dossier-print" className="gidi-report-root gidi-report-compact">
+      <GiDiPrintPageLogo />
       <header className="gidi-report-header gidi-report-avoid-break">
         <div className="gidi-report-brand">
           <GiDiLogo variant="print" />
@@ -136,21 +138,21 @@ export function PatientDossierPrint({
             </h2>
 
             {month.followUpReports.map((report) => (
-              <article key={report.followUp.id} className="gidi-dossier-area-block gidi-report-avoid-break">
-                <header className="gidi-dossier-area-header">
+              <article key={report.followUp.id} className="gidi-dossier-area-block">
+                <header className="gidi-dossier-area-header gidi-report-avoid-break">
                   <h3>{report.followUp.area.name}</h3>
                   <p>
                     Terapeuta: {report.followUp.therapist.fullName} · Estado: {report.followUp.status}
                   </p>
                 </header>
-                <FollowUpReportBody report={report} showSignature />
+                <FollowUpReportBody report={report} showSignature compact />
               </article>
             ))}
           </section>
         ))
       )}
 
-      <footer className="gidi-report-signature gidi-report-avoid-break">
+      <footer className="gidi-report-legal-footer gidi-report-avoid-break">
         <p className="gidi-report-signature-legal">
           Expediente consolidado generado por GiDi. Contiene el historial de seguimientos mensuales del paciente.
           Documento confidencial conforme a la normativa aplicable en protección de datos de salud.

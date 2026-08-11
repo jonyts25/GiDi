@@ -6,12 +6,7 @@ import Link from "next/link";
 import { AnnouncementBanner } from "@/components/announcements/AnnouncementBanner";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
 import { canViewRevenueOverview, hasFullAdminRole, hasOfficeStaffRole, hasParentPortalAccess, primaryRoleLabel } from "@/lib/role-permissions";
-
-function getUser() {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem("gidi_user");
-  return raw ? JSON.parse(raw) : null;
-}
+import { readStoredUser } from "@/lib/stored-user";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -24,7 +19,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
-    const u = getUser();
+    const u = readStoredUser();
 
     if (!token || !u) {
       router.replace("/");

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { PatientDossierPrint } from "@/components/followups/PatientDossierPrint";
 import type { PatientDossierReport } from "@/lib/followup-report.types";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { waitForPrintReady } from "@/lib/print-utils";
 
 const DOC_LABELS: Record<string, string> = {
   EVALUACION: "Evaluación",
@@ -21,15 +22,35 @@ export default function AdminPatientDossierPage() {
 
   const [dossier, setDossier] = useState<PatientDossierReport | null>(null);
   const [printDossier, setPrintDossier] = useState<PatientDossierReport | null>(null);
+  const pendingPrintRef = useRef(false);
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState("");
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    const onAfterPrint = () => setPrintDossier(null);
+    const onAfterPrint = () => {
+      setPrintDossier(null);
+      pendingPrintRef.current = false;
+    };
     window.addEventListener("afterprint", onAfterPrint);
     return () => window.removeEventListener("afterprint", onAfterPrint);
   }, []);
+
+  useEffect(() => {
+    if (!printDossier || !pendingPrintRef.current) return;
+
+    let cancelled = false;
+    void (async () => {
+      await waitForPrintReady("#patient-dossier-print");
+      if (!cancelled && pendingPrintRef.current) {
+        window.print();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [printDossier]);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -104,13 +125,8 @@ export default function AdminPatientDossierPage() {
         ],
       };
 
+      pendingPrintRef.current = true;
       setPrintDossier(enriched);
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => setTimeout(resolve, 350));
-        });
-      });
-      window.print();
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error al generar expediente");
       setPrintDossier(null);

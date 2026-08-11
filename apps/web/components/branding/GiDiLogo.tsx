@@ -1,6 +1,7 @@
 "use client";
 
 import { useBranding } from "@/components/branding/BrandingProvider";
+import { presetLogoUrl } from "@/lib/branding";
 
 type GiDiLogoProps = {
   variant?: "header" | "login" | "print";
@@ -15,19 +16,11 @@ const sizes: Record<NonNullable<GiDiLogoProps["variant"]>, string> = {
 };
 
 export function GiDiLogo({ variant = "header", className = "", alt = "GiDi — Grupo para la investigación del Desarrollo Infantil" }: GiDiLogoProps) {
-  const { logoUrl, loading } = useBranding();
-
-  if (loading) {
-    return (
-      <div
-        className={`rounded-xl bg-primary/10 ${variant === "login" ? "h-28 w-28" : "h-10 w-24"} ${className}`}
-        aria-hidden
-      />
-    );
-  }
+  const { logoUrl, loading, branding } = useBranding();
+  const src = loading ? presetLogoUrl(branding.preset) : logoUrl;
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={logoUrl} alt={alt} className={`${sizes[variant]} ${className}`} />
+    <img src={src} alt={alt} className={`${sizes[variant]} ${className}`} />
   );
 }

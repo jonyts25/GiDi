@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { BulkFollowUpReportPrint } from "@/components/followups/BulkFollowUpReportPrint";
 import type { FollowUpReport } from "@/lib/followup-report.types";
 import { useToast } from "@/components/ui/Toast";
+import { waitForPrintReady } from "@/lib/print-utils";
 
 export type FollowUpListRow = {
   id: string;
@@ -40,12 +41,32 @@ export function PatientFollowUpsExportTable(props: {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
   const [printData, setPrintData] = useState<{ reports: FollowUpReport[]; generatedAt: string } | null>(null);
+  const pendingPrintRef = useRef(false);
 
   useEffect(() => {
-    const onAfterPrint = () => setPrintData(null);
+    const onAfterPrint = () => {
+      setPrintData(null);
+      pendingPrintRef.current = false;
+    };
     window.addEventListener("afterprint", onAfterPrint);
     return () => window.removeEventListener("afterprint", onAfterPrint);
   }, []);
+
+  useEffect(() => {
+    if (!printData || !pendingPrintRef.current) return;
+
+    let cancelled = false;
+    void (async () => {
+      await waitForPrintReady("#follow-up-bulk-report-print");
+      if (!cancelled && pendingPrintRef.current) {
+        window.print();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [printData]);
 
   const filtered = useMemo(() => {
     if (!areaFilter) return rows;
@@ -91,13 +112,8 @@ export function PatientFollowUpsExportTable(props: {
         return;
       }
 
+      pendingPrintRef.current = true;
       setPrintData(data);
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => setTimeout(resolve, 350));
-        });
-      });
-      window.print();
       showToast(`✅ ${ids.length} seguimiento(s) exportado(s)`);
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al exportar", "error");

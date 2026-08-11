@@ -3,6 +3,7 @@
 import type { FollowUpReport } from "@/lib/followup-report.types";
 import { FollowUpReportBody } from "@/components/followups/FollowUpReportBody";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
+import { GiDiPrintPageLogo } from "@/components/branding/GiDiPrintPageLogo";
 
 function formatPeriod(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleDateString("es-MX", { month: "long", year: "numeric" });
@@ -21,7 +22,8 @@ export function FollowUpReportPrint({ report }: { report: FollowUpReport }) {
   const periodLabel = formatPeriod(followUp.periodYear, followUp.periodMonth);
 
   return (
-    <div id="follow-up-report-print" className="gidi-report-root" aria-hidden="true">
+    <div id="follow-up-report-print" className="gidi-report-root gidi-report-compact" aria-hidden="true">
+      <GiDiPrintPageLogo />
       <header className="gidi-report-header gidi-report-avoid-break">
         <div className="gidi-report-brand">
           <GiDiLogo variant="print" />
@@ -53,7 +55,7 @@ export function FollowUpReportPrint({ report }: { report: FollowUpReport }) {
         </div>
       </header>
 
-      <FollowUpReportBody report={report} showLegalFooter />
+      <FollowUpReportBody report={report} showLegalFooter compact />
     </div>
   );
 }

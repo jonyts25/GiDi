@@ -177,6 +177,114 @@ a {
   break-inside: avoid;
 }
 
+.gidi-report-compact {
+  font-size: 9.5pt;
+  line-height: 1.35;
+}
+
+.gidi-report-compact .gidi-report-section {
+  margin-bottom: 12px;
+}
+
+.gidi-report-compact .gidi-report-section-title {
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  font-size: 9.5pt;
+}
+
+.gidi-report-compact .gidi-report-table {
+  font-size: 8.5pt;
+}
+
+.gidi-report-compact .gidi-report-table th,
+.gidi-report-compact .gidi-report-table td {
+  padding: 5px 7px;
+}
+
+.gidi-report-compact .gidi-report-table-compact th,
+.gidi-report-compact .gidi-report-table-compact td {
+  padding: 4px 6px;
+}
+
+.gidi-report-compact .gidi-report-text-block {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+}
+
+.gidi-report-compact .gidi-report-text-block p {
+  font-size: 8.5pt;
+}
+
+.gidi-report-kpis--compact {
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.gidi-report-kpis--compact .gidi-report-kpi {
+  padding: 8px 10px;
+}
+
+.gidi-report-kpis--compact .gidi-report-kpi-value {
+  font-size: 16pt;
+}
+
+.gidi-report-kpis--compact .gidi-report-kpi-label {
+  margin-top: 4px;
+  font-size: 7.5pt;
+}
+
+.gidi-report-kpis--compact .gidi-report-kpi-sub {
+  font-size: 7pt;
+}
+
+.gidi-print-page-logo {
+  display: none;
+}
+
+.gidi-report-signature--compact {
+  margin-top: 10px;
+  padding-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 14px;
+  text-align: right;
+  border-top: 1px solid #d8e0e6;
+}
+
+.gidi-report-signature--compact .gidi-report-signature-line {
+  width: 120px;
+  margin: 0;
+  order: 2;
+}
+
+.gidi-report-signature--compact .gidi-report-signature-text {
+  order: 1;
+}
+
+.gidi-report-signature--compact .gidi-report-signature-name {
+  font-size: 9pt;
+}
+
+.gidi-report-signature--compact .gidi-report-signature-role {
+  margin-top: 2px;
+  font-size: 7.5pt;
+}
+
+.gidi-report-legal-footer {
+  margin-top: 20px;
+  padding-top: 12px;
+  border-top: 1px solid #d8e0e6;
+  text-align: center;
+}
+
+.gidi-dossier-area-separator {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed #c5d0d8;
+}
+
 .gidi-report-header {
   display: flex;
   flex-wrap: wrap;
@@ -524,11 +632,20 @@ a {
 .gidi-dossier-month-break {
   break-before: page;
   page-break-before: always;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.gidi-dossier-area-separator.gidi-dossier-month-break {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
 }
 
 .gidi-dossier-area-block {
-  margin-bottom: 28px;
-  padding-bottom: 20px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -559,7 +676,20 @@ a {
 @media print {
   @page {
     size: letter portrait;
-    margin: 14mm 12mm;
+    margin: 14mm 12mm 12mm;
+  }
+
+  .gidi-print-page-logo {
+    display: block;
+    position: fixed;
+    top: 3mm;
+    right: 5mm;
+    width: 14mm;
+    max-height: 11mm;
+    height: auto;
+    object-fit: contain;
+    opacity: 0.92;
+    z-index: 99999;
   }
 
   html,

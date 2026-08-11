@@ -2,6 +2,7 @@
 
 import { FollowUpReportBody } from "@/components/followups/FollowUpReportBody";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
+import { GiDiPrintPageLogo } from "@/components/branding/GiDiPrintPageLogo";
 import type { FollowUpReport } from "@/lib/followup-report.types";
 
 const DOC_LABELS: Record<string, string> = {
@@ -42,7 +43,8 @@ export function ParentPatientDossierPrint({ dossier }: { dossier: ParentPortalDo
   const patientName = `${dossier.patient.firstName} ${dossier.patient.lastName}`;
 
   return (
-    <div id="patient-dossier-print" className="gidi-report-root" aria-hidden="true">
+    <div id="patient-dossier-print" className="gidi-report-root gidi-report-compact" aria-hidden="true">
+      <GiDiPrintPageLogo />
       <header className="gidi-report-header gidi-report-avoid-break">
         <div className="gidi-report-brand">
           <GiDiLogo variant="print" />
@@ -101,19 +103,19 @@ export function ParentPatientDossierPrint({ dossier }: { dossier: ParentPortalDo
             </h2>
 
             {month.followUpReports.map((report) => (
-              <article key={report.followUp.id} className="gidi-dossier-area-block gidi-report-avoid-break">
-                <header className="gidi-dossier-area-header">
+              <article key={report.followUp.id} className="gidi-dossier-area-block">
+                <header className="gidi-dossier-area-header gidi-report-avoid-break">
                   <h3>{report.followUp.area.name}</h3>
                   <p>Terapeuta: {report.followUp.therapist.fullName}</p>
                 </header>
-                <FollowUpReportBody report={report} showSignature />
+                <FollowUpReportBody report={report} showSignature compact />
               </article>
             ))}
           </section>
         ))
       )}
 
-      <footer className="gidi-report-signature gidi-report-avoid-break">
+      <footer className="gidi-report-legal-footer gidi-report-avoid-break">
         <p className="gidi-report-signature-legal">
           Expediente generado por GiDi. Contiene seguimientos visibles para familias y documentos del paciente.
         </p>
