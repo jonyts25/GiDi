@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/Toast";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
 import { USERNAME_LABEL } from "@/lib/user-labels";
 import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
+import { formatCalendarDate } from "@/lib/date-utils";
 
 type MiniUser = { id: string; fullName: string; email: string; status: "ACTIVE" | "INACTIVE" };
 
@@ -532,7 +533,7 @@ export default function AdminPatientDetail() {
         {data.patient.revaluationAlertSnoozedUntil ? (
           <p className="text-sm text-subtle">
             Alerta pospuesta hasta:{" "}
-            {new Date(data.patient.revaluationAlertSnoozedUntil).toLocaleDateString("es-MX", { dateStyle: "long" })}
+            {formatCalendarDate(data.patient.revaluationAlertSnoozedUntil, { dateStyle: "long" })}
           </p>
         ) : null}
         {data.patient.revaluationSkipReason ? (
