@@ -103,7 +103,7 @@ export default function AdminPatientFollowUpsPage() {
   }
 
   return (
-    <main style={{ maxWidth: 980, margin: "30px auto", padding: 16 }}>
+    <main className="gidi-screen-only" style={{ maxWidth: 980, margin: "30px auto", padding: 16 }}>
       <div className="row">
         <div>
           <div className="h1">Seguimientos</div>

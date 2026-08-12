@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { BulkFollowUpReportPrint } from "@/components/followups/BulkFollowUpReportPrint";
@@ -124,7 +125,12 @@ export function PatientFollowUpsExportTable(props: {
 
   return (
     <>
-      {printData ? <BulkFollowUpReportPrint reports={printData.reports} generatedAt={printData.generatedAt} /> : null}
+      {printData && typeof document !== "undefined"
+        ? createPortal(
+            <BulkFollowUpReportPrint reports={printData.reports} generatedAt={printData.generatedAt} />,
+            document.body,
+          )
+        : null}
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
