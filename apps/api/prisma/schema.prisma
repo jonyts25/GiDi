@@ -126,6 +126,8 @@ model Patient {
 
   patientObjectives PatientObjective[]
 
+  scheduleSlots TherapistScheduleSlot[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -529,11 +531,14 @@ model TherapistScheduleSlot {
   endTime     String?
   label       String
   sortOrder   Int      @default(0)
+  patientId   String?  @db.Uuid
 
-  therapist User @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  therapist User    @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([therapistId])
+  @@index([patientId])
 }
