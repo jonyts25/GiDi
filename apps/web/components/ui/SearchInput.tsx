@@ -20,12 +20,16 @@ export function SearchInput({
   );
 }
 
+function normalize(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 export function filterByQuery<T>(
   items: T[],
   query: string,
   pick: (item: T) => string,
 ): T[] {
-  const q = query.trim().toLowerCase();
+  const q = normalize(query.trim());
   if (!q) return items;
-  return items.filter((item) => pick(item).toLowerCase().includes(q));
+  return items.filter((item) => normalize(pick(item)).includes(q));
 }
