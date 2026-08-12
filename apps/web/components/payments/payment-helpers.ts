@@ -45,6 +45,7 @@ export function statusClasses(status: PaymentStatus): string {
       return "bg-success/15 text-success border-success/30";
     case "PARCIAL":
       return "bg-warning/15 text-warning border-warning/30";
+    case "PENDIENTE":
     case "DEUDA":
       return "bg-danger/15 text-danger border-danger/30";
     case "PAUSA_VACACIONES":
