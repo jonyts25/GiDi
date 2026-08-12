@@ -17,12 +17,19 @@ type UserDetail = {
   roles?: { role: { key: string; name: string } }[];
 };
 
+type AssignedPatient = {
+  id: string;
+  firstName: string;
+  lastName: string;
+};
+
 export default function AdminTherapistDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
   const [u, setU] = useState<UserDetail | null>(null);
+  const [patients, setPatients] = useState<AssignedPatient[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
 
@@ -40,11 +47,15 @@ export default function AdminTherapistDetailPage() {
 
     (async () => {
       try {
-        const data = await apiFetch(`/admin/users/${id}`);
+        const [data, assigned] = await Promise.all([
+          apiFetch(`/admin/users/${id}`),
+          apiFetch(`/admin/therapists/${id}/patients`),
+        ]);
         setU(data);
         setFullName(data.fullName);
         setEmail(data.email);
         setStatus(data.status);
+        setPatients(Array.isArray(assigned) ? assigned : []);
       } catch (e: any) {
         setMsg(e.message);
       } finally {
@@ -107,6 +118,23 @@ export default function AdminTherapistDetailPage() {
         <div style={{ marginTop: 10 }}>
           <ResetPasswordButton userId={id} />
         </div>
+      </section>
+
+      <section className="card" style={{ marginTop: 14 }}>
+        <h2 className="h2" style={{ marginTop: 0 }}>Pacientes asignados</h2>
+        {patients.length === 0 ? (
+          <p className="sub">Este terapeuta no tiene pacientes asignados.</p>
+        ) : (
+          <ul className="space-y-2 text-sm">
+            {patients.map((p) => (
+              <li key={p.id}>
+                <Link href={`/admin/patients/${p.id}`} className="font-bold text-primary hover:underline">
+                  {p.firstName} {p.lastName}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <TherapistScheduleEditor
