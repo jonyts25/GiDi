@@ -162,7 +162,12 @@ export function FollowUpReportBody({
         {sessions.length === 0 ? (
           <p className="gidi-report-empty-block">No se registraron sesiones en este mes.</p>
         ) : (
-          <table className="gidi-report-table gidi-report-table-compact">
+          <>
+            <p className="gidi-report-cell-note">
+              A: Asistió · V: Vacaciones · F: Faltó (no avisó) · E: Enfermó · R: Reposición · X: No se trabajó el
+              objetivo
+            </p>
+            <table className="gidi-report-table gidi-report-table-compact">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -188,9 +193,7 @@ export function FollowUpReportBody({
                       ) : (
                         s.marks.map((m) => (
                           <li key={m.id}>
-                            <strong>
-                              {m.objectiveIdx ?? "?"}. {m.objectiveText ?? "Objetivo"}:
-                            </strong>{" "}
+                            Objetivo {m.objectiveIdx ?? "?"}:{" "}
                             <span className="gidi-report-mark-value">{markLabel(m)}</span>
                             {m.progressPercent != null ? ` (${m.progressPercent}%)` : ""}
                           </li>
@@ -202,6 +205,7 @@ export function FollowUpReportBody({
               ))}
             </tbody>
           </table>
+          </>
         )}
       </section>
 
