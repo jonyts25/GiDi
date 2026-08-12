@@ -22,6 +22,18 @@ export class TherapistScheduleService {
       this.prisma.therapistScheduleSlot.findMany({
         where: { therapistId },
         orderBy: [{ sortOrder: "asc" }, { startTime: "asc" }, { dayOfWeek: "asc" }],
+        select: {
+          id: true,
+          dayOfWeek: true,
+          startTime: true,
+          endTime: true,
+          label: true,
+          sortOrder: true,
+          patientId: true,
+          patient: {
+            select: { firstName: true, lastName: true },
+          },
+        },
       }),
     ]);
 
@@ -37,6 +49,8 @@ export class TherapistScheduleService {
         endTime: s.endTime,
         label: s.label,
         sortOrder: s.sortOrder,
+        patientId: s.patientId,
+        patient: s.patient,
       })),
     };
   }
@@ -45,14 +59,15 @@ export class TherapistScheduleService {
     await this.ensureTherapist(therapistId);
 
     const cleanSlots = (dto.slots ?? [])
-      .filter((s) => s.startTime?.trim() && s.label?.trim())
+      .filter((s) => s.startTime?.trim() && (s.label?.trim() || s.patientId))
       .map((s, i) => ({
         therapistId,
         dayOfWeek: s.dayOfWeek,
         startTime: s.startTime.trim(),
         endTime: s.endTime?.trim() || null,
-        label: s.label.trim(),
+        label: s.label?.trim() || "Paciente",
         sortOrder: s.sortOrder ?? i,
+        patientId: s.patientId || null,
       }));
 
     await this.prisma.$transaction([

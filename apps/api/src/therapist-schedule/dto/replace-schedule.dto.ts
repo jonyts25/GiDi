@@ -3,6 +3,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -33,6 +34,10 @@ export class ScheduleSlotDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsUUID()
+  patientId?: string | null;
 }
 
 export class ReplaceScheduleDto {

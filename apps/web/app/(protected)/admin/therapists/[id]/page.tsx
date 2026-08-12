@@ -140,6 +140,7 @@ export default function AdminTherapistDetailPage() {
       <TherapistScheduleEditor
         loadEndpoint={`/admin/therapists/${id}/schedule`}
         saveEndpoint={`/admin/therapists/${id}/schedule`}
+        patientsEndpoint={`/admin/therapists/${id}/patients`}
         canEdit
       />
     </main>
