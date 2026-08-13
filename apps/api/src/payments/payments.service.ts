@@ -10,6 +10,10 @@ import { userHasOfficeStaffRole } from "../auth/role-permissions";
 
 const MAX_RECEIPT_BYTES = 20 * 1024 * 1024;
 
+function periodYm(year: number, month: number): number {
+  return year * 12 + (month - 1);
+}
+
 /**
  * Un paciente inactivo (alta/baja) deja de contar en ingresos desde el mes de
  * inactivación en adelante. Los meses anteriores se conservan (ingresos reales).
@@ -21,9 +25,8 @@ function isInactiveForPeriod(
 ): boolean {
   if (patient.status !== "DISCHARGED" || !patient.dischargedAt) return false;
   const d = patient.dischargedAt;
-  const dischargeYm = d.getUTCFullYear() * 12 + d.getUTCMonth(); // 0-based month
-  const periodYm = periodYear * 12 + (periodMonth - 1);
-  return periodYm >= dischargeYm;
+  const dischargeYm = periodYm(d.getUTCFullYear(), d.getUTCMonth() + 1);
+  return periodYm(periodYear, periodMonth) >= dischargeYm;
 }
 
 const paymentSelect = {
@@ -49,6 +52,36 @@ export class PaymentsService {
 
   private isAdmin(user: AuthUser): boolean {
     return userHasOfficeStaffRole(user);
+  }
+
+  /** Adeudo acumulado por paciente en períodos anteriores al mes consultado. */
+  private async arrearsByPatient(
+    beforeYear: number,
+    beforeMonth: number,
+    patientIds: string[],
+  ): Promise<Map<string, { months: number; amount: number }>> {
+    if (patientIds.length === 0) return new Map();
+
+    const rows = await this.prisma.payment.findMany({
+      where: {
+        patientId: { in: patientIds },
+        status: { in: [PaymentStatus.DEUDA, PaymentStatus.PENDIENTE, PaymentStatus.PARCIAL] },
+        OR: [
+          { periodYear: { lt: beforeYear } },
+          { periodYear: beforeYear, periodMonth: { lt: beforeMonth } },
+        ],
+      },
+      select: { patientId: true, amountDue: true, amountPaid: true },
+    });
+
+    const map = new Map<string, { months: number; amount: number }>();
+    for (const row of rows) {
+      const balance = Math.max(row.amountDue - row.amountPaid, 0);
+      if (balance <= 0) continue;
+      const prev = map.get(row.patientId) ?? { months: 0, amount: 0 };
+      map.set(row.patientId, { months: prev.months + 1, amount: prev.amount + balance });
+    }
+    return map;
   }
 
   /** Pagos solo los ven admin o el papá vinculado al paciente. */
@@ -409,6 +442,8 @@ export class PaymentsService {
       merged.push(leftover);
     }
 
+    const arrears = await this.arrearsByPatient(year, month, merged.map((r) => r.patient.id));
+
     merged.sort((a, b) => {
       const statusOrder = (s: PaymentStatus) => {
         if (s === PaymentStatus.PENDIENTE) return 0;
@@ -433,6 +468,7 @@ export class PaymentsService {
         lastName: patient.lastName,
         center: patient.center,
       },
+      arrears: arrears.get(patient.id) ?? null,
     }));
 
     const totalDue = payments.reduce((a, p) => a + p.amountDue, 0);
