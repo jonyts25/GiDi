@@ -17,6 +17,13 @@ export type PaymentRow = {
   receiptUploadedAt?: string | null;
 };
 
+export type PatientArrears = { months: number; amount: number };
+
+export type PaymentOverviewRow = PaymentRow & {
+  patient: { id: string; firstName: string; lastName: string; center: string };
+  arrears: PatientArrears | null;
+};
+
 export type TransferInfo = {
   centerLabel: string;
   titular: string;
@@ -62,4 +69,9 @@ export function monthLabel(year: number, month: number): string {
 export function formatMoney(pesos: number | null | undefined): string {
   if (pesos == null) return "—";
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(pesos);
+}
+
+/** Badge secundario para adeudo de meses anteriores (mismo tono que deuda, más pequeño). */
+export function arrearsBadgeClasses(): string {
+  return "bg-danger/15 text-danger border-danger/30";
 }
