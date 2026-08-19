@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -427,9 +428,9 @@ export function FollowUpDetailEditor(props: {
 
   return (
     <>
-      {reportForPrint ? (
-        <FollowUpReportPrint report={reportForPrint} />
-      ) : null}
+      {reportForPrint && typeof document !== "undefined"
+        ? createPortal(<FollowUpReportPrint report={reportForPrint} />, document.body)
+        : null}
 
     <div className="gidi-screen-only max-w-[1200px] space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">

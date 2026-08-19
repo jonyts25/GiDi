@@ -18,7 +18,7 @@ export function hasFullAdminRole(roles: string[] = []): boolean {
 }
 
 export function hasOfficeStaffRole(roles: string[] = []): boolean {
-  return hasFullAdminRole(roles) || roles.includes("SECRETARY");
+  return hasFullAdminRole(roles) || roles.includes("SECRETARY") || roles.includes("FINANCE");
 }
 
 const STAFF_ROLE_KEYS = ["SUPERADMIN", "ADMIN", "SECRETARY", "THERAPIST", "FINANCE"] as const;

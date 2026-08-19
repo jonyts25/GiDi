@@ -17,6 +17,11 @@ export type PaymentRow = {
   receiptUploadedAt?: string | null;
 };
 
+export type PaymentOverviewRow = PaymentRow & {
+  patient: { id: string; firstName: string; lastName: string; center: string };
+  debtCarriedOver: number;
+};
+
 export type TransferInfo = {
   centerLabel: string;
   titular: string;

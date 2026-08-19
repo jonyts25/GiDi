@@ -700,26 +700,15 @@ a {
     -webkit-print-color-adjust: exact;
   }
 
-  body * {
-    visibility: hidden;
-  }
-
-  #follow-up-report-print,
-  #follow-up-report-print *,
-  #follow-up-bulk-report-print,
-  #follow-up-bulk-report-print *,
-  #patient-dossier-print,
-  #patient-dossier-print * {
-    visibility: visible;
+  .app-root {
+    display: none !important;
   }
 
   #follow-up-report-print,
   #follow-up-bulk-report-print,
   #patient-dossier-print {
     display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
+    position: static !important;
     width: 100%;
     padding: 0;
     margin: 0;

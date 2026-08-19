@@ -11,14 +11,10 @@ import {
   formatMoney,
   statusClasses,
   STATUS_LABEL,
-  type PaymentRow,
+  type PaymentOverviewRow,
   type PaymentStatus,
 } from "@/components/payments/payment-helpers";
 import { GIDI_CENTER_OPTIONS, labelForCenter } from "@/lib/centers";
-
-type OverviewRow = PaymentRow & {
-  patient: { id: string; firstName: string; lastName: string; center: string };
-};
 
 type Overview = {
   periodYear: number;
@@ -27,10 +23,11 @@ type Overview = {
     totalDue: number;
     totalPaid: number;
     outstanding: number;
+    debtCarriedOver?: number;
     count: number;
     byStatus: Record<string, number>;
   };
-  payments: OverviewRow[];
+  payments: PaymentOverviewRow[];
 };
 
 const STATUS_OPTIONS: PaymentStatus[] = ["PENDIENTE", "PAGADO", "PARCIAL", "DEUDA", "PAUSA_VACACIONES"];
@@ -66,12 +63,14 @@ export default function AdminPaymentsOverviewPage() {
       : data?.payments ?? [];
     const totalDue = payments.reduce((a, p) => a + p.amountDue, 0);
     const totalPaid = payments.reduce((a, p) => a + p.amountPaid, 0);
+    const debtCarriedOver = payments.reduce((a, p) => a + p.debtCarriedOver, 0);
     const byStatus: Record<string, number> = {};
     for (const p of payments) byStatus[p.status] = (byStatus[p.status] ?? 0) + 1;
     return {
       totalDue,
       totalPaid,
-      outstanding: Math.max(totalDue - totalPaid, 0),
+      debtCarriedOver,
+      outstanding: Math.max(totalDue - totalPaid, 0) + debtCarriedOver,
       count: payments.length,
       byStatus,
     };
@@ -121,7 +120,7 @@ export default function AdminPaymentsOverviewPage() {
     void reload();
   }, [router, reload]);
 
-  async function onChangeStatus(p: OverviewRow, next: PaymentStatus) {
+  async function onChangeStatus(p: PaymentOverviewRow, next: PaymentStatus) {
     if (!isAdmin) return;
     setSavingId(p.id);
     setMsg("");
@@ -219,12 +218,13 @@ export default function AdminPaymentsOverviewPage() {
                   <th className="py-2 pr-3">Estado</th>
                   <th className="py-2 pr-3">Pagado</th>
                   <th className="py-2 pr-3">Mensualidad</th>
+                  <th className="py-2 pr-3">Deuda acumulada</th>
                   <th className="py-2 pr-3">Comprobante</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredPayments.length === 0 ? (
-                  <tr><td colSpan={6} className="py-3 text-subtle">{data.payments.length === 0 ? "Sin mensualidades este mes." : "Sin coincidencias."}</td></tr>
+                  <tr><td colSpan={7} className="py-3 text-subtle">{data.payments.length === 0 ? "Sin mensualidades este mes." : "Sin coincidencias."}</td></tr>
                 ) : (
                   filteredPayments.map((p) => (
                     <tr key={p.id} className="border-b border-border/60">
@@ -254,6 +254,9 @@ export default function AdminPaymentsOverviewPage() {
                       </td>
                       <td className="py-2 pr-3">{formatMoney(p.amountPaid)}</td>
                       <td className="py-2 pr-3">{formatMoney(p.amountDue)}</td>
+                      <td className={`py-2 pr-3 ${p.debtCarriedOver > 0 ? "font-medium text-danger" : "text-subtle"}`}>
+                        {p.debtCarriedOver > 0 ? formatMoney(p.debtCarriedOver) : "—"}
+                      </td>
                       <td className="py-2 pr-3 text-subtle">{p.receiptName ? "✓" : "—"}</td>
                     </tr>
                   ))

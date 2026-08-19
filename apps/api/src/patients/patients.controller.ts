@@ -3,6 +3,7 @@ import { PatientsService } from "./patients.service";
 import { UseGuards } from "@nestjs/common";
 import { JwtGuard } from "../auth/jwt.guard";
 import { Param } from "@nestjs/common";
+import { hasOfficeStaffRole } from "../auth/role-permissions";
 
 @UseGuards(JwtGuard)
 
@@ -31,7 +32,11 @@ assignTherapist(
     const user = req.user;
     const roles: string[] = user.roles ?? [];
 
-    if (user.roles.includes("THERAPIST")) {
+    if (hasOfficeStaffRole(roles)) {
+      return this.service.findAll();
+    }
+
+    if (roles.includes("THERAPIST")) {
       return this.service.findForTherapist(user.sub);
     }
 

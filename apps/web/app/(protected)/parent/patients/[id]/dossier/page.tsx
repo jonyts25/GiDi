@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -80,7 +81,9 @@ export default function ParentPatientDossierPage() {
 
   return (
     <>
-      {printDossier ? <ParentPatientDossierPrint dossier={printDossier} /> : null}
+      {printDossier && typeof document !== "undefined"
+        ? createPortal(<ParentPatientDossierPrint dossier={printDossier} />, document.body)
+        : null}
 
       <main className="gidi-screen-only container max-w-[820px] space-y-6 py-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
