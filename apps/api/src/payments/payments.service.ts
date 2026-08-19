@@ -54,13 +54,18 @@ export class PaymentsService {
     return userHasOfficeStaffRole(user);
   }
 
-  /** Deuda arrastrada de meses anteriores al período consultado (excluye PAUSA_VACACIONES). */
-  private async debtCarriedOverByPatient(
+  /** Deuda y adeudo de meses anteriores al período consultado (excluye PAUSA_VACACIONES). */
+  private async priorPeriodDebtByPatient(
     beforeYear: number,
     beforeMonth: number,
     patientIds: string[],
-  ): Promise<Map<string, number>> {
-    if (patientIds.length === 0) return new Map();
+  ): Promise<{
+    debtCarriedOver: Map<string, number>;
+    arrears: Map<string, { months: number; amount: number }>;
+  }> {
+    if (patientIds.length === 0) {
+      return { debtCarriedOver: new Map(), arrears: new Map() };
+    }
 
     const rows = await this.prisma.payment.findMany({
       where: {
@@ -71,16 +76,27 @@ export class PaymentsService {
           { periodYear: beforeYear, periodMonth: { lt: beforeMonth } },
         ],
       },
-      select: { patientId: true, amountDue: true, amountPaid: true },
+      select: { patientId: true, amountDue: true, amountPaid: true, status: true },
     });
 
-    const map = new Map<string, number>();
+    const debtCarriedOver = new Map<string, number>();
+    const arrears = new Map<string, { months: number; amount: number }>();
+    const arrearsStatuses = new Set<PaymentStatus>([
+      PaymentStatus.DEUDA,
+      PaymentStatus.PENDIENTE,
+      PaymentStatus.PARCIAL,
+    ]);
+
     for (const row of rows) {
       const balance = Math.max(row.amountDue - row.amountPaid, 0);
       if (balance <= 0) continue;
-      map.set(row.patientId, (map.get(row.patientId) ?? 0) + balance);
+      debtCarriedOver.set(row.patientId, (debtCarriedOver.get(row.patientId) ?? 0) + balance);
+      if (arrearsStatuses.has(row.status)) {
+        const prev = arrears.get(row.patientId) ?? { months: 0, amount: 0 };
+        arrears.set(row.patientId, { months: prev.months + 1, amount: prev.amount + balance });
+      }
     }
-    return map;
+    return { debtCarriedOver, arrears };
   }
 
   /** Pagos solo los ven admin o el papá vinculado al paciente. */
@@ -441,7 +457,7 @@ export class PaymentsService {
       merged.push(leftover);
     }
 
-    const debtCarriedOver = await this.debtCarriedOverByPatient(
+    const { debtCarriedOver, arrears } = await this.priorPeriodDebtByPatient(
       year,
       month,
       merged.map((r) => r.patient.id),
@@ -472,6 +488,7 @@ export class PaymentsService {
         center: patient.center,
       },
       debtCarriedOver: debtCarriedOver.get(patient.id) ?? 0,
+      arrears: arrears.get(patient.id) ?? null,
     }));
 
     const totalDue = payments.reduce((a, p) => a + p.amountDue, 0);

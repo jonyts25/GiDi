@@ -11,6 +11,7 @@ import {
   formatMoney,
   statusClasses,
   STATUS_LABEL,
+  arrearsBadgeClasses,
   type PaymentOverviewRow,
   type PaymentStatus,
 } from "@/components/payments/payment-helpers";
@@ -41,6 +42,7 @@ export default function AdminPaymentsOverviewPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [center, setCenter] = useState("");
   const [query, setQuery] = useState("");
+  const [onlyWithArrears, setOnlyWithArrears] = useState(false);
   const [data, setData] = useState<Overview | null>(null);
   const [msg, setMsg] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -52,9 +54,12 @@ export default function AdminPaymentsOverviewPage() {
       const byCenter = center
         ? data?.payments.filter((p) => p.patient.center === center) ?? []
         : data?.payments ?? [];
-      return filterByQuery(byCenter, query, (p) => `${p.patient.firstName} ${p.patient.lastName}`);
+      const byArrears = onlyWithArrears
+        ? byCenter.filter((p) => p.debtCarriedOver > 0 || p.arrears !== null)
+        : byCenter;
+      return filterByQuery(byArrears, query, (p) => `${p.patient.firstName} ${p.patient.lastName}`);
     },
-    [data, query, center],
+    [data, query, center, onlyWithArrears],
   );
 
   const displayTotals = useMemo(() => {
@@ -176,6 +181,15 @@ export default function AdminPaymentsOverviewPage() {
             ))}
           </select>
         </label>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm">
+          <input
+            type="checkbox"
+            className="size-4 rounded border-border"
+            checked={onlyWithArrears}
+            onChange={(e) => setOnlyWithArrears(e.target.checked)}
+          />
+          <span>Solo con adeudo</span>
+        </label>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn rounded-xl px-3 py-2 text-sm" onClick={() => void exportCsv("month")}>
             Exportar mes
@@ -235,22 +249,32 @@ export default function AdminPaymentsOverviewPage() {
                       </td>
                       <td className="py-2 pr-3 text-subtle">{labelForCenter(p.patient.center)}</td>
                       <td className="py-2 pr-3">
-                        {isAdmin ? (
-                          <select
-                            className={`select text-xs ${statusClasses(p.status as PaymentStatus)}`}
-                            value={p.status}
-                            disabled={savingId === p.id}
-                            onChange={(e) => void onChangeStatus(p, e.target.value as PaymentStatus)}
-                          >
-                            {STATUS_OPTIONS.map((s) => (
-                              <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClasses(p.status as PaymentStatus)}`}>
-                            {STATUS_LABEL[p.status as PaymentStatus]}
-                          </span>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {isAdmin ? (
+                            <select
+                              className={`select text-xs ${statusClasses(p.status as PaymentStatus)}`}
+                              value={p.status}
+                              disabled={savingId === p.id}
+                              onChange={(e) => void onChangeStatus(p, e.target.value as PaymentStatus)}
+                            >
+                              {STATUS_OPTIONS.map((s) => (
+                                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClasses(p.status as PaymentStatus)}`}>
+                              {STATUS_LABEL[p.status as PaymentStatus]}
+                            </span>
+                          )}
+                          {p.arrears ? (
+                            <span
+                              className={`rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${arrearsBadgeClasses()}`}
+                              title="Adeudo de meses anteriores"
+                            >
+                              Debe {p.arrears.months} {p.arrears.months === 1 ? "mes" : "meses"} · {formatMoney(p.arrears.amount)}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="py-2 pr-3">{formatMoney(p.amountPaid)}</td>
                       <td className="py-2 pr-3">{formatMoney(p.amountDue)}</td>
