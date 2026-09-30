@@ -684,8 +684,7 @@ export function FollowUpDetailEditor(props: {
             <h2 className="text-lg font-semibold">Cuadrícula</h2>
             {fu.objectives?.length ? (
               <MonthlyFollowUpGrid
-                followUpId={fu.id}
-                objectives={fu.objectives}
+                objectives={(fu.objectives ?? []).map((o) => ({ ...o, followUpId: fu.id }))}
                 sessions={fu.sessions ?? []}
                 onSaved={() => void reload()}
                 readOnly={isLocked}

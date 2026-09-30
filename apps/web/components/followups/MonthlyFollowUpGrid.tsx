@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { formatCalendarDate } from "@/lib/date-utils";
+import { areaChipClass, areaShortLabel } from "@/lib/area-display";
 
 type Mark = { objectiveId: string; code?: string | null; progressScale?: number | null };
 type Session = {
@@ -10,7 +12,30 @@ type Session = {
   therapist?: { id: string; fullName: string };
   marks: Mark[];
 };
-type Objective = { id: string; idx: number; text: string; monthlyNotes?: string | null };
+
+export type GridObjective = {
+  id: string;
+  idx: number;
+  text: string;
+  followUpId: string;
+  monthlyNotes?: string | null;
+  globalNo?: number;
+  areaId?: string;
+  areaName?: string;
+};
+
+export type ProgramSessionColumn = {
+  date: string;
+  entries: { followUpId: string; sessionId: string; areaId: string }[];
+  therapist?: { fullName: string };
+};
+
+export type FlatMark = {
+  sessionId: string;
+  objectiveId: string;
+  code?: string | null;
+  progressScale?: number | null;
+};
 
 const LETTERS = ["V", "E", "F", "R", "X"] as const;
 const ARCHIVED_OBJECTIVE_IDX = 1000;
@@ -18,8 +43,6 @@ const ARCHIVED_OBJECTIVE_IDX = 1000;
 function cellKey(sessionId: string, objectiveId: string) {
   return `${sessionId}:${objectiveId}`;
 }
-
-import { formatCalendarDate } from "@/lib/date-utils";
 
 function formatSessionHeader(iso: string) {
   return formatCalendarDate(iso, { day: "2-digit", month: "short" });
@@ -60,14 +83,64 @@ function buildInitialMarks(sessions: Session[]): Record<string, Mark> {
   return map;
 }
 
+function buildInitialMarksFromFlat(marks: FlatMark[]): Record<string, Mark> {
+  const map: Record<string, Mark> = {};
+  for (const mark of marks) {
+    map[cellKey(mark.sessionId, mark.objectiveId)] = {
+      objectiveId: mark.objectiveId,
+      code: mark.code,
+      progressScale: mark.progressScale,
+    };
+  }
+  return map;
+}
+
+function resolveSessionId(
+  objective: GridObjective,
+  column: ProgramSessionColumn | Session,
+  programMode: boolean,
+): string | undefined {
+  if (!programMode) return (column as Session).id;
+  const col = column as ProgramSessionColumn;
+  return col.entries.find((e) => e.followUpId === objective.followUpId)?.sessionId;
+}
+
+function columnDate(column: ProgramSessionColumn | Session, programMode: boolean): string {
+  if (programMode) return (column as ProgramSessionColumn).date;
+  return (column as Session).sessionDate;
+}
+
+function columnTherapist(column: ProgramSessionColumn | Session, programMode: boolean): string | undefined {
+  if (programMode) return (column as ProgramSessionColumn).therapist?.fullName;
+  return (column as Session).therapist?.fullName;
+}
+
 export function MonthlyFollowUpGrid(props: {
-  followUpId: string;
-  objectives: Objective[];
-  sessions: Session[];
+  objectives: GridObjective[];
+  sessions?: Session[];
+  sessionColumns?: ProgramSessionColumn[];
+  flatMarks?: FlatMark[];
   onSaved: () => Promise<void> | void;
   readOnly?: boolean;
+  showObjectiveNotes?: boolean;
+  programMode?: boolean;
 }) {
-  const { followUpId, objectives, sessions, onSaved, readOnly = false } = props;
+  const {
+    objectives,
+    sessions = [],
+    sessionColumns = [],
+    flatMarks = [],
+    onSaved,
+    readOnly = false,
+    showObjectiveNotes = true,
+    programMode = false,
+  } = props;
+
+  const columns = programMode ? sessionColumns : sessions;
+  const followUpIdsKey = useMemo(
+    () => [...new Set(objectives.map((o) => o.followUpId))].sort().join(","),
+    [objectives],
+  );
 
   const [picker, setPicker] = useState<{ sessionId: string; objectiveId: string } | null>(null);
   const [draftMarks, setDraftMarks] = useState<Record<string, Mark>>({});
@@ -78,7 +151,9 @@ export function MonthlyFollowUpGrid(props: {
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    const initialMarks = buildInitialMarks(sessions);
+    const initialMarks = programMode
+      ? buildInitialMarksFromFlat(flatMarks)
+      : buildInitialMarks(sessions);
     setDraftMarks((prev) => {
       const next = { ...initialMarks };
       for (const [key, mark] of Object.entries(prev)) {
@@ -106,10 +181,10 @@ export function MonthlyFollowUpGrid(props: {
     });
     setSavedNotes(initialNotes);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- preserve local drafts across prop reloads
-  }, [followUpId, objectives, sessions]);
+  }, [followUpIdsKey, objectives, sessions, sessionColumns, flatMarks, programMode]);
 
   const sortedObjectives = useMemo(
-    () => [...objectives].sort((a, b) => a.idx - b.idx),
+    () => [...objectives].sort((a, b) => (a.globalNo ?? a.idx) - (b.globalNo ?? b.idx)),
     [objectives],
   );
 
@@ -123,13 +198,35 @@ export function MonthlyFollowUpGrid(props: {
     [sortedObjectives],
   );
 
-  const notesByObjective = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const o of objectives) {
-      map[o.id] = notesDraft[o.id] ?? o.monthlyNotes ?? "";
+  const areaIdsInOrder = useMemo(() => {
+    const ids: string[] = [];
+    for (const o of activeObjectives) {
+      if (o.areaId && !ids.includes(o.areaId)) ids.push(o.areaId);
     }
+    return ids;
+  }, [activeObjectives]);
+
+  const objectivesByArea = useMemo(() => {
+    const groups: { areaId: string | null; areaName: string | null; items: GridObjective[] }[] = [];
+    let currentAreaId: string | null | undefined = undefined;
+
+    for (const obj of activeObjectives) {
+      const areaId = obj.areaId ?? null;
+      if (areaId !== currentAreaId) {
+        groups.push({ areaId, areaName: obj.areaName ?? null, items: [obj] });
+        currentAreaId = areaId;
+      } else {
+        groups[groups.length - 1]?.items.push(obj);
+      }
+    }
+    return groups;
+  }, [activeObjectives]);
+
+  const followUpByObjective = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of objectives) map.set(o.id, o.followUpId);
     return map;
-  }, [objectives, notesDraft]);
+  }, [objectives]);
 
   const getDraftMark = useCallback(
     (sessionId: string, objectiveId: string) => {
@@ -142,11 +239,13 @@ export function MonthlyFollowUpGrid(props: {
     for (const key of new Set([...Object.keys(draftMarks), ...Object.keys(savedMarks)])) {
       if (!marksEqual(draftMarks[key], savedMarks[key])) return true;
     }
-    for (const o of objectives) {
-      if ((notesDraft[o.id] ?? "") !== (savedNotes[o.id] ?? "")) return true;
+    if (showObjectiveNotes) {
+      for (const o of objectives) {
+        if ((notesDraft[o.id] ?? "") !== (savedNotes[o.id] ?? "")) return true;
+      }
     }
     return false;
-  }, [draftMarks, savedMarks, notesDraft, savedNotes, objectives]);
+  }, [draftMarks, savedMarks, notesDraft, savedNotes, objectives, showObjectiveNotes]);
 
   function setDraftCell(sessionId: string, objectiveId: string, payload: { code?: string; progressScale?: number } | null) {
     const key = cellKey(sessionId, objectiveId);
@@ -177,6 +276,9 @@ export function MonthlyFollowUpGrid(props: {
         const colon = key.indexOf(":");
         const sessionId = key.slice(0, colon);
         const objectiveId = key.slice(colon + 1);
+        const followUpId = followUpByObjective.get(objectiveId);
+        if (!followUpId) continue;
+
         const payload = markPayload(draft);
         markJobs.push(
           apiFetch(`/followups/${followUpId}/sessions/${sessionId}/marks`, {
@@ -192,17 +294,22 @@ export function MonthlyFollowUpGrid(props: {
         );
       }
 
-      const noteChanges = objectives
-        .filter((o) => (notesDraft[o.id] ?? "") !== (savedNotes[o.id] ?? ""))
-        .map((o) => ({ objectiveId: o.id, monthlyNotes: notesDraft[o.id] ?? "" }));
-
-      if (noteChanges.length) {
-        markJobs.push(
-          apiFetch(`/followups/${followUpId}/objective-notes`, {
-            method: "PATCH",
-            body: JSON.stringify({ notes: noteChanges }),
-          }),
-        );
+      if (showObjectiveNotes) {
+        const notesByFollowUp = new Map<string, { objectiveId: string; monthlyNotes: string }[]>();
+        for (const o of objectives) {
+          if ((notesDraft[o.id] ?? "") === (savedNotes[o.id] ?? "")) continue;
+          const list = notesByFollowUp.get(o.followUpId) ?? [];
+          list.push({ objectiveId: o.id, monthlyNotes: notesDraft[o.id] ?? "" });
+          notesByFollowUp.set(o.followUpId, list);
+        }
+        for (const [followUpId, notes] of notesByFollowUp) {
+          markJobs.push(
+            apiFetch(`/followups/${followUpId}/objective-notes`, {
+              method: "PATCH",
+              body: JSON.stringify({ notes }),
+            }),
+          );
+        }
       }
 
       await Promise.all(markJobs);
@@ -214,48 +321,82 @@ export function MonthlyFollowUpGrid(props: {
     }
   }
 
-  function renderObjectiveRow(obj: Objective, archived = false) {
+  function renderObjectiveRow(obj: GridObjective, archived = false, showAreaSeparator = false) {
+    const displayNo = obj.globalNo ?? obj.idx;
+    const chipLabel = obj.areaName ? areaShortLabel(obj.areaName) : null;
+    const chipClass = obj.areaId ? areaChipClass(obj.areaId, areaIdsInOrder) : "";
+
     return (
-      <tr key={obj.id} className="border-b border-border last:border-b-0">
-        <td className="sticky left-0 z-10 max-w-[260px] border-r border-border bg-card px-3 py-2 align-top text-xs leading-snug">
-          {archived ? (
-            <span className="mr-1 rounded bg-warning/20 px-1 text-[10px] font-semibold text-warning">Archivado</span>
-          ) : null}
-          <span className="font-medium text-primary">{obj.idx}.</span> {obj.text}
-        </td>
-        {sessions.map((s) => {
-          const mark = getDraftMark(s.id, obj.id);
-          const active = picker?.sessionId === s.id && picker?.objectiveId === obj.id;
-          return (
-            <td key={s.id} className="border-r border-border p-0 text-center last:border-r-0">
-              <button
-                type="button"
-                disabled={busy || readOnly}
-                className={
-                  active
-                    ? "h-10 w-full bg-primary/20 font-bold text-primary ring-2 ring-inset ring-primary"
-                    : "h-10 w-full bg-transparent font-semibold text-ink hover:bg-primary/10"
-                }
-                onClick={() => !readOnly && setPicker({ sessionId: s.id, objectiveId: obj.id })}
-              >
-                {cellLabel(mark) || "·"}
-              </button>
+      <Fragment key={obj.id}>
+        {showAreaSeparator ? (
+          <tr className="border-b border-border bg-surface-elevated/50">
+            <td
+              colSpan={columns.length + (showObjectiveNotes ? 2 : 1)}
+              className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-subtle"
+            >
+              {obj.areaName}
             </td>
-          );
-        })}
-        <td className="px-2 py-1 align-top">
-          <textarea
-            className="textarea min-h-[64px] text-xs"
-            disabled={busy || readOnly}
-            onChange={(e) => setNotesDraft((prev) => ({ ...prev, [obj.id]: e.target.value }))}
-            placeholder="Notas del mes para este objetivo…"
-          />
-        </td>
-      </tr>
+          </tr>
+        ) : null}
+        <tr key={obj.id} className="border-b border-border last:border-b-0">
+          <td className="sticky left-0 z-10 max-w-[280px] border-r border-border bg-card px-3 py-2 align-top text-xs leading-snug">
+            <div className="flex flex-wrap items-start gap-1.5">
+              {chipLabel && obj.areaId ? (
+                <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${chipClass}`}>
+                  {chipLabel}
+                </span>
+              ) : null}
+              <span>
+                {archived ? (
+                  <span className="mr-1 rounded bg-warning/20 px-1 text-[10px] font-semibold text-warning">Archivado</span>
+                ) : null}
+                <span className="font-medium text-primary">{displayNo}.</span> {obj.text}
+              </span>
+            </div>
+          </td>
+          {columns.map((col) => {
+            const sessionId = resolveSessionId(obj, col, programMode);
+            const dateKey = columnDate(col, programMode);
+            const mark = sessionId ? getDraftMark(sessionId, obj.id) : null;
+            const active = sessionId != null && picker?.sessionId === sessionId && picker?.objectiveId === obj.id;
+            return (
+              <td key={dateKey} className="border-r border-border p-0 text-center last:border-r-0">
+                {sessionId ? (
+                  <button
+                    type="button"
+                    disabled={busy || readOnly}
+                    className={
+                      active
+                        ? "h-10 w-full bg-primary/20 font-bold text-primary ring-2 ring-inset ring-primary"
+                        : "h-10 w-full bg-transparent font-semibold text-ink hover:bg-primary/10"
+                    }
+                    onClick={() => !readOnly && setPicker({ sessionId, objectiveId: obj.id })}
+                  >
+                    {cellLabel(mark) || "·"}
+                  </button>
+                ) : (
+                  <span className="inline-flex h-10 w-full items-center justify-center text-subtle/40">—</span>
+                )}
+              </td>
+            );
+          })}
+          {showObjectiveNotes ? (
+            <td className="px-2 py-1 align-top">
+              <textarea
+                className="textarea min-h-[64px] text-xs"
+                value={notesDraft[obj.id] ?? obj.monthlyNotes ?? ""}
+                disabled={busy || readOnly}
+                onChange={(e) => setNotesDraft((prev) => ({ ...prev, [obj.id]: e.target.value }))}
+                placeholder="Notas del mes para este objetivo…"
+              />
+            </td>
+          ) : null}
+        </tr>
+      </Fragment>
     );
   }
 
-  if (!sessions.length) {
+  if (!columns.length) {
     return (
       <p className="rounded-lg border border-dashed border-border bg-surface-elevated/50 px-4 py-8 text-center text-sm text-subtle">
         Registre la primera sesión del mes para generar las columnas de la cuadrícula.
@@ -289,26 +430,38 @@ export function MonthlyFollowUpGrid(props: {
               <th className="sticky left-0 z-10 min-w-[200px] border-r border-border bg-card px-3 py-2.5 text-left font-semibold text-subtle">
                 Objetivo
               </th>
-              {sessions.map((s) => (
-                <th
-                  key={s.id}
-                  className="min-w-[72px] border-r border-border px-2 py-2.5 text-center font-medium text-subtle last:border-r-0"
-                  title={s.therapist?.fullName}
-                >
-                  <span className="block text-xs font-semibold text-ink">{formatSessionHeader(s.sessionDate)}</span>
-                  {s.therapist ? (
-                    <span className="mt-0.5 block truncate text-[10px] font-normal opacity-70">
-                      {s.therapist.fullName.split(" ")[0]}
-                    </span>
-                  ) : null}
-                </th>
-              ))}
-              <th className="min-w-[180px] px-3 py-2.5 text-left font-semibold text-subtle">Observaciones del objetivo</th>
+              {columns.map((col) => {
+                const date = columnDate(col, programMode);
+                const therapist = columnTherapist(col, programMode);
+                return (
+                  <th
+                    key={date}
+                    className="min-w-[72px] border-r border-border px-2 py-2.5 text-center font-medium text-subtle last:border-r-0"
+                    title={therapist}
+                  >
+                    <span className="block text-xs font-semibold text-ink">{formatSessionHeader(date)}</span>
+                    {therapist ? (
+                      <span className="mt-0.5 block truncate text-[10px] font-normal opacity-70">
+                        {therapist.split(" ")[0]}
+                      </span>
+                    ) : null}
+                  </th>
+                );
+              })}
+              {showObjectiveNotes ? (
+                <th className="min-w-[180px] px-3 py-2.5 text-left font-semibold text-subtle">Observaciones del objetivo</th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
-            {activeObjectives.map((obj) => renderObjectiveRow(obj))}
-            {archivedObjectives.map((obj) => renderObjectiveRow(obj, true))}
+            {programMode
+              ? objectivesByArea.flatMap((group, groupIdx) =>
+                  group.items.map((obj, itemIdx) =>
+                    renderObjectiveRow(obj, false, programMode && groupIdx > 0 && itemIdx === 0),
+                  ),
+                )
+              : activeObjectives.map((obj) => renderObjectiveRow(obj))}
+            {!programMode ? archivedObjectives.map((obj) => renderObjectiveRow(obj, true)) : null}
           </tbody>
         </table>
       </div>

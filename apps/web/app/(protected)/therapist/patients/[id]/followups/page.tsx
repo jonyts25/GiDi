@@ -32,6 +32,14 @@ export default function TherapistPatientFollowUpsPage() {
   const [pickedAreaId, setPickedAreaId] = useState("");
   const [therapistId, setTherapistId] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
+  const [programBusy, setProgramBusy] = useState(false);
+
+  const currentMonthLabel = useMemo(
+    () => new Date().toLocaleDateString("es-MX", { month: "long" }),
+    [],
+  );
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
 
   const canCreate = useMemo(() => pickedAreaId && therapistId, [pickedAreaId, therapistId]);
 
@@ -74,6 +82,29 @@ export default function TherapistPatientFollowUpsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId, year, month, therapistId, allMonths]);
 
+  async function openCurrentProgram() {
+    if (!therapistId) return;
+    setProgramBusy(true);
+    setMsg("");
+    try {
+      const program = await apiFetch("/programs", {
+        method: "POST",
+        body: JSON.stringify({
+          patientId,
+          therapistId,
+          periodYear: currentYear,
+          periodMonth: currentMonth,
+        }),
+      });
+      sessionStorage.setItem("gidi_program_patient", patientId);
+      router.push(`/therapist/programs/${program.id}`);
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error");
+    } finally {
+      setProgramBusy(false);
+    }
+  }
+
   async function onCreate() {
     setMsg("");
     try {
@@ -106,7 +137,16 @@ export default function TherapistPatientFollowUpsPage() {
       </div>
 
       <section className="card space-y-3">
-        <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          className="btn-primary w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto"
+          disabled={!therapistId || programBusy}
+          onClick={() => void openCurrentProgram()}
+        >
+          {programBusy ? "Abriendo…" : `Programación de ${currentMonthLabel}`}
+        </button>
+
+        <div className="flex flex-wrap gap-3 border-t border-border pt-4">
           <label className="grid gap-1 text-sm">
             <span className="text-subtle">Año</span>
             <input className="input w-28" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} />
@@ -136,8 +176,8 @@ export default function TherapistPatientFollowUpsPage() {
               </option>
             ))}
           </select>
-          <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" disabled={!canCreate} onClick={onCreate}>
-            + Crear nuevo
+          <button type="button" className="btn rounded-xl px-4 py-2 text-sm font-semibold" disabled={!canCreate} onClick={onCreate}>
+            + Crear seguimiento por área
           </button>
         </div>
         {msg ? <p className="text-sm text-subtle">{msg}</p> : null}
