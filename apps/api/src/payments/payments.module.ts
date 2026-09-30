@@ -4,10 +4,11 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { PaymentsController } from "./payments.controller";
 import { AdminPaymentsController } from "./admin-payments.controller";
 import { PaymentsService } from "./payments.service";
+import { IncomeService } from "./income.service";
 
 @Module({
   imports: [AuthModule, PrismaModule],
   controllers: [PaymentsController, AdminPaymentsController],
-  providers: [PaymentsService],
+  providers: [PaymentsService, IncomeService],
 })
 export class PaymentsModule {}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  canViewRevenueOverview,
+  canRegisterIncome,
   hasFullAdminRole,
   hasOfficeStaffRole,
   hasParentPortalAccess,
@@ -71,7 +71,7 @@ export default function Dashboard() {
           <Link className="btn" href="/admin/announcements">
             Avisos
           </Link>
-          {canViewRevenueOverview(roles) ? (
+          {canRegisterIncome(roles) ? (
             <Link className="btn" href="/admin/payments">
               Ingresos
             </Link>

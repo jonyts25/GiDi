@@ -14,6 +14,7 @@ import {
   type PaymentRow,
   type TransferInfo,
 } from "@/components/payments/payment-helpers";
+import { formatShortDate } from "@/lib/income-helpers";
 
 type PaymentsView = {
   patient: { id: string; firstName: string; lastName: string; center: string };
@@ -157,10 +158,23 @@ export default function ParentPaymentsPage() {
                       <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-subtle">
                         <span>Mensualidad: <strong className="text-ink">{formatMoney(p.amountDue)}</strong></span>
                         <span>Pagado: <strong className="text-ink">{formatMoney(p.amountPaid)}</strong></span>
-                        {saldo > 0 ? <span>Saldo: <strong className="text-danger">{formatMoney(saldo)}</strong></span> : null}
-                        {p.paidAt ? <span>Fecha: {new Date(p.paidAt).toLocaleDateString("es-MX")}</span> : null}
+                        {saldo > 0 ? (
+                          <span>Pendiente: <strong className="text-danger">{formatMoney(saldo)}</strong></span>
+                        ) : null}
                       </div>
-                      {p.notes ? <p className="text-xs text-subtle">{p.notes}</p> : null}
+
+                      {p.entries && p.entries.length > 0 ? (
+                        <ul className="space-y-1 border-t border-border pt-2 text-sm">
+                          {p.entries.map((entry, idx) => (
+                            <li key={`${p.id}-${idx}`} className="text-subtle">
+                              {formatShortDate(entry.receivedAt)} · {formatMoney(entry.amount)} · {entry.method}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-xs text-subtle">Sin pagos registrados este mes.</p>
+                      )}
+
                       <div className="flex flex-wrap items-center gap-3 pt-1">
                         <button
                           type="button"

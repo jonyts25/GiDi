@@ -12,10 +12,10 @@ import {
   MONTHLY_BILLING_LABEL,
   type MonthlyBillingStatus,
   type PaymentRow,
-  type PaymentStatus,
 } from "@/components/payments/payment-helpers";
 import { GIDI_CENTER_OPTIONS } from "@/lib/centers";
 import { suggestedMonthly } from "@/lib/payment-rates";
+import { formatShortDate } from "@/lib/income-helpers";
 
 type PaymentsView = {
   patient: { id: string; firstName: string; lastName: string; center: string };
@@ -29,10 +29,6 @@ type PaymentsView = {
   payments: PaymentRow[];
 };
 
-const STATUS_OPTIONS: PaymentStatus[] = ["PENDIENTE", "PAGADO", "PARCIAL", "DEUDA", "PAUSA_VACACIONES"];
-
-const now = new Date();
-
 export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
   const [data, setData] = useState<PaymentsView | null>(null);
   const [msg, setMsg] = useState("");
@@ -41,16 +37,6 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
   const [discountPercent, setDiscountPercent] = useState<string>("0");
   const [center, setCenter] = useState<string>("SAN_AGUSTIN");
   const [monthlyBillingStatus, setMonthlyBillingStatus] = useState<MonthlyBillingStatus>("NORMAL");
-
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [amountDue, setAmountDue] = useState("");
-  const [amountPaid, setAmountPaid] = useState("");
-  const [status, setStatus] = useState<PaymentStatus>("PENDIENTE");
-  const [paidAt, setPaidAt] = useState("");
-  const [method, setMethod] = useState("");
-  const [reference, setReference] = useState("");
-  const [notes, setNotes] = useState("");
 
   const reload = useCallback(async () => {
     const res = (await apiFetch(`/patients/${patientId}/payments`)) as PaymentsView;
@@ -71,17 +57,6 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
     void reload().catch((e: unknown) => setMsg(e instanceof Error ? e.message : "Error"));
   }, [patientId, reload]);
 
-  // Recalcular monto a pagar al cambiar frecuencia o descuento (no en pago por sesión).
-  useEffect(() => {
-    if (status === "PAUSA_VACACIONES") return;
-    if (sessionsPerWeek === "" || sessionsPerWeek === "0") {
-      if (sessionsPerWeek === "0") setAmountDue("");
-      return;
-    }
-    const suggested = suggestedMonthly(Number(sessionsPerWeek), Number(discountPercent) || 0);
-    if (suggested != null) setAmountDue(String(suggested));
-  }, [sessionsPerWeek, discountPercent, status]);
-
   async function onSaveBilling() {
     setMsg("");
     try {
@@ -99,66 +74,6 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
           res.suggestedMonthly != null ? formatMoney(res.suggestedMonthly) : sessionsPerWeek === "0" ? "pago por sesión (variable)" : "—"
         }`,
       );
-      await reload();
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : "Error");
-    }
-  }
-
-  function onStatusChange(next: PaymentStatus) {
-    setStatus(next);
-    if (next === "PAUSA_VACACIONES") {
-      setAmountDue("0");
-      setAmountPaid("0");
-    }
-  }
-
-  function loadRow(p: PaymentRow) {
-    setYear(p.periodYear);
-    setMonth(p.periodMonth);
-    setAmountDue(String(p.amountDue));
-    setAmountPaid(String(p.amountPaid));
-    setStatus(p.status);
-    setPaidAt(p.paidAt ? p.paidAt.slice(0, 10) : "");
-    setMethod(p.method ?? "");
-    setReference(p.reference ?? "");
-    setNotes(p.notes ?? "");
-  }
-
-  async function onSaveMonth() {
-    setMsg("");
-    try {
-      const pause = status === "PAUSA_VACACIONES";
-      await apiFetch(`/admin/patients/${patientId}/payments/${year}/${month}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          amountDue: pause ? 0 : amountDue === "" ? undefined : Number(amountDue),
-          amountPaid: pause ? 0 : amountPaid === "" ? undefined : Number(amountPaid),
-          status,
-          paidAt: paidAt || undefined,
-          method: method || undefined,
-          reference: reference || undefined,
-          notes: notes || undefined,
-        }),
-      });
-      setMsg("✅ Mensualidad guardada");
-      await reload();
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : "Error");
-    }
-  }
-
-  async function quickPaid(p: PaymentRow) {
-    setMsg("");
-    try {
-      await apiFetch(`/admin/patients/${patientId}/payments/${p.periodYear}/${p.periodMonth}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          status: "PAGADO",
-          amountPaid: p.amountDue,
-          paidAt: new Date().toISOString().slice(0, 10),
-        }),
-      });
       await reload();
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error");
@@ -203,7 +118,6 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
 
       {msg ? <p className={`text-sm ${msg.includes("✅") ? "text-success" : "text-danger"}`}>{msg}</p> : null}
 
-      {/* Configuración de cobro */}
       <div className="space-y-3 rounded-xl border border-border bg-surface/50 p-4">
         <h3 className="text-sm font-bold">Configuración de cobro</h3>
         <div className="flex flex-wrap items-end gap-3">
@@ -253,7 +167,7 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
             Guardar cobro
           </button>
           {sessionsPerWeek === "0" ? (
-            <span className="text-sm text-subtle">Monto variable por sesión (déjalo en blanco al registrar el mes).</span>
+            <span className="text-sm text-subtle">Monto variable por sesión.</span>
           ) : liveSuggested != null ? (
             <span className="text-sm text-subtle">
               Mensualidad sugerida: <strong className="text-ink">{formatMoney(liveSuggested)}</strong>
@@ -272,122 +186,47 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
       </div>
 
       {monthlyBillingStatus === "NO_INTEGRADO" ? null : (
-      <>
-      {/* Editor de mes */}
-      <div className="space-y-3 rounded-xl border border-border bg-surface/50 p-4">
-        <h3 className="text-sm font-bold">Registrar / editar mensualidad</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Año</span>
-            <input className="input" type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Mes</span>
-            <select className="select" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-              {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {new Date(2000, i, 1).toLocaleDateString("es-MX", { month: "long" })}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Monto a pagar</span>
-            <input
-              className="input"
-              type="number"
-              value={amountDue}
-              onChange={(e) => setAmountDue(e.target.value)}
-              placeholder={sessionsPerWeek === "0" ? "Variable / por sesión" : "Proporcional o mensualidad"}
-              disabled={status === "PAUSA_VACACIONES"}
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Monto pagado</span>
-            <input
-              className="input"
-              type="number"
-              value={amountPaid}
-              onChange={(e) => setAmountPaid(e.target.value)}
-              disabled={status === "PAUSA_VACACIONES"}
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Estado</span>
-            <select className="select" value={status} onChange={(e) => onStatusChange(e.target.value as PaymentStatus)}>
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Fecha de pago</span>
-            <input className="input" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Forma de pago</span>
-            <input className="input" value={method} onChange={(e) => setMethod(e.target.value)} placeholder="Transferencia, efectivo…" />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Referencia</span>
-            <input className="input" value={reference} onChange={(e) => setReference(e.target.value)} />
-          </label>
-          <label className="grid gap-1 text-sm sm:col-span-2">
-            <span className="text-subtle">Notas</span>
-            <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej. proporcional por enfermedad" />
-          </label>
+        <div className="space-y-2">
+          <h3 className="text-sm font-bold">Historial</h3>
+          {!data?.payments.length ? (
+            <p className="text-sm text-subtle">Sin mensualidades registradas.</p>
+          ) : (
+            <ul className="space-y-3">
+              {data.payments.map((p) => {
+                const saldo = Math.max(p.amountDue - p.amountPaid, 0);
+                return (
+                  <li key={p.id} className="rounded-lg border border-border px-3 py-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium capitalize">{monthLabel(p.periodYear, p.periodMonth)}</span>
+                      <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClasses(p.status)}`}>
+                        {STATUS_LABEL[p.status]}
+                      </span>
+                      <span className="text-subtle">
+                        {formatMoney(p.amountPaid)} / {formatMoney(p.amountDue)}
+                        {saldo > 0 ? ` · pendiente ${formatMoney(saldo)}` : ""}
+                      </span>
+                      {p.receiptName ? (
+                        <button type="button" className="text-xs text-info hover:underline" onClick={() => void viewReceipt(p)}>
+                          Ver comprobante
+                        </button>
+                      ) : null}
+                    </div>
+                    {p.entries && p.entries.length > 0 ? (
+                      <ul className="mt-2 space-y-1 border-t border-border pt-2 text-xs text-subtle">
+                        {p.entries.map((entry, idx) => (
+                          <li key={`${p.id}-${idx}`}>
+                            {formatShortDate(entry.receivedAt)} · {formatMoney(entry.amount)} · {entry.method}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {p.notes ? <p className="mt-2 text-xs text-subtle">{p.notes}</p> : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
-        {status === "PAUSA_VACACIONES" ? (
-          <p className="text-sm text-subtle">Pauso/Vacaciones: se registra con debe 0 y paga 0.</p>
-        ) : null}
-        <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onSaveMonth()}>
-          Guardar mensualidad
-        </button>
-      </div>
-
-      {/* Lista de meses */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-bold">Historial</h3>
-        {!data?.payments.length ? (
-          <p className="text-sm text-subtle">Sin mensualidades registradas.</p>
-        ) : (
-          <ul className="space-y-2">
-            {data.payments.map((p) => {
-              const saldo = Math.max(p.amountDue - p.amountPaid, 0);
-              return (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium capitalize">{monthLabel(p.periodYear, p.periodMonth)}</span>
-                    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusClasses(p.status)}`}>
-                      {STATUS_LABEL[p.status]}
-                    </span>
-                    <span className="text-subtle">
-                      {formatMoney(p.amountPaid)} / {formatMoney(p.amountDue)}
-                      {saldo > 0 ? ` · saldo ${formatMoney(saldo)}` : ""}
-                    </span>
-                  </span>
-                  <span className="flex flex-wrap items-center gap-2">
-                    {p.receiptName ? (
-                      <button type="button" className="text-xs text-info hover:underline" onClick={() => void viewReceipt(p)}>
-                        Ver comprobante
-                      </button>
-                    ) : null}
-                    {p.status !== "PAGADO" && p.status !== "PAUSA_VACACIONES" ? (
-                      <button type="button" className="rounded-lg border border-success/40 px-2 py-1 text-xs text-success hover:bg-success/10" onClick={() => void quickPaid(p)}>
-                        Marcar pagado
-                      </button>
-                    ) : null}
-                    <button type="button" className="btn rounded-lg px-2 py-1 text-xs" onClick={() => loadRow(p)}>
-                      Editar
-                    </button>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-      </>
       )}
     </section>
   );

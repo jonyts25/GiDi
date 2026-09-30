@@ -38,6 +38,8 @@ model User {
 
   paymentsCreated Payment[] @relation("PaymentCreatedBy")
 
+  incomeEntriesCreated IncomeEntry[] @relation("IncomeEntryCreatedBy")
+
   lastLoginAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -113,6 +115,8 @@ model Patient {
 
   /// Excluye al paciente de mensualidades sin darlo de baja clínica.
   monthlyBillingStatus MonthlyBillingStatus @default(NORMAL)
+  /// Notas persistentes de cobro (visible en hoja mensual).
+  billingNotes String?
 
   parents     ParentPatient[]
   assignments PatientTherapist[]
@@ -121,6 +125,7 @@ model Patient {
   followUps FollowUp[]
   documents PatientDocument[]
   payments  Payment[]
+  incomeEntries IncomeEntry[]
 
   appointmentRequests AppointmentRequest[]
 
@@ -439,6 +444,53 @@ enum PaymentStatus {
 enum MonthlyBillingStatus {
   NORMAL
   NO_INTEGRADO
+}
+
+enum IncomeConcept {
+  MENSUALIDAD
+  EVALUACION
+  REVALORACION
+  SESION_INDIVIDUAL
+  VISITA_ESCUELA
+  PROTEINA
+  OTRO
+}
+
+enum IncomeMethod {
+  EFECTIVO
+  BANORTE_TRANSFERENCIA
+  BANORTE_TERMINAL
+  STP
+  MERCADO_PAGO_TRANSFERENCIA
+  MERCADO_PAGO_TERMINAL
+  OTRO
+}
+
+/// Registro de ingreso recibido (abonos y otros conceptos).
+model IncomeEntry {
+  id          String        @id @default(uuid()) @db.Uuid
+  center      GidiCenter
+  receivedAt  DateTime
+  concept     IncomeConcept
+  patientId   String?       @db.Uuid
+  payerName   String?
+  amount      Decimal       @db.Decimal(10, 2)
+  periodYear  Int?
+  periodMonth Int?
+  method      IncomeMethod
+  invoiced    Boolean       @default(false)
+  notes       String?
+  createdById String?       @db.Uuid
+
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  createdBy User?    @relation("IncomeEntryCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([center, receivedAt])
+  @@index([patientId, periodYear, periodMonth])
+  @@index([concept])
 }
 
 /// Mensualidad de un paciente por mes.
