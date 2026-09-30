@@ -99,4 +99,18 @@ export const AREA_CATALOG: AreaCatalogEntry[] = [
     sortOrder: 52,
     trackingMode: AreaTrackingMode.MONTHLY_GRID,
   },
+  {
+    key: "ESCRITURA",
+    name: "Escritura",
+    category: "Aprendizaje",
+    sortOrder: 53,
+    trackingMode: AreaTrackingMode.MONTHLY_GRID,
+  },
+  {
+    key: "MATEMATICAS",
+    name: "Matemáticas",
+    category: "Aprendizaje",
+    sortOrder: 54,
+    trackingMode: AreaTrackingMode.MONTHLY_GRID,
+  },
 ];
