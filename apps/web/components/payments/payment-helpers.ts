@@ -2,6 +2,12 @@ export type PaymentStatus = "PENDIENTE" | "PAGADO" | "PARCIAL" | "DEUDA" | "PAUS
 
 export type MonthlyBillingStatus = "NORMAL" | "NO_INTEGRADO";
 
+export type PaymentEntryRow = {
+  receivedAt: string;
+  amount: number;
+  method: string;
+};
+
 export type PaymentRow = {
   id: string;
   periodYear: number;
@@ -15,6 +21,7 @@ export type PaymentRow = {
   notes?: string | null;
   receiptName?: string | null;
   receiptUploadedAt?: string | null;
+  entries?: PaymentEntryRow[];
 };
 
 export type PatientArrears = { months: number; amount: number };

@@ -36,6 +36,10 @@ export function canViewRevenueOverview(roles: string[] = []): boolean {
   return hasFullAdminRole(roles);
 }
 
+export function canRegisterIncome(roles: string[] = []): boolean {
+  return hasFullAdminRole(roles) || roles.includes("SECRETARY");
+}
+
 export function labelForRole(role: string): string {
   return ROLE_LABELS[role] ?? role;
 }
