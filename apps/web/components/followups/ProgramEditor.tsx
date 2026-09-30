@@ -782,7 +782,9 @@ export function ProgramEditor(props: {
             )}
             sessionColumns={sessionColumns}
             flatMarks={flatMarks}
-            onSaved={() => reload()}
+            onSaved={() => {
+              void reload();
+            }}
             onToast={showToast}
             readOnly={isLocked}
             showObjectiveNotes={false}

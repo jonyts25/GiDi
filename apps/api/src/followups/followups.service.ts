@@ -225,15 +225,12 @@ export class FollowUpsService {
     });
   }
 
-  private groupSummaryItems(
-    followUps: {
-      id: string;
+  private groupSummaryItems<
+    T extends Parameters<FollowUpsService["buildSummaryCard"]>[0] & {
       programId: string | null;
-      periodYear: number;
-      periodMonth: number;
       therapist: { id: string; fullName: string };
-    }[],
-  ) {
+    },
+  >(followUps: T[]) {
     type SummaryCard = ReturnType<FollowUpsService["buildSummaryCard"]>;
     type ProgramGroup = {
       programId: string;
@@ -247,7 +244,7 @@ export class FollowUpsService {
     const seenPrograms = new Set<string>();
 
     for (const fu of followUps) {
-      const card = this.buildSummaryCard(fu as Parameters<FollowUpsService["buildSummaryCard"]>[0]);
+      const card = this.buildSummaryCard(fu);
       if (!fu.programId) {
         items.push(card);
         continue;
@@ -260,9 +257,7 @@ export class FollowUpsService {
         therapistName: fu.therapist.fullName,
         periodYear: fu.periodYear,
         periodMonth: fu.periodMonth,
-        areas: programFollowUps.map((row) =>
-          this.buildSummaryCard(row as Parameters<FollowUpsService["buildSummaryCard"]>[0]),
-        ),
+        areas: programFollowUps.map((row) => this.buildSummaryCard(row)),
       });
     }
 
