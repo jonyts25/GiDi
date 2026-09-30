@@ -407,6 +407,7 @@ export class FollowUpsService {
         id: o.id,
         idx: o.idx,
         text: o.text,
+        activities: o.activities,
         monthlyNotes: o.monthlyNotes,
       })),
       sessions: fu.sessions.map((s) => ({
@@ -461,6 +462,18 @@ export class FollowUpsService {
       await this.ensureSingleTherapistAssignment(dto.patientId, therapistId);
     }
 
+    const programId =
+      area.trackingMode === "MONTHLY_GRID"
+        ? (
+            await this.getOrCreateProgramRecord(
+              dto.patientId,
+              therapistId,
+              dto.periodYear,
+              dto.periodMonth,
+            )
+          ).id
+        : null;
+
     const { prevYear, prevMonth } = previousCalendarMonth(dto.periodYear, dto.periodMonth);
 
     const prevFu = await this.prisma.followUp.findFirst({
@@ -484,6 +497,7 @@ export class FollowUpsService {
           patientId: dto.patientId,
           therapistId,
           areaId: dto.areaId,
+          programId,
           periodYear: dto.periodYear,
           periodMonth: dto.periodMonth,
           generalGoal: dto.generalGoal ?? null,
@@ -566,7 +580,30 @@ export class FollowUpsService {
 
   async replaceObjectives(user: AuthUser, id: string, dto: ReplaceObjectivesDto) {
     await this.access.assertCanEditFollowUp(user, id);
+    await this.replaceObjectivesInternal(
+      id,
+      dto.objectives.map((text) => ({ text })),
+    );
+    return this.get(user, id);
+  }
 
+  /** Reemplaza objetivos (texto y actividades opcionales). Usado por programación individual. */
+  async replaceObjectivesWithMeta(
+    user: AuthUser,
+    followUpId: string,
+    objectives: { id?: string; text: string; activities?: string | null }[],
+    options?: { skipAccessCheck?: boolean },
+  ) {
+    if (!options?.skipAccessCheck) {
+      await this.access.assertCanEditFollowUp(user, followUpId);
+    }
+    return this.replaceObjectivesInternal(followUpId, objectives);
+  }
+
+  private async replaceObjectivesInternal(
+    id: string,
+    objectives: { id?: string; text: string; activities?: string | null }[],
+  ) {
     const fu = await this.prisma.followUp.findUnique({
       where: { id },
       include: {
@@ -577,25 +614,36 @@ export class FollowUpsService {
     });
     if (!fu) throw new NotFoundException("FollowUp not found");
 
-    const newTexts = dto.objectives.map((t) => t.trim()).filter(Boolean);
+    const normalized = objectives
+      .map((o) => ({
+        id: o.id,
+        text: o.text.trim(),
+        activities: o.activities ?? null,
+      }))
+      .filter((o) => o.text.length > 0);
+
     const usedIds = new Set<string>();
 
-    for (let i = 0; i < newTexts.length; i++) {
-      const text = newTexts[i];
+    for (let i = 0; i < normalized.length; i++) {
+      const { id: objectiveId, text, activities } = normalized[i];
       const idx = i + 1;
-      const match =
+
+      let match =
+        (objectiveId
+          ? fu.objectives.find((o) => o.id === objectiveId && o.idx < ARCHIVED_OBJECTIVE_IDX)
+          : undefined) ??
         fu.objectives.find((o) => !usedIds.has(o.id) && o.text === text && o.idx < ARCHIVED_OBJECTIVE_IDX) ??
         fu.objectives.find((o) => !usedIds.has(o.id) && o.idx === idx && o.idx < ARCHIVED_OBJECTIVE_IDX);
 
       if (match) {
         await this.prisma.followUpObjective.update({
           where: { id: match.id },
-          data: { text, idx },
+          data: { text, idx, activities },
         });
         usedIds.add(match.id);
       } else {
         const created = await this.prisma.followUpObjective.create({
-          data: { followUpId: id, idx, text },
+          data: { followUpId: id, idx, text, activities },
         });
         usedIds.add(created.id);
       }
@@ -614,7 +662,7 @@ export class FollowUpsService {
       }
     }
 
-    return this.get(user, id);
+    return { ok: true };
   }
 
   async updateObjectiveNotes(user: AuthUser, id: string, dto: UpdateObjectiveNotesDto) {
@@ -700,6 +748,26 @@ export class FollowUpsService {
     }
 
     return this.get(user, followUpId);
+  }
+
+  private async getOrCreateProgramRecord(
+    patientId: string,
+    therapistId: string,
+    periodYear: number,
+    periodMonth: number,
+  ) {
+    return this.prisma.followUpProgram.upsert({
+      where: {
+        patientId_therapistId_periodYear_periodMonth: {
+          patientId,
+          therapistId,
+          periodYear,
+          periodMonth,
+        },
+      },
+      create: { patientId, therapistId, periodYear, periodMonth },
+      update: {},
+    });
   }
 
   private async ensureSingleTherapistAssignment(patientId: string, therapistId: string) {

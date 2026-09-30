@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { filterAreasForUserRoles } from "@/lib/area-permissions";
+import { resolveTrackingMode } from "@/lib/followup-area";
 import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
@@ -38,6 +39,19 @@ export default function AdminPatientFollowUpsPage() {
   const [pickedAreaId, setPickedAreaId] = useState("");
   const [pickedTherapistId, setPickedTherapistId] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
+  const [programBusy, setProgramBusy] = useState(false);
+
+  const currentMonthLabel = useMemo(
+    () => new Date().toLocaleDateString("es-MX", { month: "long" }),
+    [],
+  );
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  const textOnlyAreas = useMemo(
+    () => areas.filter((a) => resolveTrackingMode(a) === "TEXT_ONLY"),
+    [areas],
+  );
 
   const canCreate = useMemo(() => pickedAreaId && pickedTherapistId, [pickedAreaId, pickedTherapistId]);
 
@@ -81,6 +95,32 @@ export default function AdminPatientFollowUpsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId, year, month, allMonths]);
+
+  async function openCurrentProgram() {
+    if (!pickedTherapistId) {
+      setMsg("Seleccione un terapeuta para abrir la programación.");
+      return;
+    }
+    setProgramBusy(true);
+    setMsg("");
+    try {
+      const program = await apiFetch("/programs", {
+        method: "POST",
+        body: JSON.stringify({
+          patientId,
+          therapistId: pickedTherapistId,
+          periodYear: currentYear,
+          periodMonth: currentMonth,
+        }),
+      });
+      sessionStorage.setItem("gidi_program_patient", patientId);
+      router.push(`/admin/programs/${program.id}`);
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Error");
+    } finally {
+      setProgramBusy(false);
+    }
+  }
 
   async function onCreate() {
     setMsg("");
@@ -133,14 +173,24 @@ export default function AdminPatientFollowUpsPage() {
 
         <hr />
 
-        <div className="h2">Crear seguimiento del mes</div>
+        <button
+          className="btn-primary rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50"
+          disabled={!pickedTherapistId || programBusy}
+          onClick={() => void openCurrentProgram()}
+        >
+          {programBusy ? "Abriendo…" : `Programación de ${currentMonthLabel}`}
+        </button>
+
+        <hr />
+
+        <div className="h2">Crear seguimiento administrativo</div>
         <p className="sub" style={{ marginBottom: 8 }}>
-          Puede crear varios seguimientos en el mismo mes (misma área y terapeuta). Cada uno es independiente.
+          Seguimientos de texto (administrativo, familiar, escolar, etc.) se crean por área como antes.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10 }}>
           <select className="input" value={pickedAreaId} onChange={(e) => setPickedAreaId(e.target.value)}>
             <option value="">— Área —</option>
-            {areas.map((a) => (
+            {textOnlyAreas.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </select>
@@ -153,7 +203,7 @@ export default function AdminPatientFollowUpsPage() {
           </select>
 
           <button className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" disabled={!canCreate} onClick={onCreate}>
-            + Crear nuevo
+            + Crear seguimiento
           </button>
         </div>
 
