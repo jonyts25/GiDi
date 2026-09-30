@@ -80,4 +80,9 @@ export class FollowUpProgramController {
   unpublish(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.service.unpublish(user, id);
   }
+
+  @Delete("/programs/:id")
+  deleteProgram(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.service.deleteProgram(user, id);
+  }
 }

@@ -1,5 +1,8 @@
 import type { FollowUpListRow } from "@/components/followups/PatientFollowUpsExportTable";
 
+export const DELETE_PROGRAM_CONFIRM =
+  "¿Borrar esta programación completa? Se eliminarán todas sus áreas, sesiones y calificaciones.";
+
 export type FollowUpProgramListRow = {
   kind: "program";
   id: string;

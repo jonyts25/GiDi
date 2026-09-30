@@ -17,14 +17,9 @@ export default function TherapistProgramPage() {
     if (!roles.includes("THERAPIST")) return router.replace("/dashboard");
   }, [router]);
 
-  const patientId = typeof window !== "undefined" ? sessionStorage.getItem("gidi_program_patient") : null;
-
   return (
     <main className="py-6 text-ink">
-      <ProgramEditor
-        programId={params.id}
-        backHref={patientId ? `/therapist/patients/${patientId}/followups` : "/therapist/followups"}
-      />
+      <ProgramEditor programId={params.id} basePath="therapist" />
     </main>
   );
 }

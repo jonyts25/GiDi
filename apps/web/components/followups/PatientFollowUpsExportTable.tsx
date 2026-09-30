@@ -9,9 +9,11 @@ import type { FollowUpReport } from "@/lib/followup-report.types";
 import { useToast } from "@/components/ui/Toast";
 import { waitForPrintReady } from "@/lib/print-utils";
 import {
+  DELETE_PROGRAM_CONFIRM,
   formatProgramListLabel,
   groupFollowUpListRows,
   type FollowUpDisplayRow,
+  type FollowUpProgramListRow,
 } from "@/lib/followup-list-display";
 
 export type FollowUpListRow = {
@@ -35,6 +37,8 @@ export function PatientFollowUpsExportTable(props: {
   areaFilter?: string;
   onAreaFilterChange?: (areaId: string) => void;
   exportable?: (row: FollowUpListRow) => boolean;
+  isOfficeStaff?: boolean;
+  onRowsChanged?: () => void;
 }) {
   const {
     rows,
@@ -45,11 +49,14 @@ export function PatientFollowUpsExportTable(props: {
     onAreaFilterChange,
     areas = [],
     exportable = () => true,
+    isOfficeStaff = false,
+    onRowsChanged,
   } = props;
 
   const { showToast } = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [deletingProgramId, setDeletingProgramId] = useState<string | null>(null);
   const [printData, setPrintData] = useState<{
     reports: FollowUpReport[];
     generatedAt: string;
@@ -227,19 +234,55 @@ export function PatientFollowUpsExportTable(props: {
     }
   }
 
-  function renderOpenLink(item: FollowUpDisplayRow) {
-    if (item.kind === "program" && openProgramHref) {
-      return (
+  function canDeleteProgramRow(item: FollowUpProgramListRow): boolean {
+    return item.status !== "CLOSED" || isOfficeStaff;
+  }
+
+  async function deleteProgramRow(programId: string) {
+    if (!confirm(DELETE_PROGRAM_CONFIRM)) return;
+    setDeletingProgramId(programId);
+    try {
+      await apiFetch(`/programs/${programId}`, { method: "DELETE" });
+      showToast("✅ Programación eliminada");
+      onRowsChanged?.();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Error al borrar", "error");
+    } finally {
+      setDeletingProgramId(null);
+    }
+  }
+
+  function renderRowActions(item: FollowUpDisplayRow) {
+    const openLink =
+      item.kind === "program" && openProgramHref ? (
         <Link className="btn rounded-lg px-3 py-1 text-xs" href={openProgramHref(item.programId)}>
           Abrir
         </Link>
+      ) : (
+        <Link
+          className="btn rounded-lg px-3 py-1 text-xs"
+          href={openHref(item.kind === "program" ? item.followUpIds[0] : item.row.id)}
+        >
+          Abrir
+        </Link>
       );
+
+    if (item.kind !== "program" || !canDeleteProgramRow(item)) {
+      return openLink;
     }
-    const id = item.kind === "program" ? item.followUpIds[0] : item.row.id;
+
     return (
-      <Link className="btn rounded-lg px-3 py-1 text-xs" href={openHref(id)}>
-        Abrir
-      </Link>
+      <div className="flex flex-wrap gap-2">
+        {openLink}
+        <button
+          type="button"
+          className="rounded-lg border border-danger/40 px-3 py-1 text-xs text-danger hover:bg-danger/10 disabled:opacity-50"
+          disabled={deletingProgramId === item.programId}
+          onClick={() => void deleteProgramRow(item.programId)}
+        >
+          {deletingProgramId === item.programId ? "Borrando…" : "Borrar"}
+        </button>
+      </div>
     );
   }
 
@@ -343,7 +386,7 @@ export function PatientFollowUpsExportTable(props: {
                   <td className="py-2">
                     <span className="badge">{status === "CLOSED" ? "Enviado" : "Borrador"}</span>
                   </td>
-                  <td className="py-2">{renderOpenLink(item)}</td>
+                  <td className="py-2">{renderRowActions(item)}</td>
                 </tr>
               );
             })}

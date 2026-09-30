@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { AreaTrackingMode } from "@prisma/client";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { AreaTrackingMode, FollowUpStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
 import { FollowUpAccessService } from "./followup-access.service";
@@ -427,6 +427,37 @@ export class FollowUpProgramService {
     });
 
     return this.get(user, programId);
+  }
+
+  async deleteProgram(user: AuthUser, programId: string) {
+    const program = await this.prisma.followUpProgram.findUnique({
+      where: { id: programId },
+      include: { followUps: { select: { id: true, status: true } } },
+    });
+    if (!program) throw new NotFoundException("Programación no encontrada");
+
+    const hasClosed = program.followUps.some((fu) => fu.status === FollowUpStatus.CLOSED);
+
+    if (hasClosed) {
+      if (!this.access.isOfficeStaff(user)) {
+        throw new ForbiddenException(
+          "Solo administradores o secretaria pueden eliminar programaciones publicadas",
+        );
+      }
+    } else if (program.followUps.length === 0) {
+      await this.access.assertCanEditProgram(user, programId);
+    } else {
+      for (const fu of program.followUps) {
+        await this.access.assertCanEditFollowUp(user, fu.id);
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.followUp.deleteMany({ where: { programId } });
+      await tx.followUpProgram.delete({ where: { id: programId } });
+    });
+
+    return { ok: true };
   }
 
   /** Fechas de sesión ya registradas en cualquier área del programa. */

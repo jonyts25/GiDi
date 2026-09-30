@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { resolveTrackingMode } from "@/lib/followup-area";
 import { calendarDateToUtcIso, formatCalendarDate, localDateInputValue } from "@/lib/date-utils";
@@ -15,6 +16,7 @@ import {
   type ProgramSessionColumn,
 } from "@/components/followups/MonthlyFollowUpGrid";
 import { ProgramReportDownloadButton } from "@/components/followups/ProgramReportDownloadButton";
+import { DELETE_PROGRAM_CONFIRM } from "@/lib/followup-list-display";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type BankObjective = {
@@ -107,9 +109,10 @@ function draftGlobalNumbers(blocks: DraftAreaBlock[]): Map<string, number> {
 
 export function ProgramEditor(props: {
   programId: string;
-  backHref: string;
+  basePath: "therapist" | "admin";
 }) {
-  const { programId, backHref } = props;
+  const { programId, basePath } = props;
+  const router = useRouter();
   const { showToast } = useToast();
 
   const [data, setData] = useState<ProgramPayload | null>(null);
@@ -127,6 +130,7 @@ export function ProgramEditor(props: {
   const [multiSessionDates, setMultiSessionDates] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [gridKey, setGridKey] = useState(0);
+  const [isOfficeStaff, setIsOfficeStaff] = useState(false);
 
   const monthlyAreas = useMemo(
     () => allAreas.filter((a) => resolveTrackingMode(a) === "MONTHLY_GRID"),
@@ -163,6 +167,18 @@ export function ProgramEditor(props: {
     setGridKey((k) => k + 1);
     return { payload, notesDraft: draft };
   }, [programId]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem("gidi_user");
+    if (raw) {
+      try {
+        const roles: string[] = JSON.parse(raw).roles ?? [];
+        setIsOfficeStaff(hasOfficeStaffRole(roles));
+      } catch {
+        setIsOfficeStaff(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -202,6 +218,13 @@ export function ProgramEditor(props: {
     if (!data) return false;
     return data.areas.some((a) => followUpNotes[a.followUpId]?.status === "CLOSED");
   }, [data, followUpNotes]);
+
+  const canDeleteProgram = !isLocked || isOfficeStaff;
+
+  const backHref = useMemo(
+    () => (data ? `/${basePath}/patients/${data.program.patientId}/followups` : null),
+    [basePath, data],
+  );
 
   const globalNumbers = useMemo(() => draftGlobalNumbers(draftBlocks), [draftBlocks]);
 
@@ -417,6 +440,21 @@ export function ProgramEditor(props: {
     }
   }
 
+  async function deleteProgram() {
+    if (!data || !backHref) return;
+    if (!confirm(DELETE_PROGRAM_CONFIRM)) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/programs/${programId}`, { method: "DELETE" });
+      showToast("✅ Programación eliminada");
+      router.push(backHref);
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Error al borrar", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function publishProgram() {
     if (
       !confirm(
@@ -441,7 +479,20 @@ export function ProgramEditor(props: {
   }
 
   if (!data) {
-    return <p className="py-10 text-subtle">Cargando programación…</p>;
+    return (
+      <div className="max-w-[1200px] space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Programación</h1>
+            <p className="mt-1 text-sm text-subtle">Cargando…</p>
+          </div>
+          <button type="button" className="btn rounded-xl px-3 py-2 text-sm opacity-50" disabled>
+            ← Volver a seguimientos
+          </button>
+        </div>
+        <p className="py-10 text-subtle">Cargando programación…</p>
+      </div>
+    );
   }
 
   const { program } = data;
@@ -480,9 +531,15 @@ export function ProgramEditor(props: {
               }}
             />
           ) : null}
-          <Link className="btn rounded-xl px-3 py-2 text-sm" href={backHref}>
-            ← Volver a seguimientos
-          </Link>
+          {backHref ? (
+            <Link className="btn rounded-xl px-3 py-2 text-sm" href={backHref}>
+              ← Volver a seguimientos
+            </Link>
+          ) : (
+            <button type="button" className="btn rounded-xl px-3 py-2 text-sm opacity-50" disabled>
+              ← Volver a seguimientos
+            </button>
+          )}
         </div>
       </div>
 
@@ -873,30 +930,55 @@ export function ProgramEditor(props: {
         )}
       </section>
 
-      {!isLocked && data.areas.length > 0 ? (
+      {(!isLocked && data.areas.length > 0) || canDeleteProgram ? (
         <section className="card space-y-4 border-l-4 border-l-primary">
-          <h2 className="text-lg font-semibold">Publicar programación</h2>
-          <p className="text-sm text-subtle">
-            Guarde la programación, observaciones y comentarios como borrador, o publíquelos para cerrar el mes.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
-              disabled={busy}
-              onClick={() => void saveDraft()}
-            >
-              {busy ? "Guardando…" : "Guardar borrador"}
-            </button>
-            <button
-              type="button"
-              className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
-              disabled={busy}
-              onClick={() => void publishProgram()}
-            >
-              {busy ? "Publicando…" : "Publicar seguimiento"}
-            </button>
-          </div>
+          {!isLocked && data.areas.length > 0 ? (
+            <>
+              <h2 className="text-lg font-semibold">Publicar programación</h2>
+              <p className="text-sm text-subtle">
+                Guarde la programación, observaciones y comentarios como borrador, o publíquelos para cerrar el mes.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => void saveDraft()}
+                >
+                  {busy ? "Guardando…" : "Guardar borrador"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                  disabled={busy}
+                  onClick={() => void publishProgram()}
+                >
+                  {busy ? "Publicando…" : "Publicar seguimiento"}
+                </button>
+                {canDeleteProgram ? (
+                  <button
+                    type="button"
+                    className="rounded-xl border border-danger/40 px-4 py-2 text-sm font-semibold text-danger hover:bg-danger/10 disabled:opacity-50"
+                    disabled={busy}
+                    onClick={() => void deleteProgram()}
+                  >
+                    Borrar borrador
+                  </button>
+                ) : null}
+              </div>
+            </>
+          ) : canDeleteProgram ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-xl border border-danger/40 px-4 py-2 text-sm font-semibold text-danger hover:bg-danger/10 disabled:opacity-50"
+                disabled={busy}
+                onClick={() => void deleteProgram()}
+              >
+                Borrar borrador
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
     </div>

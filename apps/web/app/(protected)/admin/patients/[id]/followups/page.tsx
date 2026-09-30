@@ -115,7 +115,6 @@ export default function AdminPatientFollowUpsPage() {
           periodMonth: currentMonth,
         }),
       });
-      sessionStorage.setItem("gidi_program_patient", patientId);
       router.push(`/admin/programs/${program.id}`);
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error");
@@ -222,6 +221,8 @@ export default function AdminPatientFollowUpsPage() {
           areas={areas}
           areaFilter={areaFilter}
           onAreaFilterChange={setAreaFilter}
+          isOfficeStaff
+          onRowsChanged={load}
         />
       </section>
     </main>

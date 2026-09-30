@@ -18,14 +18,9 @@ export default function AdminProgramPage() {
     if (!hasOfficeStaffRole(roles)) return router.replace("/dashboard");
   }, [router]);
 
-  const patientId = typeof window !== "undefined" ? sessionStorage.getItem("gidi_program_patient") : null;
-
   return (
     <main className="container py-8 text-ink">
-      <ProgramEditor
-        programId={params.id}
-        backHref={patientId ? `/admin/patients/${patientId}/followups` : "/admin/patients"}
-      />
+      <ProgramEditor programId={params.id} basePath="admin" />
     </main>
   );
 }

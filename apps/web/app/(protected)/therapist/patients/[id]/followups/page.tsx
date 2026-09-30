@@ -6,6 +6,7 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { filterAreasForUserRoles } from "@/lib/area-permissions";
+import { hasOfficeStaffRole } from "@/lib/role-permissions";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type FollowUpRow = {
@@ -36,6 +37,7 @@ export default function TherapistPatientFollowUpsPage() {
   const [therapistId, setTherapistId] = useState("");
   const [areaFilter, setAreaFilter] = useState("");
   const [programBusy, setProgramBusy] = useState(false);
+  const [isOfficeStaff, setIsOfficeStaff] = useState(false);
 
   const currentMonthLabel = useMemo(
     () => new Date().toLocaleDateString("es-MX", { month: "long" }),
@@ -56,6 +58,7 @@ export default function TherapistPatientFollowUpsPage() {
 
     const user = JSON.parse(userRaw);
     setTherapistId(user.id ?? "");
+    setIsOfficeStaff(hasOfficeStaffRole(roles));
 
     (async () => {
       try {
@@ -99,7 +102,6 @@ export default function TherapistPatientFollowUpsPage() {
           periodMonth: currentMonth,
         }),
       });
-      sessionStorage.setItem("gidi_program_patient", patientId);
       router.push(`/therapist/programs/${program.id}`);
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : "Error");
@@ -195,6 +197,8 @@ export default function TherapistPatientFollowUpsPage() {
           areas={allowedAreas}
           areaFilter={areaFilter}
           onAreaFilterChange={setAreaFilter}
+          isOfficeStaff={isOfficeStaff}
+          onRowsChanged={load}
         />
       </section>
     </main>
