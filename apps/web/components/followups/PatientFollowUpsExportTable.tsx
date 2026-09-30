@@ -8,6 +8,11 @@ import { BulkFollowUpReportPrint } from "@/components/followups/BulkFollowUpRepo
 import type { FollowUpReport } from "@/lib/followup-report.types";
 import { useToast } from "@/components/ui/Toast";
 import { waitForPrintReady } from "@/lib/print-utils";
+import {
+  formatProgramListLabel,
+  groupFollowUpListRows,
+  type FollowUpDisplayRow,
+} from "@/lib/followup-list-display";
 
 export type FollowUpListRow = {
   id: string;
@@ -16,6 +21,8 @@ export type FollowUpListRow = {
   status: string;
   area: { id: string; name: string; key?: string };
   therapist?: { fullName: string };
+  programId?: string | null;
+  program?: { id: string; therapist?: { fullName: string } };
   createdAt?: string;
 };
 
@@ -23,15 +30,17 @@ export function PatientFollowUpsExportTable(props: {
   rows: FollowUpListRow[];
   allMonths: boolean;
   openHref: (id: string) => string;
+  openProgramHref?: (programId: string) => string;
+  areas?: { id: string; name: string }[];
   areaFilter?: string;
   onAreaFilterChange?: (areaId: string) => void;
-  areas?: { id: string; name: string }[];
   exportable?: (row: FollowUpListRow) => boolean;
 }) {
   const {
     rows,
     allMonths,
     openHref,
+    openProgramHref,
     areaFilter = "",
     onAreaFilterChange,
     areas = [],
@@ -41,7 +50,11 @@ export function PatientFollowUpsExportTable(props: {
   const { showToast } = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
-  const [printData, setPrintData] = useState<{ reports: FollowUpReport[]; generatedAt: string } | null>(null);
+  const [printData, setPrintData] = useState<{
+    reports: FollowUpReport[];
+    generatedAt: string;
+    programHeader?: { periodYear: number; periodMonth: number; therapistName: string };
+  } | null>(null);
   const pendingPrintRef = useRef(false);
 
   useEffect(() => {
@@ -74,29 +87,117 @@ export function PatientFollowUpsExportTable(props: {
     return rows.filter((r) => r.area.id === areaFilter);
   }, [rows, areaFilter]);
 
-  const exportableRows = useMemo(() => filtered.filter(exportable), [filtered, exportable]);
+  const displayRows = useMemo(() => groupFollowUpListRows(filtered), [filtered]);
 
-  const allSelected = exportableRows.length > 0 && exportableRows.every((r) => selected.has(r.id));
+  const exportableFollowUpIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const item of displayRows) {
+      if (item.kind === "program") {
+        for (const id of item.followUpIds) {
+          const row = rows.find((r) => r.id === id);
+          if (row && exportable(row)) ids.add(id);
+        }
+      } else if (exportable(item.row)) {
+        ids.add(item.row.id);
+      }
+    }
+    return ids;
+  }, [displayRows, rows, exportable]);
+
+  const selectedFollowUpCount = useMemo(() => {
+    let count = 0;
+    for (const item of displayRows) {
+      if (item.kind === "program") {
+        if (selected.has(item.programId)) {
+          count += item.followUpIds.filter((id) => exportableFollowUpIds.has(id)).length;
+        }
+      } else if (selected.has(item.row.id)) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [displayRows, selected, exportableFollowUpIds]);
+
+  const allSelected =
+    displayRows.length > 0 &&
+    displayRows.every((item) => {
+      if (item.kind === "program") {
+        return !item.followUpIds.some((id) => exportableFollowUpIds.has(id)) || selected.has(item.programId);
+      }
+      return !exportable(item.row) || selected.has(item.row.id);
+    });
 
   function toggleAll() {
     if (allSelected) {
       setSelected(new Set());
-    } else {
-      setSelected(new Set(exportableRows.map((r) => r.id)));
+      return;
     }
+    const next = new Set<string>();
+    for (const item of displayRows) {
+      if (item.kind === "program") {
+        if (item.followUpIds.some((id) => exportableFollowUpIds.has(id))) {
+          next.add(item.programId);
+        }
+      } else if (exportable(item.row)) {
+        next.add(item.row.id);
+      }
+    }
+    setSelected(next);
   }
 
-  function toggleOne(id: string) {
+  function toggleDisplayRow(item: FollowUpDisplayRow) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const key = item.kind === "program" ? item.programId : item.row.id;
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
 
+  function isRowSelected(item: FollowUpDisplayRow): boolean {
+    return selected.has(item.kind === "program" ? item.programId : item.row.id);
+  }
+
+  function canSelectRow(item: FollowUpDisplayRow): boolean {
+    if (item.kind === "program") {
+      return item.followUpIds.some((id) => exportableFollowUpIds.has(id));
+    }
+    return exportable(item.row);
+  }
+
+  function resolveSelectedFollowUpIds(): string[] {
+    const ids: string[] = [];
+    for (const item of displayRows) {
+      if (item.kind === "program") {
+        if (!selected.has(item.programId)) continue;
+        for (const id of item.followUpIds) {
+          if (exportableFollowUpIds.has(id)) ids.push(id);
+        }
+      } else if (selected.has(item.row.id) && exportable(item.row)) {
+        ids.push(item.row.id);
+      }
+    }
+    return ids;
+  }
+
+  function resolveProgramHeader(ids: string[]) {
+    const selectedRows = rows.filter((r) => ids.includes(r.id));
+    const programIds = new Set(selectedRows.map((r) => r.programId).filter(Boolean) as string[]);
+    if (programIds.size !== 1) return undefined;
+    const programId = [...programIds][0];
+    const programRows = selectedRows.filter((r) => r.programId === programId);
+    if (programRows.length !== ids.length) return undefined;
+    const first = programRows[0];
+    return {
+      periodYear: first.periodYear,
+      periodMonth: first.periodMonth,
+      therapistName: first.therapist?.fullName ?? first.program?.therapist?.fullName ?? "—",
+    };
+  }
+
   async function exportSelected() {
-    const ids = [...selected].filter((id) => exportableRows.some((r) => r.id === id));
+    const ids = resolveSelectedFollowUpIds();
     if (!ids.length) {
       showToast("Seleccione al menos un seguimiento", "error");
       return;
@@ -114,7 +215,10 @@ export function PatientFollowUpsExportTable(props: {
       }
 
       pendingPrintRef.current = true;
-      setPrintData(data);
+      setPrintData({
+        ...data,
+        programHeader: resolveProgramHeader(ids),
+      });
       showToast(`✅ ${ids.length} seguimiento(s) exportado(s)`);
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al exportar", "error");
@@ -123,11 +227,31 @@ export function PatientFollowUpsExportTable(props: {
     }
   }
 
+  function renderOpenLink(item: FollowUpDisplayRow) {
+    if (item.kind === "program" && openProgramHref) {
+      return (
+        <Link className="btn rounded-lg px-3 py-1 text-xs" href={openProgramHref(item.programId)}>
+          Abrir
+        </Link>
+      );
+    }
+    const id = item.kind === "program" ? item.followUpIds[0] : item.row.id;
+    return (
+      <Link className="btn rounded-lg px-3 py-1 text-xs" href={openHref(id)}>
+        Abrir
+      </Link>
+    );
+  }
+
   return (
     <>
       {printData && typeof document !== "undefined"
         ? createPortal(
-            <BulkFollowUpReportPrint reports={printData.reports} generatedAt={printData.generatedAt} />,
+            <BulkFollowUpReportPrint
+              reports={printData.reports}
+              generatedAt={printData.generatedAt}
+              programHeader={printData.programHeader}
+            />,
             document.body,
           )
         : null}
@@ -148,33 +272,28 @@ export function PatientFollowUpsExportTable(props: {
               ))}
             </select>
           ) : null}
-          <span className="text-xs text-subtle">{filtered.length} seguimiento(s)</span>
+          <span className="text-xs text-subtle">{displayRows.length} seguimiento(s)</span>
         </div>
         <button
           type="button"
           className="btn rounded-xl px-3 py-1.5 text-xs font-semibold"
-          disabled={exporting || selected.size === 0}
+          disabled={exporting || selectedFollowUpCount === 0}
           onClick={() => void exportSelected()}
         >
-          {exporting ? "Preparando PDF…" : `Exportar seleccionados (${selected.size})`}
+          {exporting ? "Preparando PDF…" : `Exportar seleccionados (${selectedFollowUpCount})`}
         </button>
       </div>
 
-      {filtered.length === 0 ? (
+      {displayRows.length === 0 ? (
         <p className="text-sm text-subtle">No hay seguimientos para mostrar.</p>
       ) : (
         <table className="table w-full text-sm">
           <thead>
             <tr className="text-left text-subtle">
               <th className="w-10 py-2">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  aria-label="Seleccionar todos"
-                />
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Seleccionar todos" />
               </th>
-              <th className="py-2">Área</th>
+              <th className="py-2">Seguimiento</th>
               {allMonths ? <th className="py-2">Mes</th> : null}
               <th className="py-2">Terapeuta</th>
               <th className="py-2">Estado</th>
@@ -182,37 +301,49 @@ export function PatientFollowUpsExportTable(props: {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => {
-              const canExport = exportable(r);
+            {displayRows.map((item) => {
+              const canSelect = canSelectRow(item);
+              const key = item.kind === "program" ? item.programId : item.row.id;
+              const label =
+                item.kind === "program"
+                  ? formatProgramListLabel(
+                      item.periodYear,
+                      item.periodMonth,
+                      item.therapist?.fullName,
+                      item.areas.map((a) => a.name),
+                    )
+                  : item.row.area.name;
+              const status = item.kind === "program" ? item.status : item.row.status;
+              const therapist =
+                item.kind === "program" ? (item.therapist?.fullName ?? "—") : (item.row.therapist?.fullName ?? "—");
+              const periodYear = item.kind === "program" ? item.periodYear : item.row.periodYear;
+              const periodMonth = item.kind === "program" ? item.periodMonth : item.row.periodMonth;
+
               return (
-                <tr key={r.id} className="border-t border-border">
+                <tr key={key} className="border-t border-border">
                   <td className="py-2">
                     <input
                       type="checkbox"
-                      checked={selected.has(r.id)}
-                      disabled={!canExport}
-                      onChange={() => toggleOne(r.id)}
-                      aria-label={`Seleccionar ${r.area.name}`}
+                      checked={isRowSelected(item)}
+                      disabled={!canSelect}
+                      onChange={() => toggleDisplayRow(item)}
+                      aria-label={`Seleccionar ${label}`}
                     />
                   </td>
-                  <td className="py-2 font-medium">{r.area.name}</td>
+                  <td className="py-2 font-medium">{label}</td>
                   {allMonths ? (
                     <td className="py-2 capitalize">
-                      {new Date(r.periodYear, r.periodMonth - 1, 1).toLocaleDateString("es-MX", {
+                      {new Date(periodYear, periodMonth - 1, 1).toLocaleDateString("es-MX", {
                         month: "short",
                         year: "numeric",
                       })}
                     </td>
                   ) : null}
-                  <td className="py-2">{r.therapist?.fullName ?? "—"}</td>
+                  <td className="py-2">{therapist}</td>
                   <td className="py-2">
-                    <span className="badge">{r.status === "CLOSED" ? "Enviado" : "Borrador"}</span>
+                    <span className="badge">{status === "CLOSED" ? "Enviado" : "Borrador"}</span>
                   </td>
-                  <td className="py-2">
-                    <Link className="btn rounded-lg px-3 py-1 text-xs" href={openHref(r.id)}>
-                      Abrir
-                    </Link>
-                  </td>
+                  <td className="py-2">{renderOpenLink(item)}</td>
                 </tr>
               );
             })}

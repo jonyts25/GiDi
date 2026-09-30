@@ -46,4 +46,9 @@ export class ParentController {
       month ? Number(month) : undefined,
     );
   }
+
+  @Get("programs/:id/summary")
+  programSummary(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.followUps.getParentProgramSummary(user, id);
+  }
 }

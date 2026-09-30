@@ -79,6 +79,7 @@ export class FollowUpsService {
         area: { select: { id: true, key: true, name: true, category: true, trackingMode: true } },
         therapist: { select: { id: true, fullName: true, email: true, status: true } },
         patient: { select: { id: true, firstName: true, lastName: true } },
+        program: { select: { id: true, therapist: { select: { fullName: true } } } },
       },
     });
   }
@@ -127,32 +128,7 @@ export class FollowUpsService {
   async getParentSummary(user: AuthUser, patientId: string, year?: number, month?: number) {
     await this.access.assertCanViewPatient(user, patientId);
 
-    // Audiencia: papás solo ven los marcados para papás; escuela los marcados para escuela; admin ve todo.
-    const visibilityFilter = this.access.isAdmin(user)
-      ? {}
-      : user.roles.includes("SCHOOL")
-        ? { visibleToSchool: true }
-        : { visibleToParent: true };
-
-    const followUps = await this.prisma.followUp.findMany({
-      where: {
-        patientId,
-        ...(year ? { periodYear: year } : {}),
-        ...(month ? { periodMonth: month } : {}),
-        status: FollowUpStatus.CLOSED,
-        ...visibilityFilter,
-      },
-      include: {
-        area: { select: { id: true, key: true, name: true, trackingMode: true } },
-        therapist: { select: { id: true, fullName: true } },
-        objectives: { where: { idx: { lt: ARCHIVED_OBJECTIVE_IDX } }, orderBy: { idx: "asc" } },
-        sessions: {
-          orderBy: { sessionDate: "asc" },
-          include: { marks: true },
-        },
-      },
-      orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }, { area: { sortOrder: "asc" } }],
-    });
+    const followUps = await this.fetchVisibleClosedFollowUps(user, patientId, year, month);
 
     const patient = await this.prisma.patient.findUnique({
       where: { id: patientId },
@@ -164,8 +140,133 @@ export class FollowUpsService {
       patient,
       periodYear: year ?? null,
       periodMonth: month ?? null,
-      followUps: followUps.map((fu) => this.buildSummaryCard(fu)),
+      followUps: this.groupSummaryItems(followUps),
     };
+  }
+
+  async getParentProgramSummary(user: AuthUser, programId: string) {
+    await this.access.assertCanViewProgram(user, programId);
+
+    const visibilityFilter = this.parentVisibilityFilter(user);
+
+    const program = await this.prisma.followUpProgram.findUnique({
+      where: { id: programId },
+      include: {
+        patient: { select: { id: true, firstName: true, lastName: true } },
+        therapist: { select: { id: true, fullName: true } },
+        followUps: {
+          where: {
+            status: FollowUpStatus.CLOSED,
+            ...visibilityFilter,
+          },
+          include: this.parentSummaryFollowUpInclude(),
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!program) throw new NotFoundException("Programación no encontrada");
+    if (program.followUps.length === 0) {
+      throw new NotFoundException("No hay seguimientos publicados visibles en esta programación");
+    }
+
+    return {
+      programId: program.id,
+      patient: program.patient,
+      therapistName: program.therapist.fullName,
+      periodYear: program.periodYear,
+      periodMonth: program.periodMonth,
+      areas: program.followUps.map((fu) => this.buildSummaryCard(fu)),
+    };
+  }
+
+  private parentVisibilityFilter(user: AuthUser): { visibleToSchool?: true; visibleToParent?: true } {
+    if (this.access.isAdmin(user)) return {};
+    if (user.roles.includes("SCHOOL")) return { visibleToSchool: true };
+    return { visibleToParent: true };
+  }
+
+  private parentSummaryFollowUpInclude() {
+    return {
+      area: { select: { id: true, key: true, name: true, trackingMode: true } },
+      therapist: { select: { id: true, fullName: true } },
+      objectives: { where: { idx: { lt: ARCHIVED_OBJECTIVE_IDX } }, orderBy: { idx: "asc" as const } },
+      sessions: {
+        orderBy: { sessionDate: "asc" as const },
+        include: { marks: true },
+      },
+    };
+  }
+
+  private async fetchVisibleClosedFollowUps(
+    user: AuthUser,
+    patientId: string,
+    year?: number,
+    month?: number,
+  ) {
+    return this.prisma.followUp.findMany({
+      where: {
+        patientId,
+        ...(year ? { periodYear: year } : {}),
+        ...(month ? { periodMonth: month } : {}),
+        status: FollowUpStatus.CLOSED,
+        ...this.parentVisibilityFilter(user),
+      },
+      include: {
+        ...this.parentSummaryFollowUpInclude(),
+        program: { select: { id: true } },
+      },
+      orderBy: [
+        { periodYear: "desc" },
+        { periodMonth: "desc" },
+        { programId: "asc" },
+        { createdAt: "asc" },
+      ],
+    });
+  }
+
+  private groupSummaryItems(
+    followUps: {
+      id: string;
+      programId: string | null;
+      periodYear: number;
+      periodMonth: number;
+      therapist: { id: string; fullName: string };
+    }[],
+  ) {
+    type SummaryCard = ReturnType<FollowUpsService["buildSummaryCard"]>;
+    type ProgramGroup = {
+      programId: string;
+      therapistName: string;
+      periodYear: number;
+      periodMonth: number;
+      areas: SummaryCard[];
+    };
+
+    const items: (SummaryCard | ProgramGroup)[] = [];
+    const seenPrograms = new Set<string>();
+
+    for (const fu of followUps) {
+      const card = this.buildSummaryCard(fu as Parameters<FollowUpsService["buildSummaryCard"]>[0]);
+      if (!fu.programId) {
+        items.push(card);
+        continue;
+      }
+      if (seenPrograms.has(fu.programId)) continue;
+      seenPrograms.add(fu.programId);
+      const programFollowUps = followUps.filter((row) => row.programId === fu.programId);
+      items.push({
+        programId: fu.programId,
+        therapistName: fu.therapist.fullName,
+        periodYear: fu.periodYear,
+        periodMonth: fu.periodMonth,
+        areas: programFollowUps.map((row) =>
+          this.buildSummaryCard(row as Parameters<FollowUpsService["buildSummaryCard"]>[0]),
+        ),
+      });
+    }
+
+    return items;
   }
 
   private buildSummaryCard(fu: {
@@ -226,17 +327,12 @@ export class FollowUpsService {
   }
 
   async getBulkReport(user: AuthUser, ids: string[]) {
-    const uniqueIds = [...new Set(ids)];
+    const orderedIds = ids.filter((id, idx) => ids.indexOf(id) === idx);
     const reports: ReturnType<FollowUpsService["buildFollowUpReport"]>[] = [];
-    for (const id of uniqueIds) {
+    for (const id of orderedIds) {
       const fu = await this.get(user, id);
       reports.push(this.buildFollowUpReport(fu));
     }
-    reports.sort((a, b) => {
-      const ka = `${a.followUp.periodYear}-${String(a.followUp.periodMonth).padStart(2, "0")}-${a.followUp.area.name}`;
-      const kb = `${b.followUp.periodYear}-${String(b.followUp.periodMonth).padStart(2, "0")}-${b.followUp.area.name}`;
-      return kb.localeCompare(ka);
-    });
     return {
       generatedAt: new Date().toISOString(),
       reports,

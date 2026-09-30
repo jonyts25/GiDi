@@ -14,6 +14,7 @@ import {
   type FlatMark,
   type ProgramSessionColumn,
 } from "@/components/followups/MonthlyFollowUpGrid";
+import { ProgramReportDownloadButton } from "@/components/followups/ProgramReportDownloadButton";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type BankObjective = {
@@ -446,6 +447,7 @@ export function ProgramEditor(props: {
   const { program } = data;
   const monthLabel = MONTH_NAMES[program.periodMonth - 1] ?? String(program.periodMonth);
   const patientName = `${program.patient.firstName} ${program.patient.lastName}`;
+  const programFollowUpIds = data.areas.map((a) => a.followUpId);
 
   return (
     <div className="max-w-[1200px] space-y-6">
@@ -466,9 +468,22 @@ export function ProgramEditor(props: {
             </p>
           ) : null}
         </div>
-        <Link className="btn rounded-xl px-3 py-2 text-sm" href={backHref}>
-          ← Volver a seguimientos
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {programFollowUpIds.length > 0 ? (
+            <ProgramReportDownloadButton
+              followUpIds={programFollowUpIds}
+              patientName={patientName}
+              programHeader={{
+                periodYear: program.periodYear,
+                periodMonth: program.periodMonth,
+                therapistName: program.therapist.fullName,
+              }}
+            />
+          ) : null}
+          <Link className="btn rounded-xl px-3 py-2 text-sm" href={backHref}>
+            ← Volver a seguimientos
+          </Link>
+        </div>
       </div>
 
       <section className="card space-y-4 border-l-4 border-l-primary">

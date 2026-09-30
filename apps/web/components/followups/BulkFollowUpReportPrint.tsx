@@ -27,8 +27,13 @@ export function BulkFollowUpReportPrint(props: {
   reports: FollowUpReport[];
   patientName?: string;
   generatedAt: string;
+  programHeader?: {
+    periodYear: number;
+    periodMonth: number;
+    therapistName: string;
+  };
 }) {
-  const { reports, patientName, generatedAt } = props;
+  const { reports, patientName, generatedAt, programHeader } = props;
   const name =
     patientName ??
     (reports[0]
@@ -47,23 +52,38 @@ export function BulkFollowUpReportPrint(props: {
           </div>
         </div>
         <div className="gidi-report-meta">
-          <h1 className="gidi-report-title">Expediente de seguimientos</h1>
+          <h1 className="gidi-report-title">
+            {programHeader ? "Seguimiento mensual" : "Expediente de seguimientos"}
+          </h1>
           <dl className="gidi-report-meta-grid">
             <div>
               <dt>Paciente</dt>
               <dd>{name}</dd>
             </div>
-            <div>
-              <dt>Seguimientos incluidos</dt>
-              <dd>{reports.length}</dd>
-            </div>
+            {programHeader ? (
+              <>
+                <div>
+                  <dt>Periodo</dt>
+                  <dd>{formatPeriod(programHeader.periodYear, programHeader.periodMonth)}</dd>
+                </div>
+                <div>
+                  <dt>Terapeuta</dt>
+                  <dd>{programHeader.therapistName}</dd>
+                </div>
+              </>
+            ) : (
+              <div>
+                <dt>Seguimientos incluidos</dt>
+                <dd>{reports.length}</dd>
+              </div>
+            )}
           </dl>
           <p className="gidi-report-generated">Generado: {formatGeneratedAt(generatedAt)}</p>
         </div>
       </header>
 
       {reports.map((report, idx) => {
-        const monthBreak = isNewMonth(reports, idx);
+        const monthBreak = !programHeader && isNewMonth(reports, idx);
         return (
           <article
             key={report.followUp.id}
@@ -71,12 +91,17 @@ export function BulkFollowUpReportPrint(props: {
           >
             <header className="gidi-dossier-area-header gidi-report-avoid-break">
               <h3>
-                {report.followUp.area.name} · {formatPeriod(report.followUp.periodYear, report.followUp.periodMonth)}
+                {report.followUp.area.name}
+                {!programHeader
+                  ? ` · ${formatPeriod(report.followUp.periodYear, report.followUp.periodMonth)}`
+                  : ""}
               </h3>
-              <p>
-                Terapeuta: {report.followUp.therapist.fullName} · Estado:{" "}
-                {report.followUp.status === "CLOSED" ? "Enviado" : "Borrador"}
-              </p>
+              {!programHeader ? (
+                <p>
+                  Terapeuta: {report.followUp.therapist.fullName} · Estado:{" "}
+                  {report.followUp.status === "CLOSED" ? "Enviado" : "Borrador"}
+                </p>
+              ) : null}
             </header>
             <FollowUpReportBody report={report} showSignature compact />
           </article>
@@ -85,7 +110,10 @@ export function BulkFollowUpReportPrint(props: {
 
       <footer className="gidi-report-legal-footer gidi-report-avoid-break">
         <p className="gidi-report-signature-legal">
-          Documento generado por GiDi. Contiene los seguimientos seleccionados del paciente.
+          Documento generado por GiDi.
+          {programHeader
+            ? " Contiene el seguimiento mensual del paciente."
+            : " Contiene los seguimientos seleccionados del paciente."}
         </p>
       </footer>
     </div>

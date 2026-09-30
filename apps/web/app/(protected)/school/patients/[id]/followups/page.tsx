@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import {
   ParentFollowUpSummaryCard,
-  type ParentFollowUpCardData,
+  type ParentFollowUpSummaryItem,
 } from "@/components/followups/ParentFollowUpSummaryCard";
 import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 
@@ -14,7 +14,7 @@ type SummaryResponse = {
   patient: { id: string; firstName: string; lastName: string };
   periodYear: number | null;
   periodMonth: number | null;
-  followUps: ParentFollowUpCardData[];
+  followUps: ParentFollowUpSummaryItem[];
 };
 
 type FollowUpRow = {
@@ -22,8 +22,10 @@ type FollowUpRow = {
   status: string;
   periodYear: number;
   periodMonth: number;
+  programId?: string | null;
   area: { id: string; name: string };
   therapist?: { fullName: string };
+  program?: { id: string; therapist?: { fullName: string } };
 };
 
 export default function SchoolPatientFollowUpsPage() {
@@ -117,6 +119,7 @@ export default function SchoolPatientFollowUpsPage() {
           rows={exportRows}
           allMonths={allMonths}
           openHref={(fid) => `/school/patients/${patientId}/followups#${fid}`}
+          openProgramHref={(programId) => `/school/programs/${programId}`}
           areas={areas}
           areaFilter={areaFilter}
           onAreaFilterChange={setAreaFilter}
@@ -132,7 +135,12 @@ export default function SchoolPatientFollowUpsPage() {
         </section>
       ) : (
         <div className="space-y-6">
-          {data?.followUps.map((fu) => <ParentFollowUpSummaryCard key={fu.followUpId} data={fu} />)}
+          {data?.followUps.map((item) => (
+            <ParentFollowUpSummaryCard
+              key={"programId" in item ? item.programId : item.followUpId}
+              data={item}
+            />
+          ))}
         </div>
       )}
     </main>

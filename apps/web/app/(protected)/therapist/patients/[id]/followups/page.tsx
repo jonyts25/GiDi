@@ -13,7 +13,10 @@ type FollowUpRow = {
   periodYear: number;
   periodMonth: number;
   status: string;
+  programId?: string | null;
   area: Area;
+  therapist?: { fullName: string };
+  program?: { id: string; therapist?: { fullName: string } };
   createdAt: string;
 };
 
@@ -188,6 +191,7 @@ export default function TherapistPatientFollowUpsPage() {
           rows={rows}
           allMonths={allMonths}
           openHref={(id) => `/therapist/followups/${id}`}
+          openProgramHref={(programId) => `/therapist/programs/${programId}`}
           areas={allowedAreas}
           areaFilter={areaFilter}
           onAreaFilterChange={setAreaFilter}
