@@ -17,6 +17,7 @@ import {
   aggregatePaymentFromEntries,
   PaymentCountingEntry,
   previousPeriod,
+  resolveAmountDueFromBilling,
 } from "./recompute-payment";
 import { CreateIncomeEntryDto, UpdateIncomeEntryDto } from "./dto/income-entry.dto";
 
@@ -352,22 +353,20 @@ export class IncomeService {
 
     let amountDue = existing?.amountDue;
     if (amountDue == null) {
-      const suggested = suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent);
-      if (suggested != null) {
-        amountDue = suggested;
-      } else {
-        const prev = previousPeriod(year, month);
-        const prevPayment = await tx.payment.findUnique({
-          where: {
-            patientId_periodYear_periodMonth: {
-              patientId,
-              periodYear: prev.year,
-              periodMonth: prev.month,
-            },
+      const prev = previousPeriod(year, month);
+      const prevPayment = await tx.payment.findUnique({
+        where: {
+          patientId_periodYear_periodMonth: {
+            patientId,
+            periodYear: prev.year,
+            periodMonth: prev.month,
           },
-        });
-        amountDue = prevPayment?.amountDue ?? 0;
-      }
+        },
+      });
+      amountDue = resolveAmountDueFromBilling(
+        suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent),
+        prevPayment?.amountDue,
+      );
     }
 
     const manualStatus = existing?.status;

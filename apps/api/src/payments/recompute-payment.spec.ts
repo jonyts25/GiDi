@@ -35,6 +35,12 @@ describe("aggregatePaymentFromEntries", () => {
     expect(result.paidAt).toBeNull();
   });
 
+  it("marca PAGADO cuando PARCIAL con 2150 pagado y amountDue baja de 4130 a 2150", () => {
+    const result = aggregatePaymentFromEntries([entry(2150)], 2150, PaymentStatus.PARCIAL);
+    expect(result.amountPaid).toBe(2150);
+    expect(result.status).toBe(PaymentStatus.PAGADO);
+  });
+
   it("recalcula al mover un abono de un mes a otro", () => {
     const jan = aggregatePaymentFromEntries([entry(4000, 10)], baseDue, PaymentStatus.PENDIENTE);
     expect(jan.status).toBe(PaymentStatus.PAGADO);

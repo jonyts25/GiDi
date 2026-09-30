@@ -82,3 +82,12 @@ export function previousPeriod(year: number, month: number): { year: number; mon
   if (month === 1) return { year: year - 1, month: 12 };
   return { year, month: month - 1 };
 }
+
+/** Monto sugerido o, si no hay tarifa, el amountDue del mes anterior. */
+export function resolveAmountDueFromBilling(
+  suggested: number | null | undefined,
+  fallbackPreviousDue: number | null | undefined,
+): number {
+  if (suggested != null) return suggested;
+  return fallbackPreviousDue ?? 0;
+}

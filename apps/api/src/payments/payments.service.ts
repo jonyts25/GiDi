@@ -4,6 +4,8 @@ import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
 import { CENTER_PAYMENT_INFO, suggestedMonthly } from "./payment-config";
 import { incomeMethodLabel } from "./income-config";
+import { IncomeService } from "./income.service";
+import { previousPeriod, resolveAmountDueFromBilling } from "./recompute-payment";
 import { SetBillingDto } from "./dto/set-billing.dto";
 import { UpsertPaymentDto } from "./dto/upsert-payment.dto";
 import { UploadReceiptDto } from "./dto/upload-receipt.dto";
@@ -49,7 +51,10 @@ const paymentSelect = {
 
 @Injectable()
 export class PaymentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private income: IncomeService,
+  ) {}
 
   private isAdmin(user: AuthUser): boolean {
     return userHasOfficeStaffRole(user);
@@ -237,18 +242,33 @@ export class PaymentsService {
       where: { patientId_periodYear_periodMonth: { patientId, periodYear: year, periodMonth: month } },
     });
 
-    const defaultDue =
-      suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent) ?? 0;
-
-    let amountDue = dto.amountDue ?? existing?.amountDue ?? defaultDue;
-    const amountPaid = existing?.amountPaid ?? 0;
+    const suggested = suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent);
+    const defaultDue = suggested ?? 0;
+    const previousStatus = existing?.status ?? null;
     const status = dto.status ?? existing?.status ?? PaymentStatus.PENDIENTE;
 
+    let amountDue: number;
     if (status === PaymentStatus.PAUSA_VACACIONES) {
       amountDue = 0;
+    } else if (dto.amountDue != null) {
+      amountDue = dto.amountDue;
+    } else if (previousStatus === PaymentStatus.PAUSA_VACACIONES) {
+      const prev = previousPeriod(year, month);
+      const prevPayment = await this.prisma.payment.findUnique({
+        where: {
+          patientId_periodYear_periodMonth: {
+            patientId,
+            periodYear: prev.year,
+            periodMonth: prev.month,
+          },
+        },
+      });
+      amountDue = resolveAmountDueFromBilling(suggested, prevPayment?.amountDue);
+    } else {
+      amountDue = existing?.amountDue ?? defaultDue;
     }
 
-    const saved = await this.prisma.payment.upsert({
+    await this.prisma.payment.upsert({
       where: { patientId_periodYear_periodMonth: { patientId, periodYear: year, periodMonth: month } },
       create: {
         patientId,
@@ -269,8 +289,19 @@ export class PaymentsService {
         reference: dto.reference ?? undefined,
         notes: dto.notes ?? undefined,
       },
+    });
+
+    if (status !== PaymentStatus.PAUSA_VACACIONES) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.income.recomputePayment(tx, patientId, year, month);
+      });
+    }
+
+    const saved = await this.prisma.payment.findUnique({
+      where: { patientId_periodYear_periodMonth: { patientId, periodYear: year, periodMonth: month } },
       select: paymentSelect,
     });
+    if (!saved) throw new NotFoundException("Pago no encontrado tras guardar");
 
     return saved;
   }
