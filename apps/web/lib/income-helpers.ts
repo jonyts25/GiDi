@@ -14,6 +14,8 @@ export type IncomeMethod =
   | "STP"
   | "MERCADO_PAGO_TRANSFERENCIA"
   | "MERCADO_PAGO_TERMINAL"
+  | "SCOTIABANK_TRANSFERENCIA"
+  | "SCOTIABANK_TERMINAL"
   | "OTRO";
 
 export const INCOME_CONCEPT_LABEL: Record<IncomeConcept, string> = {
@@ -33,6 +35,8 @@ export const INCOME_METHOD_LABEL: Record<IncomeMethod, string> = {
   STP: "STP",
   MERCADO_PAGO_TRANSFERENCIA: "Mercado Pago transferencia",
   MERCADO_PAGO_TERMINAL: "Mercado Pago terminal",
+  SCOTIABANK_TRANSFERENCIA: "Scotiabank Transferencia",
+  SCOTIABANK_TERMINAL: "Scotiabank Terminal",
   OTRO: "Otro",
 };
 
