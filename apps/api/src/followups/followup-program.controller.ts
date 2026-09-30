@@ -54,7 +54,7 @@ export class FollowUpProgramController {
     @Param("id") id: string,
     @Body() dto: CreateProgramSessionDto,
   ) {
-    return this.service.addSession(user, id, dto.date);
+    return this.service.addSessions(user, id, dto);
   }
 
   @Delete("/programs/:id/sessions/:date")
@@ -69,5 +69,15 @@ export class FollowUpProgramController {
   @Post("/programs/:id/copy-from-previous")
   copyFromPrevious(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.service.copyFromPrevious(user, id);
+  }
+
+  @Post("/programs/:id/publish")
+  publish(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.service.publish(user, id);
+  }
+
+  @Post("/programs/:id/unpublish")
+  unpublish(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.service.unpublish(user, id);
   }
 }

@@ -530,6 +530,28 @@ export class FollowUpsService {
     return this.get(user, createdId);
   }
 
+  /** Publica un seguimiento (status CLOSED). Reutilizado por programación mensual. */
+  async publishFollowUp(user: AuthUser, id: string) {
+    await this.access.assertCanEditFollowUp(user, id);
+    await this.prisma.followUp.update({
+      where: { id },
+      data: { status: FollowUpStatus.CLOSED },
+    });
+  }
+
+  /** Revierte un seguimiento publicado a borrador (solo ADMIN). */
+  async unpublishFollowUp(user: AuthUser, id: string) {
+    const fu = await this.access.getFollowUpForAccess(id);
+    if (fu.status !== FollowUpStatus.CLOSED) return;
+    if (!this.access.isAdmin(user)) {
+      throw new ForbiddenException("Solo administradores pueden reabrir seguimientos");
+    }
+    await this.prisma.followUp.update({
+      where: { id },
+      data: { status: FollowUpStatus.DRAFT },
+    });
+  }
+
   async update(user: AuthUser, id: string, dto: UpdateFollowUpDto) {
     const fu = await this.access.getFollowUpForAccess(id);
 

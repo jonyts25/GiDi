@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { formatCalendarDate } from "@/lib/date-utils";
-import { areaChipClass, areaShortLabel } from "@/lib/area-display";
+import { areaBorderClass, areaChipClass, areaHeaderClass, areaShortLabel } from "@/lib/area-display";
 
 type Mark = { objectiveId: string; code?: string | null; progressScale?: number | null };
 type Session = {
@@ -121,6 +121,7 @@ export function MonthlyFollowUpGrid(props: {
   sessionColumns?: ProgramSessionColumn[];
   flatMarks?: FlatMark[];
   onSaved: () => Promise<void> | void;
+  onToast?: (message: string, type?: "success" | "error") => void;
   readOnly?: boolean;
   showObjectiveNotes?: boolean;
   programMode?: boolean;
@@ -131,6 +132,7 @@ export function MonthlyFollowUpGrid(props: {
     sessionColumns = [],
     flatMarks = [],
     onSaved,
+    onToast,
     readOnly = false,
     showObjectiveNotes = true,
     programMode = false,
@@ -314,8 +316,11 @@ export function MonthlyFollowUpGrid(props: {
 
       await Promise.all(markJobs);
       await onSaved();
+      onToast?.("✅ Guardado correctamente", "success");
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Error al guardar");
+      const message = e instanceof Error ? e.message : "Error al guardar";
+      setErr(message);
+      onToast?.(message, "error");
     } finally {
       setBusy(false);
     }
@@ -325,20 +330,22 @@ export function MonthlyFollowUpGrid(props: {
     const displayNo = obj.globalNo ?? obj.idx;
     const chipLabel = obj.areaName ? areaShortLabel(obj.areaName) : null;
     const chipClass = obj.areaId ? areaChipClass(obj.areaId, areaIdsInOrder) : "";
+    const borderClass = obj.areaId ? areaBorderClass(obj.areaId, areaIdsInOrder) : "";
+    const headerClass = obj.areaId ? areaHeaderClass(obj.areaId, areaIdsInOrder) : "";
 
     return (
       <Fragment key={obj.id}>
-        {showAreaSeparator ? (
-          <tr className="border-b border-border bg-surface-elevated/50">
+        {showAreaSeparator && obj.areaName ? (
+          <tr className="border-b border-border">
             <td
               colSpan={columns.length + (showObjectiveNotes ? 2 : 1)}
-              className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-subtle"
+              className={`px-3 py-2 text-xs font-semibold ${headerClass}`}
             >
               {obj.areaName}
             </td>
           </tr>
         ) : null}
-        <tr key={obj.id} className="border-b border-border last:border-b-0">
+        <tr key={obj.id} className={`border-b border-border border-l-4 last:border-b-0 ${borderClass}`}>
           <td className="sticky left-0 z-10 max-w-[280px] border-r border-border bg-card px-3 py-2 align-top text-xs leading-snug">
             <div className="flex flex-wrap items-start gap-1.5">
               {chipLabel && obj.areaId ? (

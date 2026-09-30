@@ -50,6 +50,12 @@ export class PutProgramRowsDto {
 }
 
 export class CreateProgramSessionDto {
+  @IsOptional()
   @IsString()
-  date!: string;
+  date?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  dates?: string[];
 }

@@ -5,8 +5,10 @@ import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { resolveTrackingMode } from "@/lib/followup-area";
 import { calendarDateToUtcIso, formatCalendarDate, localDateInputValue } from "@/lib/date-utils";
-import { areaChipClass, areaShortLabel } from "@/lib/area-display";
+import { areaChipClass, areaHeaderClass } from "@/lib/area-display";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { useToast } from "@/components/ui/Toast";
+import { MultiDatePicker } from "@/components/ui/MultiDatePicker";
 import {
   MonthlyFollowUpGrid,
   type FlatMark,
@@ -58,6 +60,7 @@ type FollowUpNotes = {
   status: string;
   generalNotes: string | null;
   homeWork: string | null;
+  parentComments: string | null;
 };
 
 type DraftObjective = { id?: string; text: string; activities: string };
@@ -106,18 +109,21 @@ export function ProgramEditor(props: {
   backHref: string;
 }) {
   const { programId, backHref } = props;
+  const { showToast } = useToast();
 
   const [data, setData] = useState<ProgramPayload | null>(null);
   const [allAreas, setAllAreas] = useState<Area[]>([]);
   const [followUpNotes, setFollowUpNotes] = useState<Record<string, FollowUpNotes>>({});
   const [draftBlocks, setDraftBlocks] = useState<DraftAreaBlock[]>([]);
-  const [notesDraft, setNotesDraft] = useState<Record<string, { generalNotes: string; homeWork: string }>>({});
+  const [notesDraft, setNotesDraft] = useState<
+    Record<string, { generalNotes: string; homeWork: string; parentComments: string }>
+  >({});
   const [bankByArea, setBankByArea] = useState<Record<string, BankObjective[]>>({});
   const [bankQuery, setBankQuery] = useState<Record<string, string>>({});
   const [bankOpen, setBankOpen] = useState<string | null>(null);
-  const [sessionDate, setSessionDate] = useState(localDateInputValue());
-  const [msg, setMsg] = useState("");
-  const [msgType, setMsgType] = useState<"success" | "error">("success");
+  const [sessionMode, setSessionMode] = useState<"single" | "multi">("single");
+  const [singleSessionDate, setSingleSessionDate] = useState(localDateInputValue());
+  const [multiSessionDates, setMultiSessionDates] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [gridKey, setGridKey] = useState(0);
 
@@ -139,7 +145,7 @@ export function ProgramEditor(props: {
     )) as FollowUpNotes[];
 
     const notesMap: Record<string, FollowUpNotes> = {};
-    const draft: Record<string, { generalNotes: string; homeWork: string }> = {};
+    const draft: Record<string, { generalNotes: string; homeWork: string; parentComments: string }> = {};
     for (const fu of followups) {
       notesMap[fu.id] = fu;
     }
@@ -148,11 +154,13 @@ export function ProgramEditor(props: {
       draft[area.followUpId] = {
         generalNotes: fu?.generalNotes ?? "",
         homeWork: fu?.homeWork ?? "",
+        parentComments: fu?.parentComments ?? "",
       };
     }
     setFollowUpNotes(notesMap);
     setNotesDraft(draft);
     setGridKey((k) => k + 1);
+    return { payload, notesDraft: draft };
   }, [programId]);
 
   useEffect(() => {
@@ -162,11 +170,10 @@ export function ProgramEditor(props: {
         setAllAreas(areas);
         await reload();
       } catch (e: unknown) {
-        setMsgType("error");
-        setMsg(e instanceof Error ? e.message : "Error al cargar");
+        showToast(e instanceof Error ? e.message : "Error al cargar", "error");
       }
     })();
-  }, [reload]);
+  }, [reload, showToast]);
 
   const canLoadBank = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -220,6 +227,48 @@ export function ProgramEditor(props: {
 
   const programEmpty = data ? data.areas.length === 0 : false;
 
+  function buildRowsPayload() {
+    return draftBlocks
+      .filter((b) => b.objectives.some((o) => o.text.trim()))
+      .map((b) => ({
+        areaId: b.areaId,
+        objectives: b.objectives
+          .filter((o) => o.text.trim())
+          .map((o) => ({
+            ...(o.id ? { id: o.id } : {}),
+            text: o.text.trim(),
+            activities: o.activities.trim() || null,
+          })),
+      }));
+  }
+
+  async function persistRows() {
+    await apiFetch(`/programs/${programId}/rows`, {
+      method: "PUT",
+      body: JSON.stringify(buildRowsPayload()),
+    });
+  }
+
+  async function persistAllObservations(
+    areas: ProgramArea[],
+    drafts: Record<string, { generalNotes: string; homeWork: string; parentComments: string }>,
+    status: "DRAFT" | "CLOSED" = "DRAFT",
+  ) {
+    for (const area of areas) {
+      const draft = drafts[area.followUpId];
+      if (!draft) continue;
+      await apiFetch(`/followups/${area.followUpId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          generalNotes: draft.generalNotes,
+          homeWork: draft.homeWork,
+          parentComments: draft.parentComments,
+          status,
+        }),
+      });
+    }
+  }
+
   function addAreaBlock(areaId: string) {
     if (!areaId || usedAreaIds.has(areaId)) return;
     setDraftBlocks((prev) => [...prev, { areaId, objectives: [{ text: "", activities: "" }] }]);
@@ -264,31 +313,12 @@ export function ProgramEditor(props: {
 
   async function saveRows() {
     setBusy(true);
-    setMsg("");
     try {
-      const rows = draftBlocks
-        .filter((b) => b.objectives.some((o) => o.text.trim()))
-        .map((b) => ({
-          areaId: b.areaId,
-          objectives: b.objectives
-            .filter((o) => o.text.trim())
-            .map((o) => ({
-              ...(o.id ? { id: o.id } : {}),
-              text: o.text.trim(),
-              activities: o.activities.trim() || null,
-            })),
-        }));
-
-      await apiFetch(`/programs/${programId}/rows`, {
-        method: "PUT",
-        body: JSON.stringify(rows),
-      });
+      await persistRows();
       await reload();
-      setMsgType("success");
-      setMsg("✅ Programación guardada");
+      showToast("✅ Guardado correctamente");
     } catch (e: unknown) {
-      setMsgType("error");
-      setMsg(e instanceof Error ? e.message : "Error al guardar");
+      showToast(e instanceof Error ? e.message : "Error al guardar", "error");
     } finally {
       setBusy(false);
     }
@@ -296,15 +326,12 @@ export function ProgramEditor(props: {
 
   async function copyFromPrevious() {
     setBusy(true);
-    setMsg("");
     try {
       await apiFetch(`/programs/${programId}/copy-from-previous`, { method: "POST" });
       await reload();
-      setMsgType("success");
-      setMsg("✅ Programación copiada del mes anterior");
+      showToast("✅ Guardado correctamente");
     } catch (e: unknown) {
-      setMsgType("error");
-      setMsg(e instanceof Error ? e.message : "Error al copiar");
+      showToast(e instanceof Error ? e.message : "Error al copiar", "error");
     } finally {
       setBusy(false);
     }
@@ -312,19 +339,27 @@ export function ProgramEditor(props: {
 
   async function addSession() {
     if (!data) return;
+    const dates = sessionMode === "single" ? [singleSessionDate] : multiSessionDates;
+    if (!dates.length) {
+      showToast("Indique al menos una fecha válida", "error");
+      return;
+    }
     setBusy(true);
-    setMsg("");
     try {
+      const body =
+        sessionMode === "single"
+          ? { date: calendarDateToUtcIso(dates[0]) }
+          : { dates: dates.map((d) => calendarDateToUtcIso(d)) };
       await apiFetch(`/programs/${programId}/sessions`, {
         method: "POST",
-        body: JSON.stringify({ date: calendarDateToUtcIso(sessionDate) }),
+        body: JSON.stringify(body),
       });
       await reload();
-      setMsgType("success");
-      setMsg("✅ Sesión agregada");
+      setSingleSessionDate(localDateInputValue());
+      setMultiSessionDates([]);
+      showToast("✅ Guardado correctamente");
     } catch (e: unknown) {
-      setMsgType("error");
-      setMsg(e instanceof Error ? e.message : "Error al agregar sesión");
+      showToast(e instanceof Error ? e.message : "Error al agregar sesión", "error");
     } finally {
       setBusy(false);
     }
@@ -333,15 +368,12 @@ export function ProgramEditor(props: {
   async function deleteSession(date: string) {
     if (!confirm(`¿Eliminar la sesión del ${formatCalendarDate(date)} y todas sus marcas?`)) return;
     setBusy(true);
-    setMsg("");
     try {
       await apiFetch(`/programs/${programId}/sessions/${encodeURIComponent(date)}`, { method: "DELETE" });
       await reload();
-      setMsgType("success");
-      setMsg("✅ Sesión eliminada");
+      showToast("✅ Guardado correctamente");
     } catch (e: unknown) {
-      setMsgType("error");
-      setMsg(e instanceof Error ? e.message : "Error al eliminar sesión");
+      showToast(e instanceof Error ? e.message : "Error al eliminar sesión", "error");
     } finally {
       setBusy(false);
     }
@@ -351,21 +383,57 @@ export function ProgramEditor(props: {
     const draft = notesDraft[followUpId];
     if (!draft) return;
     setBusy(true);
-    setMsg("");
     try {
       await apiFetch(`/followups/${followUpId}`, {
         method: "PATCH",
         body: JSON.stringify({
           generalNotes: draft.generalNotes,
           homeWork: draft.homeWork,
+          parentComments: draft.parentComments,
         }),
       });
       await reload();
-      setMsgType("success");
-      setMsg("✅ Observaciones guardadas");
+      showToast("✅ Guardado correctamente");
     } catch (e: unknown) {
-      setMsgType("error");
-      setMsg(e instanceof Error ? e.message : "Error al guardar observaciones");
+      showToast(e instanceof Error ? e.message : "Error al guardar observaciones", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveDraft() {
+    setBusy(true);
+    try {
+      await persistRows();
+      const { payload, notesDraft: freshNotes } = await reload();
+      await persistAllObservations(payload.areas, freshNotes, "DRAFT");
+      await reload();
+      showToast("✅ Guardado correctamente");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Error al guardar borrador", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function publishProgram() {
+    if (
+      !confirm(
+        "¿Publicar este seguimiento? Ya no podrá modificarse (solo un administrador puede revertirlo).",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await persistRows();
+      const { payload, notesDraft: freshNotes } = await reload();
+      await persistAllObservations(payload.areas, freshNotes, "DRAFT");
+      await apiFetch(`/programs/${programId}/publish`, { method: "POST" });
+      await reload();
+      showToast("✅ Guardado correctamente");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Error al publicar", "error");
     } finally {
       setBusy(false);
     }
@@ -403,8 +471,6 @@ export function ProgramEditor(props: {
         </Link>
       </div>
 
-      {msg ? <p className={`text-sm ${msgType === "error" ? "text-danger" : "text-success"}`}>{msg}</p> : null}
-
       <section className="card space-y-4 border-l-4 border-l-primary">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Programación individual</h2>
@@ -429,7 +495,7 @@ export function ProgramEditor(props: {
                 data.areas.find((a) => a.areaId === block.areaId)?.areaName ??
                 monthlyAreas.find((a) => a.id === block.areaId)?.name ??
                 "Área";
-              const chipClass = areaChipClass(block.areaId, areaIdsInOrder);
+              const headerClass = areaHeaderClass(block.areaId, areaIdsInOrder);
               const query = bankQuery[block.areaId] ?? "";
               const bankItems = (bankByArea[block.areaId] ?? []).filter((item) => {
                 if (!query.trim()) return true;
@@ -437,13 +503,13 @@ export function ProgramEditor(props: {
               });
 
               return (
-                <div key={block.areaId} className="rounded-xl border border-border bg-surface-elevated/30 p-4">
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <span className={`rounded px-2 py-1 text-xs font-semibold ${chipClass}`}>{areaShortLabel(areaName)}</span>
+                <div key={block.areaId} className="overflow-hidden rounded-xl border border-border">
+                  <div className={`flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 ${headerClass}`}>
+                    <span className="text-sm font-semibold">{areaName}</span>
                     {!isLocked ? (
                       <button
                         type="button"
-                        className="text-xs text-danger hover:underline"
+                        className="text-xs text-white/90 underline hover:text-white"
                         disabled={busy}
                         onClick={() => removeAreaBlock(block.areaId)}
                       >
@@ -451,123 +517,124 @@ export function ProgramEditor(props: {
                       </button>
                     ) : null}
                   </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-border text-left text-subtle">
-                          <th className="w-12 px-2 py-2 font-semibold">No.</th>
-                          <th className="min-w-[220px] px-2 py-2 font-semibold">Objetivo específico</th>
-                          <th className="min-w-[180px] px-2 py-2 font-semibold">Actividades</th>
-                          {!isLocked ? <th className="w-10" /> : null}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {block.objectives.map((obj, objIdx) => {
-                          const key = obj.id ?? `${block.areaId}:${obj.text}`;
-                          const no = globalNumbers.get(key) ?? objIdx + 1;
-                          return (
-                            <tr key={`${block.areaId}-${objIdx}`} className="border-b border-border/60 last:border-b-0">
-                              <td className="px-2 py-2 align-top font-semibold text-primary">{no}</td>
-                              <td className="px-2 py-2 align-top">
-                                <div className="relative">
-                                  <textarea
-                                    className="textarea min-h-[56px] w-full text-sm"
-                                    value={obj.text}
-                                    disabled={busy || isLocked}
-                                    placeholder="Objetivo específico…"
-                                    onChange={(e) => updateObjective(block.areaId, objIdx, { text: e.target.value })}
-                                    onFocus={() => {
-                                      if (canLoadBank) void loadBankForArea(block.areaId);
-                                    }}
-                                  />
-                                  {canLoadBank && !isLocked && bankOpen === `${block.areaId}:${objIdx}` ? (
-                                    <>
+                  <div className="bg-surface-elevated/30 p-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[640px] border-collapse text-sm">
+                        <thead>
+                          <tr className="border-b border-border text-left text-subtle">
+                            <th className="w-12 px-2 py-2 font-semibold">No.</th>
+                            <th className="min-w-[220px] px-2 py-2 font-semibold">Objetivo específico</th>
+                            <th className="min-w-[180px] px-2 py-2 font-semibold">Actividades</th>
+                            {!isLocked ? <th className="w-10" /> : null}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {block.objectives.map((obj, objIdx) => {
+                            const key = obj.id ?? `${block.areaId}:${obj.text}`;
+                            const no = globalNumbers.get(key) ?? objIdx + 1;
+                            return (
+                              <tr key={`${block.areaId}-${objIdx}`} className="border-b border-border/60 last:border-b-0">
+                                <td className="px-2 py-2 align-top font-semibold text-primary">{no}</td>
+                                <td className="px-2 py-2 align-top">
+                                  <div className="relative">
+                                    <textarea
+                                      className="textarea min-h-[56px] w-full text-sm"
+                                      value={obj.text}
+                                      disabled={busy || isLocked}
+                                      placeholder="Objetivo específico…"
+                                      onChange={(e) => updateObjective(block.areaId, objIdx, { text: e.target.value })}
+                                      onFocus={() => {
+                                        if (canLoadBank) void loadBankForArea(block.areaId);
+                                      }}
+                                    />
+                                    {canLoadBank && !isLocked && bankOpen === `${block.areaId}:${objIdx}` ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          className="fixed inset-0 z-30"
+                                          aria-label="Cerrar banco"
+                                          onClick={() => setBankOpen(null)}
+                                        />
+                                        <div className="absolute left-0 top-full z-40 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+                                          <input
+                                            className="input w-full rounded-none border-0 border-b text-xs"
+                                            placeholder="Buscar en banco…"
+                                            value={query}
+                                            autoFocus
+                                            onChange={(e) =>
+                                              setBankQuery((prev) => ({ ...prev, [block.areaId]: e.target.value }))
+                                            }
+                                          />
+                                          {bankItems.length ? (
+                                            bankItems.slice(0, 20).map((item) => (
+                                              <button
+                                                key={item.id}
+                                                type="button"
+                                                className="block w-full px-3 py-2 text-left text-xs hover:bg-primary/10"
+                                                onClick={() => appendBankObjective(block.areaId, objIdx, item.description)}
+                                              >
+                                                {item.description}
+                                              </button>
+                                            ))
+                                          ) : (
+                                            <p className="px-3 py-2 text-xs text-subtle">Sin coincidencias</p>
+                                          )}
+                                        </div>
+                                      </>
+                                    ) : null}
+                                    {canLoadBank && !isLocked ? (
                                       <button
                                         type="button"
-                                        className="fixed inset-0 z-30"
-                                        aria-label="Cerrar banco"
-                                        onClick={() => setBankOpen(null)}
-                                      />
-                                      <div className="absolute left-0 top-full z-40 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
-                                        <input
-                                          className="input w-full rounded-none border-0 border-b text-xs"
-                                          placeholder="Buscar en banco…"
-                                          value={query}
-                                          autoFocus
-                                          onChange={(e) =>
-                                            setBankQuery((prev) => ({ ...prev, [block.areaId]: e.target.value }))
-                                          }
-                                        />
-                                        {bankItems.length ? (
-                                          bankItems.slice(0, 20).map((item) => (
-                                            <button
-                                              key={item.id}
-                                              type="button"
-                                              className="block w-full px-3 py-2 text-left text-xs hover:bg-primary/10"
-                                              onClick={() => appendBankObjective(block.areaId, objIdx, item.description)}
-                                            >
-                                              {item.description}
-                                            </button>
-                                          ))
-                                        ) : (
-                                          <p className="px-3 py-2 text-xs text-subtle">Sin coincidencias</p>
-                                        )}
-                                      </div>
-                                    </>
-                                  ) : null}
-                                  {canLoadBank && !isLocked ? (
+                                        className="mt-1 text-xs text-primary hover:underline"
+                                        onClick={() => {
+                                          void loadBankForArea(block.areaId);
+                                          setBankOpen(`${block.areaId}:${objIdx}`);
+                                        }}
+                                      >
+                                        Elegir del banco
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 align-top">
+                                  <textarea
+                                    className="textarea min-h-[56px] w-full text-sm"
+                                    value={obj.activities}
+                                    disabled={busy || isLocked}
+                                    placeholder="Actividades…"
+                                    onChange={(e) => updateObjective(block.areaId, objIdx, { activities: e.target.value })}
+                                  />
+                                </td>
+                                {!isLocked ? (
+                                  <td className="px-1 py-2 align-top">
                                     <button
                                       type="button"
-                                      className="mt-1 text-xs text-primary hover:underline"
-                                      onClick={() => {
-                                        void loadBankForArea(block.areaId);
-                                        setBankOpen(`${block.areaId}:${objIdx}`);
-                                      }}
+                                      className="text-xs text-danger hover:underline"
+                                      disabled={busy || block.objectives.length <= 1}
+                                      onClick={() => removeObjective(block.areaId, objIdx)}
                                     >
-                                      Elegir del banco
+                                      ✕
                                     </button>
-                                  ) : null}
-                                </div>
-                              </td>
-                              <td className="px-2 py-2 align-top">
-                                <textarea
-                                  className="textarea min-h-[56px] w-full text-sm"
-                                  value={obj.activities}
-                                  disabled={busy || isLocked}
-                                  placeholder="Actividades…"
-                                  onChange={(e) => updateObjective(block.areaId, objIdx, { activities: e.target.value })}
-                                />
-                              </td>
-                              {!isLocked ? (
-                                <td className="px-1 py-2 align-top">
-                                  <button
-                                    type="button"
-                                    className="text-xs text-danger hover:underline"
-                                    disabled={busy || block.objectives.length <= 1}
-                                    onClick={() => removeObjective(block.areaId, objIdx)}
-                                  >
-                                    ✕
-                                  </button>
-                                </td>
-                              ) : null}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                                  </td>
+                                ) : null}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
 
-                  {!isLocked ? (
-                    <button
-                      type="button"
-                      className="mt-3 text-sm text-primary hover:underline"
-                      disabled={busy}
-                      onClick={() => addObjective(block.areaId)}
-                    >
-                      + Agregar objetivo
-                    </button>
-                  ) : null}
+                    {!isLocked ? (
+                      <button
+                        type="button"
+                        className="mt-3 text-sm text-primary hover:underline"
+                        disabled={busy}
+                        onClick={() => addObjective(block.areaId)}
+                      >
+                        + Agregar objetivo
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               );
             })}
@@ -612,24 +679,51 @@ export function ProgramEditor(props: {
         <h2 className="text-lg font-semibold">Tabla de seguimiento</h2>
 
         {!isLocked ? (
-          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface-elevated/40 p-4">
-            <label className="grid gap-1 text-sm">
-              <span className="font-medium text-subtle">Fecha de sesión</span>
-              <input
-                type="date"
-                className="input w-auto"
-                value={sessionDate}
-                onChange={(e) => setSessionDate(e.target.value)}
+          <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface-elevated/40 p-4">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={`rounded-lg px-3 py-1 text-xs font-semibold ${sessionMode === "single" ? "bg-primary text-white" : "border border-border"}`}
+                onClick={() => setSessionMode("single")}
                 disabled={busy}
-              />
-            </label>
+              >
+                Una fecha
+              </button>
+              <button
+                type="button"
+                className={`rounded-lg px-3 py-1 text-xs font-semibold ${sessionMode === "multi" ? "bg-primary text-white" : "border border-border"}`}
+                onClick={() => setSessionMode("multi")}
+                disabled={busy}
+              >
+                Varias fechas
+              </button>
+            </div>
+
+            {sessionMode === "single" ? (
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium text-subtle">Fecha de sesión</span>
+                <input
+                  type="date"
+                  className="input w-auto"
+                  value={singleSessionDate}
+                  onChange={(e) => setSingleSessionDate(e.target.value)}
+                  disabled={busy}
+                />
+              </label>
+            ) : (
+              <div className="grid gap-1 text-sm">
+                <span className="font-medium text-subtle">Seleccione fechas en el calendario</span>
+                <MultiDatePicker selected={multiSessionDates} onChange={setMultiSessionDates} disabled={busy} />
+              </div>
+            )}
+
             <button
               type="button"
-              className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              className="btn-primary w-fit rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
               disabled={busy || data.areas.length === 0}
               onClick={() => void addSession()}
             >
-              + Agregar sesión
+              {sessionMode === "multi" ? "+ Agregar sesiones" : "+ Agregar sesión"}
             </button>
           </div>
         ) : null}
@@ -674,6 +768,7 @@ export function ProgramEditor(props: {
             sessionColumns={sessionColumns}
             flatMarks={flatMarks}
             onSaved={() => reload()}
+            onToast={showToast}
             readOnly={isLocked}
             showObjectiveNotes={false}
             programMode
@@ -690,13 +785,13 @@ export function ProgramEditor(props: {
         ) : (
           <div className="space-y-6">
             {data.areas.map((area) => {
-              const draft = notesDraft[area.followUpId] ?? { generalNotes: "", homeWork: "" };
+              const draft = notesDraft[area.followUpId] ?? { generalNotes: "", homeWork: "", parentComments: "" };
               const chipClass = areaChipClass(area.areaId, areaIdsInOrder);
               const areaLocked = followUpNotes[area.followUpId]?.status === "CLOSED";
               return (
                 <div key={area.followUpId} className="rounded-xl border border-border p-4">
                   <p className={`mb-3 inline-block rounded px-2 py-1 text-xs font-semibold ${chipClass}`}>
-                    {areaShortLabel(area.areaName)}
+                    {area.areaName}
                   </p>
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="grid gap-1 text-sm">
@@ -728,6 +823,20 @@ export function ProgramEditor(props: {
                       />
                     </label>
                   </div>
+                  <label className="mt-4 grid gap-1 text-sm">
+                    <span className="font-medium text-subtle">Comentarios que hizo la familia / tutores</span>
+                    <textarea
+                      className="textarea min-h-[100px]"
+                      value={draft.parentComments}
+                      disabled={busy || areaLocked}
+                      onChange={(e) =>
+                        setNotesDraft((prev) => ({
+                          ...prev,
+                          [area.followUpId]: { ...draft, parentComments: e.target.value },
+                        }))
+                      }
+                    />
+                  </label>
                   {!areaLocked ? (
                     <button
                       type="button"
@@ -746,6 +855,33 @@ export function ProgramEditor(props: {
           </div>
         )}
       </section>
+
+      {!isLocked && data.areas.length > 0 ? (
+        <section className="card space-y-4 border-l-4 border-l-primary">
+          <h2 className="text-lg font-semibold">Publicar programación</h2>
+          <p className="text-sm text-subtle">
+            Guarde la programación, observaciones y comentarios como borrador, o publíquelos para cerrar el mes.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              disabled={busy}
+              onClick={() => void saveDraft()}
+            >
+              {busy ? "Guardando…" : "Guardar borrador"}
+            </button>
+            <button
+              type="button"
+              className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              disabled={busy}
+              onClick={() => void publishProgram()}
+            >
+              {busy ? "Publicando…" : "Publicar seguimiento"}
+            </button>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

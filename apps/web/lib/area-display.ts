@@ -1,13 +1,18 @@
-const AREA_CHIP_PALETTE = [
-  "bg-sky-500/20 text-sky-800 dark:text-sky-200",
-  "bg-emerald-500/20 text-emerald-800 dark:text-emerald-200",
-  "bg-amber-500/20 text-amber-900 dark:text-amber-100",
-  "bg-violet-500/20 text-violet-800 dark:text-violet-200",
-  "bg-rose-500/20 text-rose-800 dark:text-rose-200",
-  "bg-teal-500/20 text-teal-800 dark:text-teal-200",
-  "bg-orange-500/20 text-orange-900 dark:text-orange-100",
-  "bg-indigo-500/20 text-indigo-800 dark:text-indigo-200",
+const AREA_PALETTE = [
+  { chip: "bg-sky-600 text-white", border: "border-l-sky-600", header: "bg-sky-600 text-white" },
+  { chip: "bg-emerald-600 text-white", border: "border-l-emerald-600", header: "bg-emerald-600 text-white" },
+  { chip: "bg-amber-600 text-white", border: "border-l-amber-600", header: "bg-amber-600 text-white" },
+  { chip: "bg-violet-600 text-white", border: "border-l-violet-600", header: "bg-violet-600 text-white" },
+  { chip: "bg-rose-600 text-white", border: "border-l-rose-600", header: "bg-rose-600 text-white" },
+  { chip: "bg-teal-600 text-white", border: "border-l-teal-600", header: "bg-teal-600 text-white" },
+  { chip: "bg-orange-600 text-white", border: "border-l-orange-600", header: "bg-orange-600 text-white" },
+  { chip: "bg-indigo-600 text-white", border: "border-l-indigo-600", header: "bg-indigo-600 text-white" },
 ] as const;
+
+function paletteIndex(areaId: string, areaIdsInOrder: string[]): number {
+  const idx = areaIdsInOrder.indexOf(areaId);
+  return idx >= 0 ? idx : hashString(areaId);
+}
 
 /** Nombre corto para chips en tablas de programación (p. ej. «Estimulación temprana…» → «Estim. temprana»). */
 export function areaShortLabel(name: string): string {
@@ -27,9 +32,15 @@ export function areaShortLabel(name: string): string {
 }
 
 export function areaChipClass(areaId: string, areaIdsInOrder: string[]): string {
-  const idx = areaIdsInOrder.indexOf(areaId);
-  const paletteIdx = idx >= 0 ? idx : hashString(areaId);
-  return AREA_CHIP_PALETTE[paletteIdx % AREA_CHIP_PALETTE.length];
+  return AREA_PALETTE[paletteIndex(areaId, areaIdsInOrder) % AREA_PALETTE.length].chip;
+}
+
+export function areaBorderClass(areaId: string, areaIdsInOrder: string[]): string {
+  return AREA_PALETTE[paletteIndex(areaId, areaIdsInOrder) % AREA_PALETTE.length].border;
+}
+
+export function areaHeaderClass(areaId: string, areaIdsInOrder: string[]): string {
+  return AREA_PALETTE[paletteIndex(areaId, areaIdsInOrder) % AREA_PALETTE.length].header;
 }
 
 function hashString(value: string): number {

@@ -6,6 +6,7 @@ import { FollowUpAccessService } from "./followup-access.service";
 import { FollowUpsService } from "./followups.service";
 import {
   CreateFollowUpProgramDto,
+  CreateProgramSessionDto,
   ProgramAreaRowDto,
 } from "./dto/followup-program.dto";
 
@@ -49,7 +50,7 @@ export class FollowUpProgramService {
           include: {
             area: { select: { id: true, key: true, name: true, sortOrder: true, trackingMode: true } },
           },
-          orderBy: { area: { sortOrder: "asc" } },
+          orderBy: { createdAt: "asc" },
         },
       },
     });
@@ -109,7 +110,7 @@ export class FollowUpProgramService {
               include: { marks: true },
             },
           },
-          orderBy: { area: { sortOrder: "asc" } },
+          orderBy: { createdAt: "asc" },
         },
       },
     });
@@ -274,8 +275,13 @@ export class FollowUpProgramService {
     return this.get(user, programId);
   }
 
-  async addSession(user: AuthUser, programId: string, dateIso: string) {
+  async addSessions(user: AuthUser, programId: string, dto: CreateProgramSessionDto) {
     await this.access.assertCanEditProgram(user, programId);
+
+    const dateIsos = dto.dates?.length ? dto.dates : dto.date ? [dto.date] : [];
+    if (dateIsos.length === 0) {
+      throw new BadRequestException("Indique al menos una fecha");
+    }
 
     const program = await this.prisma.followUpProgram.findUnique({
       where: { id: programId },
@@ -286,28 +292,35 @@ export class FollowUpProgramService {
       throw new BadRequestException("La programación no tiene áreas; guarde filas primero.");
     }
 
-    const sessionDate = normalizeUtcDate(dateIso);
-    if (
-      sessionDate.getUTCFullYear() !== program.periodYear ||
-      sessionDate.getUTCMonth() + 1 !== program.periodMonth
-    ) {
-      throw new BadRequestException("La fecha debe pertenecer al mes de la programación");
-    }
+    const sessionDates = dateIsos.map((iso) => {
+      const sessionDate = normalizeUtcDate(iso);
+      if (
+        sessionDate.getUTCFullYear() !== program.periodYear ||
+        sessionDate.getUTCMonth() + 1 !== program.periodMonth
+      ) {
+        throw new BadRequestException("La fecha debe pertenecer al mes de la programación");
+      }
+      return sessionDate;
+    });
 
-    for (const fu of program.followUps) {
-      const exists = await this.prisma.followUpSession.findFirst({
-        where: { followUpId: fu.id, sessionDate },
-      });
-      if (exists) continue;
+    await this.prisma.$transaction(async (tx) => {
+      for (const sessionDate of sessionDates) {
+        for (const fu of program.followUps) {
+          const exists = await tx.followUpSession.findFirst({
+            where: { followUpId: fu.id, sessionDate },
+          });
+          if (exists) continue;
 
-      await this.prisma.followUpSession.create({
-        data: {
-          followUpId: fu.id,
-          therapistId: fu.therapistId,
-          sessionDate,
-        },
-      });
-    }
+          await tx.followUpSession.create({
+            data: {
+              followUpId: fu.id,
+              therapistId: fu.therapistId,
+              sessionDate,
+            },
+          });
+        }
+      }
+    });
 
     return this.get(user, programId);
   }
@@ -359,7 +372,7 @@ export class FollowUpProgramService {
               orderBy: { idx: "asc" },
             },
           },
-          orderBy: { area: { sortOrder: "asc" } },
+          orderBy: { createdAt: "asc" },
         },
       },
     });
@@ -377,6 +390,43 @@ export class FollowUpProgramService {
     }));
 
     return this.putRows(user, programId, rows);
+  }
+
+  async publish(user: AuthUser, programId: string) {
+    await this.access.assertCanEditProgram(user, programId);
+
+    const program = await this.prisma.followUpProgram.findUnique({
+      where: { id: programId },
+      include: { followUps: { select: { id: true } } },
+    });
+    if (!program) throw new NotFoundException("Programación no encontrada");
+    if (program.followUps.length === 0) {
+      throw new BadRequestException("La programación no tiene áreas para publicar");
+    }
+
+    await this.prisma.$transaction(async () => {
+      for (const fu of program.followUps) {
+        await this.followUps.publishFollowUp(user, fu.id);
+      }
+    });
+
+    return this.get(user, programId);
+  }
+
+  async unpublish(user: AuthUser, programId: string) {
+    const program = await this.prisma.followUpProgram.findUnique({
+      where: { id: programId },
+      include: { followUps: { select: { id: true } } },
+    });
+    if (!program) throw new NotFoundException("Programación no encontrada");
+
+    await this.prisma.$transaction(async () => {
+      for (const fu of program.followUps) {
+        await this.followUps.unpublishFollowUp(user, fu.id);
+      }
+    });
+
+    return this.get(user, programId);
   }
 
   /** Fechas de sesión ya registradas en cualquier área del programa. */
