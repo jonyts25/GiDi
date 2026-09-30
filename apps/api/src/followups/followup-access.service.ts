@@ -143,4 +143,60 @@ export class FollowUpAccessService {
       throw new ForbiddenException("Su perfil no puede crear seguimientos en esta área");
     }
   }
+
+  async getProgramForAccess(programId: string) {
+    const program = await this.prisma.followUpProgram.findUnique({
+      where: { id: programId },
+      select: {
+        id: true,
+        patientId: true,
+        therapistId: true,
+        periodYear: true,
+        periodMonth: true,
+      },
+    });
+    if (!program) throw new NotFoundException("Programación no encontrada");
+    return program;
+  }
+
+  async assertCanViewProgram(user: AuthUser, programId: string) {
+    const program = await this.getProgramForAccess(programId);
+    await this.assertCanViewPatient(user, program.patientId);
+    return program;
+  }
+
+  async assertCanEditProgram(user: AuthUser, programId: string) {
+    const program = await this.getProgramForAccess(programId);
+    if (this.isOfficeStaff(user)) return program;
+
+    if (user.roles.includes("THERAPIST")) {
+      const assigned = await this.prisma.patientTherapist.findFirst({
+        where: { patientId: program.patientId, therapistId: user.sub },
+      });
+      if (!assigned) throw new ForbiddenException("Paciente no asignado");
+      if (program.therapistId !== user.sub) {
+        throw new ForbiddenException("Solo el terapeuta titular puede editar esta programación");
+      }
+      return program;
+    }
+
+    throw new ForbiddenException("No puede editar esta programación");
+  }
+
+  async assertCanCreateProgram(
+    user: AuthUser,
+    input: { patientId: string; therapistId: string },
+  ): Promise<void> {
+    await this.assertCanEditPatientFollowUps(user, input.patientId);
+    if (this.isOfficeStaff(user)) return;
+
+    if (user.roles.includes("THERAPIST")) {
+      if (input.therapistId !== user.sub) {
+        throw new ForbiddenException("Debe crear la programación a su nombre");
+      }
+      return;
+    }
+
+    throw new ForbiddenException("No puede crear programación para este paciente");
+  }
 }
