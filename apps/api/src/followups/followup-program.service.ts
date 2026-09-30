@@ -232,6 +232,8 @@ export class FollowUpProgramService {
       await this.prisma.followUp.delete({ where: { id: fu.id } });
     }
 
+    const programSessionDates = await this.existingProgramSessionDates(program.id);
+
     for (const row of rows) {
       const area = await this.prisma.area.findUnique({ where: { id: row.areaId } });
       if (!area) throw new NotFoundException("Área no encontrada");
@@ -257,6 +259,11 @@ export class FollowUpProgramService {
             periodMonth: program.periodMonth,
           },
         });
+        await this.createSessionsForNewFollowUp(
+          followUp.id,
+          program.therapistId,
+          programSessionDates,
+        );
       }
 
       await this.followUps.replaceObjectivesWithMeta(user, followUp.id, row.objectives, {
@@ -370,5 +377,34 @@ export class FollowUpProgramService {
     }));
 
     return this.putRows(user, programId, rows);
+  }
+
+  /** Fechas de sesión ya registradas en cualquier área del programa. */
+  private async existingProgramSessionDates(programId: string): Promise<Date[]> {
+    const rows = await this.prisma.followUpSession.findMany({
+      where: { followUp: { programId } },
+      select: { sessionDate: true },
+      distinct: ["sessionDate"],
+      orderBy: { sessionDate: "asc" },
+    });
+    return rows.map((r) => r.sessionDate);
+  }
+
+  /** Replica columnas de sesión existentes al agregar un área nueva al programa. */
+  private async createSessionsForNewFollowUp(
+    followUpId: string,
+    therapistId: string,
+    sessionDates: Date[],
+  ) {
+    if (sessionDates.length === 0) return;
+
+    await this.prisma.followUpSession.createMany({
+      data: sessionDates.map((sessionDate) => ({
+        followUpId,
+        therapistId,
+        sessionDate,
+      })),
+      skipDuplicates: true,
+    });
   }
 }
