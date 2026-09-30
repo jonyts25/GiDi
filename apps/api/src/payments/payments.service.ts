@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { PaymentStatus } from "@prisma/client";
+import { IncomeConcept, PaymentStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
 import { CENTER_PAYMENT_INFO, suggestedMonthly } from "./payment-config";
+import { incomeMethodLabel } from "./income-config";
 import { SetBillingDto } from "./dto/set-billing.dto";
 import { UpsertPaymentDto } from "./dto/upsert-payment.dto";
 import { UploadReceiptDto } from "./dto/upload-receipt.dto";
@@ -138,6 +139,39 @@ export class PaymentsService {
       take: parentOnly ? 6 : undefined,
     });
 
+    const incomeRows = await this.prisma.incomeEntry.findMany({
+      where: {
+        patientId,
+        concept: { in: [IncomeConcept.MENSUALIDAD, IncomeConcept.SESION_INDIVIDUAL] },
+      },
+      orderBy: [{ receivedAt: "asc" }],
+      select: {
+        periodYear: true,
+        periodMonth: true,
+        receivedAt: true,
+        amount: true,
+        method: true,
+      },
+    });
+
+    const entriesByPeriod = new Map<string, { receivedAt: string; amount: number; method: string }[]>();
+    for (const row of incomeRows) {
+      if (row.periodYear == null || row.periodMonth == null) continue;
+      const key = `${row.periodYear}-${row.periodMonth}`;
+      const list = entriesByPeriod.get(key) ?? [];
+      list.push({
+        receivedAt: row.receivedAt.toISOString(),
+        amount: Number(row.amount),
+        method: incomeMethodLabel(row.method),
+      });
+      entriesByPeriod.set(key, list);
+    }
+
+    const paymentsWithEntries = payments.map((p) => ({
+      ...p,
+      entries: entriesByPeriod.get(`${p.periodYear}-${p.periodMonth}`) ?? [],
+    }));
+
     const outstanding = payments.reduce(
       (acc, p) => acc + Math.max(p.amountDue - p.amountPaid, 0),
       0,
@@ -158,7 +192,7 @@ export class PaymentsService {
       },
       transferInfo: CENTER_PAYMENT_INFO[patient.center],
       totals: { outstanding },
-      payments,
+      payments: paymentsWithEntries,
     };
   }
 
@@ -207,23 +241,12 @@ export class PaymentsService {
       suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent) ?? 0;
 
     let amountDue = dto.amountDue ?? existing?.amountDue ?? defaultDue;
-    let amountPaid = dto.amountPaid ?? existing?.amountPaid ?? 0;
+    const amountPaid = existing?.amountPaid ?? 0;
     const status = dto.status ?? existing?.status ?? PaymentStatus.PENDIENTE;
 
     if (status === PaymentStatus.PAUSA_VACACIONES) {
       amountDue = 0;
-      amountPaid = 0;
     }
-
-    const data = {
-      amountDue,
-      amountPaid,
-      status,
-      paidAt: dto.paidAt ? new Date(dto.paidAt) : existing?.paidAt ?? undefined,
-      method: dto.method ?? undefined,
-      reference: dto.reference ?? undefined,
-      notes: dto.notes ?? undefined,
-    };
 
     const saved = await this.prisma.payment.upsert({
       where: { patientId_periodYear_periodMonth: { patientId, periodYear: year, periodMonth: month } },
@@ -231,23 +254,20 @@ export class PaymentsService {
         patientId,
         periodYear: year,
         periodMonth: month,
-        amountDue: data.amountDue,
-        amountPaid: data.amountPaid,
-        status: data.status,
-        paidAt: data.paidAt ?? null,
-        method: data.method ?? null,
-        reference: data.reference ?? null,
-        notes: data.notes ?? null,
+        amountDue,
+        amountPaid: 0,
+        status,
+        paidAt: null,
+        method: null,
+        reference: dto.reference ?? null,
+        notes: dto.notes ?? null,
         createdById: adminUserId,
       },
       update: {
-        amountDue: data.amountDue,
-        amountPaid: data.amountPaid,
-        status: data.status,
-        paidAt: dto.paidAt ? new Date(dto.paidAt) : undefined,
-        method: data.method,
-        reference: data.reference,
-        notes: data.notes,
+        amountDue,
+        status,
+        reference: dto.reference ?? undefined,
+        notes: dto.notes ?? undefined,
       },
       select: paymentSelect,
     });
