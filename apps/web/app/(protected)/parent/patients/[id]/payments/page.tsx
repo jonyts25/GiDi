@@ -18,7 +18,12 @@ import { formatShortDate } from "@/lib/income-helpers";
 
 type PaymentsView = {
   patient: { id: string; firstName: string; lastName: string; center: string };
-  billing: { sessionsPerWeek: number | null; discountPercent: number; suggestedMonthly: number | null };
+  billing: {
+    sessionsPerWeek: number | null;
+    discountPercent: number;
+    agreedMonthlyAmount: number | null;
+    suggestedMonthly: number | null;
+  };
   transferInfo: TransferInfo;
   totals: { outstanding: number };
   payments: PaymentRow[];

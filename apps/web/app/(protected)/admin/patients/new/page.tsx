@@ -9,7 +9,7 @@ import { hasOfficeStaffRole } from "@/lib/role-permissions";
 import { prepareFileForUpload } from "@/lib/compress-upload";
 import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
 import { FilePickerButton, MultiFilePickerButton } from "@/components/ui/FilePickerButton";
-import { suggestedMonthly } from "@/lib/payment-rates";
+import { billingAmountFor } from "@/lib/payment-rates";
 
 type DocCategory = "EVALUACION" | "REVALUACION" | "SEGUIMIENTO_PADRES";
 
@@ -49,6 +49,7 @@ export default function AdminNewPatientPage() {
   const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
   const [sessionsPerWeek, setSessionsPerWeek] = useState("");
   const [discountPercent, setDiscountPercent] = useState("0");
+  const [agreedMonthlyAmount, setAgreedMonthlyAmount] = useState("");
   const [payYear, setPayYear] = useState(String(new Date().getFullYear()));
   const [payMonth, setPayMonth] = useState(String(new Date().getMonth() + 1));
   const [payAmountDue, setPayAmountDue] = useState("");
@@ -124,15 +125,21 @@ export default function AdminNewPatientPage() {
     })();
   }, [router]);
 
-  // Recalcular monto a pagar al cambiar frecuencia / descuento
+  const hasAgreedAmount = agreedMonthlyAmount !== "" && Number(agreedMonthlyAmount) > 0;
+
+  // Recalcular monto a pagar al cambiar frecuencia / descuento / mensualidad acordada
   useEffect(() => {
     if (sessionsPerWeek === "" || sessionsPerWeek === "0") {
       if (sessionsPerWeek === "0") setPayAmountDue("");
       return;
     }
-    const suggested = suggestedMonthly(Number(sessionsPerWeek), Number(discountPercent) || 0);
-    if (suggested != null) setPayAmountDue(String(suggested));
-  }, [sessionsPerWeek, discountPercent]);
+    const amount = billingAmountFor({
+      agreedMonthlyAmount: hasAgreedAmount ? Number(agreedMonthlyAmount) : null,
+      sessionsPerWeek: Number(sessionsPerWeek),
+      discountPercent: Number(discountPercent) || 0,
+    });
+    if (amount != null) setPayAmountDue(String(amount));
+  }, [sessionsPerWeek, discountPercent, agreedMonthlyAmount, hasAgreedAmount]);
 
   function addGuardianFromExisting() {
     if (!pickedParentId) {
@@ -256,6 +263,7 @@ export default function AdminNewPatientPage() {
         center,
         sessionsPerWeek: sessionsPerWeek === "" ? undefined : Number(sessionsPerWeek),
         discountPercent: Number(discountPercent) || 0,
+        agreedMonthlyAmount: agreedMonthlyAmount === "" ? undefined : Number(agreedMonthlyAmount),
         therapistIds: selectedTherapistIds.length ? selectedTherapistIds : undefined,
       };
 
@@ -402,6 +410,21 @@ export default function AdminNewPatientPage() {
             </select>
           </label>
           <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Mensualidad acordada ($)</span>
+            <input
+              className="input w-32"
+              type="number"
+              min={0}
+              placeholder="Opcional"
+              value={agreedMonthlyAmount}
+              onChange={(e) => setAgreedMonthlyAmount(e.target.value)}
+              disabled={!!createdPatientId}
+            />
+            <span className="text-xs text-subtle">
+              Si se llena, se cobra este monto y se ignora el descuento %.
+            </span>
+          </label>
+          <label className="grid gap-1 text-sm">
             <span className="text-subtle">Descuento (%)</span>
             <input
               className="input w-24"
@@ -410,8 +433,11 @@ export default function AdminNewPatientPage() {
               max={100}
               value={discountPercent}
               onChange={(e) => setDiscountPercent(e.target.value)}
-              disabled={!!createdPatientId || sessionsPerWeek === "0"}
+              disabled={!!createdPatientId || sessionsPerWeek === "0" || hasAgreedAmount}
             />
+            {hasAgreedAmount ? (
+              <span className="text-xs text-subtle">No aplica: hay mensualidad acordada.</span>
+            ) : null}
           </label>
         </div>
         <p className="sub" style={{ marginTop: 8 }}>Primer mes registrado (opcional):</p>

@@ -107,6 +107,8 @@ model Patient {
   // Configuración de cobro (mensualidad por frecuencia + descuento opcional).
   sessionsPerWeek Int?
   discountPercent Int? @default(0)
+  /// Mensualidad fija acordada (pesos, sin centavos). Si > 0, manda sobre el cálculo por descuento.
+  agreedMonthlyAmount Int?
 
   /// Fecha de la última revaloración clínica (manual).
   lastRevaluationDate DateTime?

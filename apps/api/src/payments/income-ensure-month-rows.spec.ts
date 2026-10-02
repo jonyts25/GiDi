@@ -11,6 +11,7 @@ describe("IncomeService.ensureMonthRows", () => {
     id: "p1",
     sessionsPerWeek: 2,
     discountPercent: 0,
+    agreedMonthlyAmount: null,
     status: "ACTIVE",
     dischargedAt: null,
   };
@@ -94,6 +95,41 @@ describe("IncomeService.ensureMonthRows", () => {
     await buildService(prisma).ensureMonthRows(2026, 10);
 
     expect(created).toEqual([expect.objectContaining({ amountDue: 2150 })]);
+  });
+
+  it("crea octubre con 1500 cuando hay mensualidad acordada aunque septiembre tenía 2150", async () => {
+    let created: unknown[] = [];
+    const prisma = {
+      patient: {
+        findMany: async () => [
+          { ...activePatient, sessionsPerWeek: 1, discountPercent: 30, agreedMonthlyAmount: 1500 },
+        ],
+      },
+      payment: {
+        findMany: async (args: { where: { periodYear?: number; periodMonth?: number } }) => {
+          if (args.where.periodYear === 2026 && args.where.periodMonth === 10) {
+            return [];
+          }
+          return [
+            {
+              patientId: "p1",
+              periodYear: 2026,
+              periodMonth: 9,
+              amountDue: 2150,
+              status: PaymentStatus.PAGADO,
+            },
+          ];
+        },
+        createMany: async ({ data }: { data: unknown[] }) => {
+          created = data;
+          return { count: data.length };
+        },
+      },
+    } as unknown as PrismaService;
+
+    await buildService(prisma).ensureMonthRows(2026, 10);
+
+    expect(created).toEqual([expect.objectContaining({ amountDue: 1500 })]);
   });
 
   it("usa tarifa sugerida sin historial (2 sesiones → 4130)", async () => {

@@ -11,7 +11,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
-import { suggestedMonthly } from "./payment-config";
+import { billingAmountFor } from "./payment-config";
 import { PAYMENT_COUNTING_CONCEPTS } from "./income-config";
 import {
   aggregatePaymentFromEntries,
@@ -194,6 +194,7 @@ export class IncomeService {
         id: true,
         sessionsPerWeek: true,
         discountPercent: true,
+        agreedMonthlyAmount: true,
         status: true,
         dischargedAt: true,
       },
@@ -243,8 +244,7 @@ export class IncomeService {
       periodYear: year,
       periodMonth: month,
       amountDue: resolveInheritedAmountDue(
-        patient.sessionsPerWeek,
-        patient.discountPercent,
+        patient,
         historyByPatient.get(patient.id) ?? new Map(),
         year,
         month,
@@ -410,7 +410,13 @@ export class IncomeService {
 
     const patient = await tx.patient.findUnique({
       where: { id: patientId },
-      select: { id: true, sessionsPerWeek: true, discountPercent: true, center: true },
+      select: {
+        id: true,
+        sessionsPerWeek: true,
+        discountPercent: true,
+        agreedMonthlyAmount: true,
+        center: true,
+      },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
 
@@ -449,7 +455,7 @@ export class IncomeService {
         },
       });
       amountDue = resolveAmountDueFromBilling(
-        suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent),
+        billingAmountFor(patient),
         prevPayment?.amountDue,
       );
     }

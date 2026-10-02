@@ -63,11 +63,13 @@ describe("aggregatePaymentFromEntries", () => {
 });
 
 describe("resolveInheritedAmountDue", () => {
+  const patient2Sessions = { sessionsPerWeek: 2, discountPercent: 0, agreedMonthlyAmount: null };
+
   it("hereda el amountDue del mes anterior", () => {
     const history = new Map([
       ["2026-9", { amountDue: 4130, status: PaymentStatus.PENDIENTE }],
     ]);
-    expect(resolveInheritedAmountDue(2, 0, history, 2026, 10)).toBe(4130);
+    expect(resolveInheritedAmountDue(patient2Sessions, history, 2026, 10)).toBe(4130);
   });
 
   it("salta pausa del mes anterior y toma el último monto positivo en 6 meses", () => {
@@ -75,10 +77,24 @@ describe("resolveInheritedAmountDue", () => {
       ["2026-9", { amountDue: 0, status: PaymentStatus.PAUSA_VACACIONES }],
       ["2026-8", { amountDue: 2150, status: PaymentStatus.PAGADO }],
     ]);
-    expect(resolveInheritedAmountDue(2, 0, history, 2026, 10)).toBe(2150);
+    expect(resolveInheritedAmountDue(patient2Sessions, history, 2026, 10)).toBe(2150);
   });
 
   it("usa tarifa sugerida sin historial", () => {
-    expect(resolveInheritedAmountDue(2, 0, new Map(), 2026, 10)).toBe(4130);
+    expect(resolveInheritedAmountDue(patient2Sessions, new Map(), 2026, 10)).toBe(4130);
+  });
+
+  it("prioriza mensualidad acordada sobre historial", () => {
+    const history = new Map([
+      ["2026-9", { amountDue: 2150, status: PaymentStatus.PAGADO }],
+    ]);
+    expect(
+      resolveInheritedAmountDue(
+        { agreedMonthlyAmount: 1500, sessionsPerWeek: 1, discountPercent: 30 },
+        history,
+        2026,
+        10,
+      ),
+    ).toBe(1500);
   });
 });

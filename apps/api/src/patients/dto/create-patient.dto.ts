@@ -8,6 +8,7 @@ export class CreatePatientDto {
   center?: GidiCenter;
   sessionsPerWeek?: number;
   discountPercent?: number;
+  agreedMonthlyAmount?: number | null;
   therapistIds?: string[];
 
   /** Varios tutores: `existingParentId` o pareja `email`+`fullName` por elemento. Si se omite, se usa `parent` (compat). */

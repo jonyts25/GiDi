@@ -2,7 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { IncomeConcept, PaymentStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
-import { CENTER_PAYMENT_INFO, suggestedMonthly } from "./payment-config";
+import { billingAmountFor, CENTER_PAYMENT_INFO } from "./payment-config";
 import { incomeMethodLabel } from "./income-config";
 import { IncomeService } from "./income.service";
 import { previousPeriod, resolveAmountDueFromBilling } from "./recompute-payment";
@@ -115,6 +115,7 @@ export class PaymentsService {
         center: true,
         sessionsPerWeek: true,
         discountPercent: true,
+        agreedMonthlyAmount: true,
         monthlyBillingStatus: true,
       },
     });
@@ -177,7 +178,8 @@ export class PaymentsService {
       billing: {
         sessionsPerWeek: patient.sessionsPerWeek,
         discountPercent: patient.discountPercent ?? 0,
-        suggestedMonthly: suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent),
+        agreedMonthlyAmount: patient.agreedMonthlyAmount,
+        suggestedMonthly: billingAmountFor(patient),
         monthlyBillingStatus: patient.monthlyBillingStatus,
       },
       transferInfo: CENTER_PAYMENT_INFO[patient.center],
@@ -195,6 +197,8 @@ export class PaymentsService {
       data: {
         sessionsPerWeek: dto.sessionsPerWeek === undefined ? undefined : dto.sessionsPerWeek,
         discountPercent: dto.discountPercent ?? undefined,
+        agreedMonthlyAmount:
+          dto.agreedMonthlyAmount === undefined ? undefined : dto.agreedMonthlyAmount,
         center: dto.center ?? undefined,
         monthlyBillingStatus: dto.monthlyBillingStatus ?? undefined,
       },
@@ -202,6 +206,7 @@ export class PaymentsService {
         id: true,
         sessionsPerWeek: true,
         discountPercent: true,
+        agreedMonthlyAmount: true,
         center: true,
         monthlyBillingStatus: true,
       },
@@ -209,7 +214,7 @@ export class PaymentsService {
 
     return {
       ...updated,
-      suggestedMonthly: suggestedMonthly(updated.sessionsPerWeek, updated.discountPercent),
+      suggestedMonthly: billingAmountFor(updated),
     };
   }
 
@@ -219,7 +224,12 @@ export class PaymentsService {
 
     const patient = await this.prisma.patient.findUnique({
       where: { id: patientId },
-      select: { id: true, sessionsPerWeek: true, discountPercent: true },
+      select: {
+        id: true,
+        sessionsPerWeek: true,
+        discountPercent: true,
+        agreedMonthlyAmount: true,
+      },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
 
@@ -227,7 +237,7 @@ export class PaymentsService {
       where: { patientId_periodYear_periodMonth: { patientId, periodYear: year, periodMonth: month } },
     });
 
-    const suggested = suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent);
+    const suggested = billingAmountFor(patient);
     const defaultDue = suggested ?? 0;
     const previousStatus = existing?.status ?? null;
     const status = dto.status ?? existing?.status ?? PaymentStatus.PENDIENTE;
@@ -306,11 +316,16 @@ export class PaymentsService {
 
     const patient = await this.prisma.patient.findUnique({
       where: { id: patientId },
-      select: { id: true, sessionsPerWeek: true, discountPercent: true },
+      select: {
+        id: true,
+        sessionsPerWeek: true,
+        discountPercent: true,
+        agreedMonthlyAmount: true,
+      },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
 
-    const defaultDue = suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent) ?? 0;
+    const defaultDue = billingAmountFor(patient) ?? 0;
 
     const saved = await this.prisma.payment.upsert({
       where: { patientId_periodYear_periodMonth: { patientId, periodYear: year, periodMonth: month } },
@@ -429,6 +444,7 @@ export class PaymentsService {
             dischargedAt: true,
             sessionsPerWeek: true,
             discountPercent: true,
+            agreedMonthlyAmount: true,
             monthlyBillingStatus: true,
           },
         },
@@ -451,6 +467,7 @@ export class PaymentsService {
         dischargedAt: true,
         sessionsPerWeek: true,
         discountPercent: true,
+        agreedMonthlyAmount: true,
         monthlyBillingStatus: true,
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
@@ -466,7 +483,7 @@ export class PaymentsService {
         merged.push(existing);
         paymentByPatientId.delete(patient.id);
       } else {
-        const defaultDue = suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent) ?? 0;
+        const defaultDue = billingAmountFor(patient) ?? 0;
         merged.push({
           id: `virtual-${patient.id}`,
           periodYear: year,

@@ -1,6 +1,6 @@
 import { IncomeConcept, IncomeMethod, PaymentStatus } from "@prisma/client";
 import { incomeMethodLabel } from "./income-config";
-import { suggestedMonthly } from "./payment-config";
+import { PatientBillingProfile, suggestedMonthly } from "./payment-config";
 
 export type PaymentCountingEntry = {
   receivedAt: Date;
@@ -102,14 +102,17 @@ function periodKey(year: number, month: number): string {
   return `${year}-${month}`;
 }
 
-/** Hereda amountDue del mes anterior o de los 6 previos; si no hay, tarifa sugerida. */
+/** Hereda amountDue para meses nuevos: acordada > mes anterior > 6 previos > tarifa > 0. */
 export function resolveInheritedAmountDue(
-  sessionsPerWeek: number | null | undefined,
-  discountPercent: number | null | undefined,
+  patient: PatientBillingProfile,
   historyByPeriod: Map<string, PaymentHistoryEntry>,
   year: number,
   month: number,
 ): number {
+  if (patient.agreedMonthlyAmount != null && patient.agreedMonthlyAmount > 0) {
+    return patient.agreedMonthlyAmount;
+  }
+
   const prev = previousPeriod(year, month);
   const prevEntry = historyByPeriod.get(periodKey(prev.year, prev.month));
 
@@ -131,7 +134,7 @@ export function resolveInheritedAmountDue(
     ({ year: y, month: m } = previousPeriod(y, m));
   }
 
-  const suggested = suggestedMonthly(sessionsPerWeek, discountPercent);
+  const suggested = suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent);
   if (suggested != null && suggested > 0) return suggested;
   return 0;
 }

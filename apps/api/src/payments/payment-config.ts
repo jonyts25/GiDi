@@ -42,6 +42,12 @@ export const CENTER_PAYMENT_INFO: Record<GidiCenter, CenterPaymentInfo> = {
   },
 };
 
+export type PatientBillingProfile = {
+  agreedMonthlyAmount?: number | null;
+  sessionsPerWeek?: number | null;
+  discountPercent?: number | null;
+};
+
 /** Mensualidad sugerida a partir de frecuencia y descuento (%).
  * `sessionsPerWeek === 0` = pago por sesión (sin monto fijo). */
 export function suggestedMonthly(
@@ -53,4 +59,12 @@ export function suggestedMonthly(
   if (base == null) return null;
   const disc = Math.min(Math.max(discountPercent ?? 0, 0), 100);
   return Math.round(base * (1 - disc / 100));
+}
+
+/** Monto de cobro: mensualidad acordada si existe; si no, tarifa sugerida. */
+export function billingAmountFor(patient: PatientBillingProfile): number | null {
+  if (patient.agreedMonthlyAmount != null && patient.agreedMonthlyAmount > 0) {
+    return patient.agreedMonthlyAmount;
+  }
+  return suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent);
 }

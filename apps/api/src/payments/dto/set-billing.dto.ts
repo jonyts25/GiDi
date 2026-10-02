@@ -16,6 +16,13 @@ export class SetBillingDto {
   @Max(100)
   discountPercent?: number;
 
+  /** `null` quita la mensualidad acordada. */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsInt()
+  @Min(0)
+  agreedMonthlyAmount?: number | null;
+
   @IsOptional()
   @IsEnum(GidiCenter)
   center?: GidiCenter;

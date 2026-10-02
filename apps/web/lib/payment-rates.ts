@@ -5,6 +5,12 @@ export const MONTHLY_RATES: Record<number, number> = {
   3: 5000,
 };
 
+export type PatientBillingProfile = {
+  agreedMonthlyAmount?: number | null;
+  sessionsPerWeek?: number | null;
+  discountPercent?: number | null;
+};
+
 /** `0` = pago por sesión (precio variable). */
 export function suggestedMonthly(
   sessionsPerWeek: number | null | undefined,
@@ -15,6 +21,14 @@ export function suggestedMonthly(
   if (base == null) return null;
   const disc = Math.min(Math.max(discountPercent ?? 0, 0), 100);
   return Math.round(base * (1 - disc / 100));
+}
+
+/** Monto de cobro: mensualidad acordada si existe; si no, tarifa sugerida. */
+export function billingAmountFor(patient: PatientBillingProfile): number | null {
+  if (patient.agreedMonthlyAmount != null && patient.agreedMonthlyAmount > 0) {
+    return patient.agreedMonthlyAmount;
+  }
+  return suggestedMonthly(patient.sessionsPerWeek, patient.discountPercent);
 }
 
 export function isPayPerSession(sessionsPerWeek: number | null | undefined): boolean {

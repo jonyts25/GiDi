@@ -53,6 +53,7 @@ export class PatientsService {
           center: dto.center ?? undefined,
           sessionsPerWeek: dto.sessionsPerWeek ?? undefined,
           discountPercent: dto.discountPercent ?? undefined,
+          agreedMonthlyAmount: dto.agreedMonthlyAmount ?? undefined,
           assignments: therapistId
             ? {
                 create: { therapistId },

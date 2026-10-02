@@ -14,7 +14,7 @@ import {
   type PaymentRow,
 } from "@/components/payments/payment-helpers";
 import { GIDI_CENTER_OPTIONS } from "@/lib/centers";
-import { suggestedMonthly } from "@/lib/payment-rates";
+import { billingAmountFor } from "@/lib/payment-rates";
 import { formatShortDate } from "@/lib/income-helpers";
 
 type PaymentsView = {
@@ -22,6 +22,7 @@ type PaymentsView = {
   billing: {
     sessionsPerWeek: number | null;
     discountPercent: number;
+    agreedMonthlyAmount: number | null;
     suggestedMonthly: number | null;
     monthlyBillingStatus: MonthlyBillingStatus;
   };
@@ -35,6 +36,7 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
 
   const [sessionsPerWeek, setSessionsPerWeek] = useState<string>("");
   const [discountPercent, setDiscountPercent] = useState<string>("0");
+  const [agreedMonthlyAmount, setAgreedMonthlyAmount] = useState<string>("");
   const [center, setCenter] = useState<string>("SAN_AGUSTIN");
   const [monthlyBillingStatus, setMonthlyBillingStatus] = useState<MonthlyBillingStatus>("NORMAL");
 
@@ -49,6 +51,11 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
           : "",
     );
     setDiscountPercent(String(res.billing.discountPercent ?? 0));
+    setAgreedMonthlyAmount(
+      res.billing.agreedMonthlyAmount != null && res.billing.agreedMonthlyAmount > 0
+        ? String(res.billing.agreedMonthlyAmount)
+        : "",
+    );
     setCenter(res.patient.center);
     setMonthlyBillingStatus(res.billing.monthlyBillingStatus ?? "NORMAL");
   }, [patientId]);
@@ -65,14 +72,22 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
         body: JSON.stringify({
           sessionsPerWeek: sessionsPerWeek === "" ? null : Number(sessionsPerWeek),
           discountPercent: Number(discountPercent) || 0,
+          agreedMonthlyAmount:
+            agreedMonthlyAmount === "" ? null : Number(agreedMonthlyAmount),
           center,
           monthlyBillingStatus,
         }),
       });
+      const amountLabel =
+        res.suggestedMonthly != null
+          ? formatMoney(res.suggestedMonthly)
+          : sessionsPerWeek === "0"
+            ? "pago por sesión (variable)"
+            : "—";
       setMsg(
-        `✅ Cobro guardado · Mensualidad sugerida: ${
-          res.suggestedMonthly != null ? formatMoney(res.suggestedMonthly) : sessionsPerWeek === "0" ? "pago por sesión (variable)" : "—"
-        }`,
+        `✅ Cobro guardado · ${
+          agreedMonthlyAmount !== "" ? "Mensualidad acordada" : "Mensualidad sugerida"
+        }: ${amountLabel}`,
       );
       await reload();
     } catch (e: unknown) {
@@ -102,9 +117,14 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
     }
   }
 
-  const liveSuggested =
+  const hasAgreedAmount = agreedMonthlyAmount !== "" && Number(agreedMonthlyAmount) > 0;
+  const liveBillingAmount =
     sessionsPerWeek && sessionsPerWeek !== "0"
-      ? suggestedMonthly(Number(sessionsPerWeek), Number(discountPercent) || 0)
+      ? billingAmountFor({
+          agreedMonthlyAmount: hasAgreedAmount ? Number(agreedMonthlyAmount) : null,
+          sessionsPerWeek: Number(sessionsPerWeek),
+          discountPercent: Number(discountPercent) || 0,
+        })
       : null;
 
   return (
@@ -152,6 +172,20 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
             </select>
           </label>
           <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Mensualidad acordada ($)</span>
+            <input
+              className="input w-36"
+              type="number"
+              min={0}
+              placeholder="Opcional"
+              value={agreedMonthlyAmount}
+              onChange={(e) => setAgreedMonthlyAmount(e.target.value)}
+            />
+            <span className="text-xs text-subtle">
+              Si se llena, se cobra este monto y se ignora el descuento %.
+            </span>
+          </label>
+          <label className="grid gap-1 text-sm">
             <span className="text-subtle">Descuento (%)</span>
             <input
               className="input w-28"
@@ -160,21 +194,28 @@ export function AdminPaymentsPanel({ patientId }: { patientId: string }) {
               max={100}
               value={discountPercent}
               onChange={(e) => setDiscountPercent(e.target.value)}
-              disabled={sessionsPerWeek === "0"}
+              disabled={sessionsPerWeek === "0" || hasAgreedAmount}
             />
+            {hasAgreedAmount ? (
+              <span className="text-xs text-subtle">No aplica: hay mensualidad acordada.</span>
+            ) : null}
           </label>
           <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={() => void onSaveBilling()}>
             Guardar cobro
           </button>
           {sessionsPerWeek === "0" ? (
             <span className="text-sm text-subtle">Monto variable por sesión.</span>
-          ) : liveSuggested != null ? (
+          ) : liveBillingAmount != null ? (
             <span className="text-sm text-subtle">
-              Mensualidad sugerida: <strong className="text-ink">{formatMoney(liveSuggested)}</strong>
+              {hasAgreedAmount ? "Mensualidad acordada" : "Mensualidad sugerida"}:{" "}
+              <strong className="text-ink">{formatMoney(liveBillingAmount)}</strong>
             </span>
           ) : data?.billing.suggestedMonthly != null ? (
             <span className="text-sm text-subtle">
-              Mensualidad sugerida: <strong className="text-ink">{formatMoney(data.billing.suggestedMonthly)}</strong>
+              {data.billing.agreedMonthlyAmount != null && data.billing.agreedMonthlyAmount > 0
+                ? "Mensualidad acordada"
+                : "Mensualidad sugerida"}
+              : <strong className="text-ink">{formatMoney(data.billing.suggestedMonthly)}</strong>
             </span>
           ) : null}
         </div>
