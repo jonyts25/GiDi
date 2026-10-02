@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { filterAreasForUserRoles } from "@/lib/area-permissions";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { programPeriodOptions } from "@/lib/date-utils";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type FollowUpRow = {
@@ -27,9 +28,12 @@ export default function TherapistPatientFollowUpsPage() {
   const patientId = params.id;
 
   const now = new Date();
+  const programPeriods = useMemo(() => programPeriodOptions(now), []);
+  const defaultProgramPeriod = programPeriods[1] ?? programPeriods[0];
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [allMonths, setAllMonths] = useState(false);
+  const [programMonthsBack, setProgramMonthsBack] = useState(defaultProgramPeriod.monthsBack);
   const [areas, setAreas] = useState<Area[]>([]);
   const [rows, setRows] = useState<FollowUpRow[]>([]);
   const [msg, setMsg] = useState("");
@@ -39,12 +43,10 @@ export default function TherapistPatientFollowUpsPage() {
   const [programBusy, setProgramBusy] = useState(false);
   const [isOfficeStaff, setIsOfficeStaff] = useState(false);
 
-  const currentMonthLabel = useMemo(
-    () => new Date().toLocaleDateString("es-MX", { month: "long" }),
-    [],
+  const selectedProgramPeriod = useMemo(
+    () => programPeriods.find((p) => p.monthsBack === programMonthsBack) ?? defaultProgramPeriod,
+    [programPeriods, programMonthsBack, defaultProgramPeriod],
   );
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
 
   const canCreate = useMemo(() => pickedAreaId && therapistId, [pickedAreaId, therapistId]);
 
@@ -88,7 +90,7 @@ export default function TherapistPatientFollowUpsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId, year, month, therapistId, allMonths]);
 
-  async function openCurrentProgram() {
+  async function openProgram() {
     if (!therapistId) return;
     setProgramBusy(true);
     setMsg("");
@@ -98,8 +100,8 @@ export default function TherapistPatientFollowUpsPage() {
         body: JSON.stringify({
           patientId,
           therapistId,
-          periodYear: currentYear,
-          periodMonth: currentMonth,
+          periodYear: selectedProgramPeriod.periodYear,
+          periodMonth: selectedProgramPeriod.periodMonth,
         }),
       });
       router.push(`/therapist/programs/${program.id}`);
@@ -142,14 +144,30 @@ export default function TherapistPatientFollowUpsPage() {
       </div>
 
       <section className="card space-y-3">
-        <button
-          type="button"
-          className="btn-primary w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50 sm:w-auto"
-          disabled={!therapistId || programBusy}
-          onClick={() => void openCurrentProgram()}
-        >
-          {programBusy ? "Abriendo…" : `Programación de ${currentMonthLabel}`}
-        </button>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Mes de programación</span>
+            <select
+              className="select min-w-[200px]"
+              value={programMonthsBack}
+              onChange={(e) => setProgramMonthsBack(Number(e.target.value))}
+            >
+              {programPeriods.map((p) => (
+                <option key={p.monthsBack} value={p.monthsBack}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="btn-primary rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50"
+            disabled={!therapistId || programBusy}
+            onClick={() => void openProgram()}
+          >
+            {programBusy ? "Abriendo…" : `Programación de ${selectedProgramPeriod.label}`}
+          </button>
+        </div>
 
         <div className="flex flex-wrap gap-3 border-t border-border pt-4">
           <label className="grid gap-1 text-sm">

@@ -8,6 +8,7 @@ import { filterAreasForUserRoles } from "@/lib/area-permissions";
 import { resolveTrackingMode } from "@/lib/followup-area";
 import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { programPeriodOptions } from "@/lib/date-utils";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type Therapist = { id: string; fullName: string; email: string };
@@ -29,9 +30,12 @@ export default function AdminPatientFollowUpsPage() {
   const patientId = params.id;
 
   const now = new Date();
+  const programPeriods = useMemo(() => programPeriodOptions(now), []);
+  const defaultProgramPeriod = programPeriods[1] ?? programPeriods[0];
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [allMonths, setAllMonths] = useState(false);
+  const [programMonthsBack, setProgramMonthsBack] = useState(defaultProgramPeriod.monthsBack);
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [therapists, setTherapists] = useState<Therapist[]>([]);
@@ -43,12 +47,10 @@ export default function AdminPatientFollowUpsPage() {
   const [areaFilter, setAreaFilter] = useState("");
   const [programBusy, setProgramBusy] = useState(false);
 
-  const currentMonthLabel = useMemo(
-    () => new Date().toLocaleDateString("es-MX", { month: "long" }),
-    [],
+  const selectedProgramPeriod = useMemo(
+    () => programPeriods.find((p) => p.monthsBack === programMonthsBack) ?? defaultProgramPeriod,
+    [programPeriods, programMonthsBack, defaultProgramPeriod],
   );
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
 
   const textOnlyAreas = useMemo(
     () => areas.filter((a) => resolveTrackingMode(a) === "TEXT_ONLY"),
@@ -98,7 +100,7 @@ export default function AdminPatientFollowUpsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId, year, month, allMonths]);
 
-  async function openCurrentProgram() {
+  async function openProgram() {
     if (!pickedTherapistId) {
       setMsg("Seleccione un terapeuta para abrir la programación.");
       return;
@@ -111,8 +113,8 @@ export default function AdminPatientFollowUpsPage() {
         body: JSON.stringify({
           patientId,
           therapistId: pickedTherapistId,
-          periodYear: currentYear,
-          periodMonth: currentMonth,
+          periodYear: selectedProgramPeriod.periodYear,
+          periodMonth: selectedProgramPeriod.periodMonth,
         }),
       });
       router.push(`/admin/programs/${program.id}`);
@@ -174,13 +176,30 @@ export default function AdminPatientFollowUpsPage() {
 
         <hr />
 
-        <button
-          className="btn-primary rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50"
-          disabled={!pickedTherapistId || programBusy}
-          onClick={() => void openCurrentProgram()}
-        >
-          {programBusy ? "Abriendo…" : `Programación de ${currentMonthLabel}`}
-        </button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+          <label className="sub" style={{ display: "grid", gap: 4 }}>
+            Mes de programación
+            <select
+              className="input"
+              style={{ minWidth: 200 }}
+              value={programMonthsBack}
+              onChange={(e) => setProgramMonthsBack(Number(e.target.value))}
+            >
+              {programPeriods.map((p) => (
+                <option key={p.monthsBack} value={p.monthsBack}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            className="btn-primary rounded-xl px-4 py-3 text-sm font-semibold disabled:opacity-50"
+            disabled={!pickedTherapistId || programBusy}
+            onClick={() => void openProgram()}
+          >
+            {programBusy ? "Abriendo…" : `Programación de ${selectedProgramPeriod.label}`}
+          </button>
+        </div>
 
         <hr />
 

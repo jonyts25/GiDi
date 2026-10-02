@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
@@ -125,6 +125,7 @@ export function ProgramEditor(props: {
   const [bankByArea, setBankByArea] = useState<Record<string, BankObjective[]>>({});
   const [bankQuery, setBankQuery] = useState<Record<string, string>>({});
   const [bankOpen, setBankOpen] = useState<string | null>(null);
+  const bankRef = useRef<HTMLDivElement>(null);
   const [sessionMode, setSessionMode] = useState<"single" | "multi">("single");
   const [singleSessionDate, setSingleSessionDate] = useState(localDateInputValue());
   const [multiSessionDates, setMultiSessionDates] = useState<string[]>([]);
@@ -203,6 +204,28 @@ export function ProgramEditor(props: {
       return false;
     }
   }, []);
+
+  useEffect(() => {
+    if (!bankOpen) return;
+
+    const onMouseDown = (e: MouseEvent) => {
+      const el = bankRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setBankOpen(null);
+      }
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBankOpen(null);
+    };
+
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [bankOpen]);
 
   async function loadBankForArea(areaId: string) {
     if (!canLoadBank || bankByArea[areaId]) return;
@@ -618,16 +641,19 @@ export function ProgramEditor(props: {
                                       onFocus={() => {
                                         if (canLoadBank) void loadBankForArea(block.areaId);
                                       }}
+                                      onBlur={(e) => {
+                                        if (bankOpen !== `${block.areaId}:${objIdx}`) return;
+                                        const next = e.relatedTarget as Node | null;
+                                        if (next && bankRef.current?.contains(next)) return;
+                                        setBankOpen(null);
+                                      }}
                                     />
                                     {canLoadBank && !isLocked && bankOpen === `${block.areaId}:${objIdx}` ? (
                                       <>
-                                        <button
-                                          type="button"
-                                          className="fixed inset-0 z-30"
-                                          aria-label="Cerrar banco"
-                                          onClick={() => setBankOpen(null)}
-                                        />
-                                        <div className="absolute left-0 top-full z-40 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg">
+                                        <div
+                                          ref={bankRef}
+                                          className="absolute left-0 top-full z-40 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border bg-card shadow-lg"
+                                        >
                                           <input
                                             className="input w-full rounded-none border-0 border-b text-xs"
                                             placeholder="Buscar en banco…"

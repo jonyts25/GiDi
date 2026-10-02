@@ -717,65 +717,95 @@ export class FollowUpsService {
     id: string,
     objectives: { id?: string; text: string; activities?: string | null }[],
   ) {
-    const fu = await this.prisma.followUp.findUnique({
-      where: { id },
-      include: {
-        objectives: {
-          include: { _count: { select: { marks: true } } },
+    return this.prisma.$transaction(async (tx) => {
+      const fu = await tx.followUp.findUnique({
+        where: { id },
+        include: {
+          objectives: {
+            include: { _count: { select: { marks: true } } },
+          },
         },
-      },
+      });
+      if (!fu) throw new NotFoundException("FollowUp not found");
+
+      const normalized = objectives
+        .map((o) => ({
+          id: o.id,
+          text: o.text.trim(),
+          activities: o.activities ?? null,
+        }))
+        .filter((o) => o.text.length > 0);
+
+      const activeObjectives = fu.objectives.filter((o) => o.idx < ARCHIVED_OBJECTIVE_IDX);
+
+      // Paso 1: índices temporales negativos para evitar colisión @@unique([followUpId, idx]).
+      for (let i = 0; i < activeObjectives.length; i++) {
+        await tx.followUpObjective.update({
+          where: { id: activeObjectives[i].id },
+          data: { idx: -(i + 1) },
+        });
+      }
+
+      const usedIds = new Set<string>();
+      const matches: ((typeof fu.objectives)[number] | null)[] = [];
+
+      for (let i = 0; i < normalized.length; i++) {
+        const { id: objectiveId, text } = normalized[i];
+        const idx = i + 1;
+
+        const match =
+          (objectiveId
+            ? fu.objectives.find((o) => o.id === objectiveId && o.idx < ARCHIVED_OBJECTIVE_IDX)
+            : undefined) ??
+          fu.objectives.find(
+            (o) => !usedIds.has(o.id) && o.text === text && o.idx < ARCHIVED_OBJECTIVE_IDX,
+          ) ??
+          fu.objectives.find(
+            (o) => !usedIds.has(o.id) && o.idx === idx && o.idx < ARCHIVED_OBJECTIVE_IDX,
+          );
+
+        matches.push(match ?? null);
+        if (match) usedIds.add(match.id);
+      }
+
+      const maxArchivedIdx = fu.objectives
+        .filter((o) => o.idx >= ARCHIVED_OBJECTIVE_IDX)
+        .reduce((max, o) => Math.max(max, o.idx), ARCHIVED_OBJECTIVE_IDX - 1);
+      let archiveIdx = Math.max(maxArchivedIdx + 1, ARCHIVED_OBJECTIVE_IDX);
+
+      // Paso 2: archivar o borrar los que no vienen en el payload.
+      for (const obj of fu.objectives) {
+        if (usedIds.has(obj.id)) continue;
+        if (obj._count.marks > 0) {
+          await tx.followUpObjective.update({
+            where: { id: obj.id },
+            data: { idx: archiveIdx++ },
+          });
+        } else {
+          await tx.followUpObjective.delete({ where: { id: obj.id } });
+        }
+      }
+
+      // Paso 3: asignar idx finales 1..N (emparejamiento por id, luego por texto) y crear nuevos.
+      for (let i = 0; i < normalized.length; i++) {
+        const { text, activities } = normalized[i];
+        const idx = i + 1;
+        const match = matches[i];
+
+        if (match) {
+          await tx.followUpObjective.update({
+            where: { id: match.id },
+            data: { text, idx, activities },
+          });
+        } else {
+          await tx.followUpObjective.create({
+            data: { followUpId: id, idx, text, activities },
+          });
+        }
+      }
+
+      return { ok: true };
     });
-    if (!fu) throw new NotFoundException("FollowUp not found");
-
-    const normalized = objectives
-      .map((o) => ({
-        id: o.id,
-        text: o.text.trim(),
-        activities: o.activities ?? null,
-      }))
-      .filter((o) => o.text.length > 0);
-
-    const usedIds = new Set<string>();
-
-    for (let i = 0; i < normalized.length; i++) {
-      const { id: objectiveId, text, activities } = normalized[i];
-      const idx = i + 1;
-
-      let match =
-        (objectiveId
-          ? fu.objectives.find((o) => o.id === objectiveId && o.idx < ARCHIVED_OBJECTIVE_IDX)
-          : undefined) ??
-        fu.objectives.find((o) => !usedIds.has(o.id) && o.text === text && o.idx < ARCHIVED_OBJECTIVE_IDX) ??
-        fu.objectives.find((o) => !usedIds.has(o.id) && o.idx === idx && o.idx < ARCHIVED_OBJECTIVE_IDX);
-
-      if (match) {
-        await this.prisma.followUpObjective.update({
-          where: { id: match.id },
-          data: { text, idx, activities },
-        });
-        usedIds.add(match.id);
-      } else {
-        const created = await this.prisma.followUpObjective.create({
-          data: { followUpId: id, idx, text, activities },
-        });
-        usedIds.add(created.id);
-      }
-    }
-
-    let archiveIdx = ARCHIVED_OBJECTIVE_IDX;
-    for (const obj of fu.objectives) {
-      if (usedIds.has(obj.id)) continue;
-      if (obj._count.marks > 0) {
-        await this.prisma.followUpObjective.update({
-          where: { id: obj.id },
-          data: { idx: archiveIdx++ },
-        });
-      } else {
-        await this.prisma.followUpObjective.delete({ where: { id: obj.id } });
-      }
-    }
-
-    return { ok: true };
   }
 
   async updateObjectiveNotes(user: AuthUser, id: string, dto: UpdateObjectiveNotesDto) {
