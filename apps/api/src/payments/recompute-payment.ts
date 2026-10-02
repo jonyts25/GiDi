@@ -1,5 +1,6 @@
 import { IncomeConcept, IncomeMethod, PaymentStatus } from "@prisma/client";
 import { incomeMethodLabel } from "./income-config";
+import { suggestedMonthly } from "./payment-config";
 
 export type PaymentCountingEntry = {
   receivedAt: Date;
@@ -90,4 +91,47 @@ export function resolveAmountDueFromBilling(
 ): number {
   if (suggested != null) return suggested;
   return fallbackPreviousDue ?? 0;
+}
+
+export type PaymentHistoryEntry = {
+  amountDue: number;
+  status: PaymentStatus;
+};
+
+function periodKey(year: number, month: number): string {
+  return `${year}-${month}`;
+}
+
+/** Hereda amountDue del mes anterior o de los 6 previos; si no hay, tarifa sugerida. */
+export function resolveInheritedAmountDue(
+  sessionsPerWeek: number | null | undefined,
+  discountPercent: number | null | undefined,
+  historyByPeriod: Map<string, PaymentHistoryEntry>,
+  year: number,
+  month: number,
+): number {
+  const prev = previousPeriod(year, month);
+  const prevEntry = historyByPeriod.get(periodKey(prev.year, prev.month));
+
+  if (
+    prevEntry &&
+    prevEntry.status !== PaymentStatus.PAUSA_VACACIONES &&
+    prevEntry.amountDue > 0
+  ) {
+    return prevEntry.amountDue;
+  }
+
+  let y = prev.year;
+  let m = prev.month;
+  for (let i = 0; i < 6; i++) {
+    const entry = historyByPeriod.get(periodKey(y, m));
+    if (entry && entry.status !== PaymentStatus.PAUSA_VACACIONES && entry.amountDue > 0) {
+      return entry.amountDue;
+    }
+    ({ year: y, month: m } = previousPeriod(y, m));
+  }
+
+  const suggested = suggestedMonthly(sessionsPerWeek, discountPercent);
+  if (suggested != null && suggested > 0) return suggested;
+  return 0;
 }

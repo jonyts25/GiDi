@@ -1,5 +1,9 @@
 import { IncomeConcept, IncomeMethod, PaymentStatus } from "@prisma/client";
-import { aggregatePaymentFromEntries, PaymentCountingEntry } from "./recompute-payment";
+import {
+  aggregatePaymentFromEntries,
+  PaymentCountingEntry,
+  resolveInheritedAmountDue,
+} from "./recompute-payment";
 
 const baseDue = 4000;
 
@@ -55,5 +59,26 @@ describe("aggregatePaymentFromEntries", () => {
       PaymentStatus.PENDIENTE,
     );
     expect(feb.status).toBe(PaymentStatus.PAGADO);
+  });
+});
+
+describe("resolveInheritedAmountDue", () => {
+  it("hereda el amountDue del mes anterior", () => {
+    const history = new Map([
+      ["2026-9", { amountDue: 4130, status: PaymentStatus.PENDIENTE }],
+    ]);
+    expect(resolveInheritedAmountDue(2, 0, history, 2026, 10)).toBe(4130);
+  });
+
+  it("salta pausa del mes anterior y toma el último monto positivo en 6 meses", () => {
+    const history = new Map([
+      ["2026-9", { amountDue: 0, status: PaymentStatus.PAUSA_VACACIONES }],
+      ["2026-8", { amountDue: 2150, status: PaymentStatus.PAGADO }],
+    ]);
+    expect(resolveInheritedAmountDue(2, 0, history, 2026, 10)).toBe(2150);
+  });
+
+  it("usa tarifa sugerida sin historial", () => {
+    expect(resolveInheritedAmountDue(2, 0, new Map(), 2026, 10)).toBe(4130);
   });
 });

@@ -6,31 +6,13 @@ import { CENTER_PAYMENT_INFO, suggestedMonthly } from "./payment-config";
 import { incomeMethodLabel } from "./income-config";
 import { IncomeService } from "./income.service";
 import { previousPeriod, resolveAmountDueFromBilling } from "./recompute-payment";
+import { isInactiveForPeriod } from "./payment-period";
 import { SetBillingDto } from "./dto/set-billing.dto";
 import { UpsertPaymentDto } from "./dto/upsert-payment.dto";
 import { UploadReceiptDto } from "./dto/upload-receipt.dto";
 import { userHasOfficeStaffRole } from "../auth/role-permissions";
 
 const MAX_RECEIPT_BYTES = 20 * 1024 * 1024;
-
-function periodYm(year: number, month: number): number {
-  return year * 12 + (month - 1);
-}
-
-/**
- * Un paciente inactivo (alta/baja) deja de contar en ingresos desde el mes de
- * inactivación en adelante. Los meses anteriores se conservan (ingresos reales).
- */
-function isInactiveForPeriod(
-  patient: { status: string; dischargedAt: Date | null },
-  periodYear: number,
-  periodMonth: number,
-): boolean {
-  if (patient.status !== "DISCHARGED" || !patient.dischargedAt) return false;
-  const d = patient.dischargedAt;
-  const dischargeYm = periodYm(d.getUTCFullYear(), d.getUTCMonth() + 1);
-  return periodYm(periodYear, periodMonth) >= dischargeYm;
-}
 
 const paymentSelect = {
   id: true,
@@ -120,6 +102,9 @@ export class PaymentsService {
   /** Vista de pagos del paciente: configuración, datos de transferencia y meses. */
   async getPatientView(user: AuthUser, patientId: string) {
     await this.assertParentOrAdmin(user, patientId);
+
+    const now = new Date();
+    await this.income.ensureMonthRows(now.getFullYear(), now.getMonth() + 1);
 
     const patient = await this.prisma.patient.findUnique({
       where: { id: patientId },

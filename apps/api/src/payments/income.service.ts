@@ -18,7 +18,9 @@ import {
   PaymentCountingEntry,
   previousPeriod,
   resolveAmountDueFromBilling,
+  resolveInheritedAmountDue,
 } from "./recompute-payment";
+import { isInactiveForPeriod, isPastOrCurrentPeriod } from "./payment-period";
 import { CreateIncomeEntryDto, UpdateIncomeEntryDto } from "./dto/income-entry.dto";
 
 const incomeSelect = {
@@ -178,8 +180,91 @@ export class IncomeService {
     });
   }
 
+  async ensureMonthRows(year: number, month: number, center?: GidiCenter) {
+    if (month < 1 || month > 12) throw new BadRequestException("Mes inválido");
+    if (!isPastOrCurrentPeriod(year, month)) return;
+
+    const patients = await this.prisma.patient.findMany({
+      where: {
+        status: "ACTIVE",
+        monthlyBillingStatus: { not: "NO_INTEGRADO" },
+        ...(center ? { center } : {}),
+      },
+      select: {
+        id: true,
+        sessionsPerWeek: true,
+        discountPercent: true,
+        status: true,
+        dischargedAt: true,
+      },
+    });
+
+    const billablePatients = patients.filter((p) => !isInactiveForPeriod(p, year, month));
+    if (billablePatients.length === 0) return;
+
+    const patientIds = billablePatients.map((p) => p.id);
+    const existing = await this.prisma.payment.findMany({
+      where: {
+        patientId: { in: patientIds },
+        periodYear: year,
+        periodMonth: month,
+      },
+      select: { patientId: true },
+    });
+    const hasPayment = new Set(existing.map((p) => p.patientId));
+    const missing = billablePatients.filter((p) => !hasPayment.has(p.id));
+    if (missing.length === 0) return;
+
+    const missingIds = missing.map((p) => p.id);
+    const historyRows = await this.prisma.payment.findMany({
+      where: { patientId: { in: missingIds } },
+      select: {
+        patientId: true,
+        periodYear: true,
+        periodMonth: true,
+        amountDue: true,
+        status: true,
+      },
+    });
+
+    const historyByPatient = new Map<string, Map<string, { amountDue: number; status: PaymentStatus }>>();
+    for (const row of historyRows) {
+      const key = `${row.periodYear}-${row.periodMonth}`;
+      let map = historyByPatient.get(row.patientId);
+      if (!map) {
+        map = new Map();
+        historyByPatient.set(row.patientId, map);
+      }
+      map.set(key, { amountDue: row.amountDue, status: row.status });
+    }
+
+    const toCreate = missing.map((patient) => ({
+      patientId: patient.id,
+      periodYear: year,
+      periodMonth: month,
+      amountDue: resolveInheritedAmountDue(
+        patient.sessionsPerWeek,
+        patient.discountPercent,
+        historyByPatient.get(patient.id) ?? new Map(),
+        year,
+        month,
+      ),
+      amountPaid: 0,
+      status: PaymentStatus.PENDIENTE,
+    }));
+
+    if (toCreate.length === 0) return;
+
+    await this.prisma.payment.createMany({
+      data: toCreate,
+      skipDuplicates: true,
+    });
+  }
+
   async monthSheet(year: number, month: number, center?: GidiCenter) {
     if (month < 1 || month > 12) throw new BadRequestException("Mes inválido");
+
+    await this.ensureMonthRows(year, month, center);
 
     const payments = await this.prisma.payment.findMany({
       where: {
