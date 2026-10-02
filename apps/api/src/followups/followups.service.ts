@@ -773,8 +773,8 @@ export class FollowUpsService {
         .reduce((max, o) => Math.max(max, o.idx), ARCHIVED_OBJECTIVE_IDX - 1);
       let archiveIdx = Math.max(maxArchivedIdx + 1, ARCHIVED_OBJECTIVE_IDX);
 
-      // Paso 2: archivar o borrar los que no vienen en el payload.
-      for (const obj of fu.objectives) {
+      // Paso 2: archivar o borrar los activos que no vienen en el payload.
+      for (const obj of activeObjectives) {
         if (usedIds.has(obj.id)) continue;
         if (obj._count.marks > 0) {
           await tx.followUpObjective.update({
@@ -805,7 +805,7 @@ export class FollowUpsService {
       }
 
       return { ok: true };
-    });
+    }, { timeout: 15000 });
   }
 
   async updateObjectiveNotes(user: AuthUser, id: string, dto: UpdateObjectiveNotesDto) {
