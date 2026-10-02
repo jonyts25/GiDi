@@ -615,6 +615,7 @@ model TherapistScheduleSlot {
   label       String
   sortOrder   Int      @default(0)
   patientId   String?  @db.Uuid
+  isFree      Boolean  @default(false)
 
   therapist User    @relation(fields: [therapistId], references: [id], onDelete: Cascade)
   patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)

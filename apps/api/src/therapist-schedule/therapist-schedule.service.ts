@@ -30,6 +30,7 @@ export class TherapistScheduleService {
           label: true,
           sortOrder: true,
           patientId: true,
+          isFree: true,
           patient: {
             select: { firstName: true, lastName: true },
           },
@@ -50,6 +51,7 @@ export class TherapistScheduleService {
         label: s.label,
         sortOrder: s.sortOrder,
         patientId: s.patientId,
+        isFree: s.isFree,
         patient: s.patient,
       })),
     };
@@ -59,15 +61,20 @@ export class TherapistScheduleService {
     await this.ensureTherapist(therapistId);
 
     const cleanSlots = (dto.slots ?? [])
-      .filter((s) => s.startTime?.trim() && (s.label?.trim() || s.patientId))
+      .filter((s) => {
+        if (!s.startTime?.trim()) return false;
+        if (s.isFree) return true;
+        return Boolean(s.label?.trim() || s.patientId);
+      })
       .map((s, i) => ({
         therapistId,
         dayOfWeek: s.dayOfWeek,
         startTime: s.startTime.trim(),
         endTime: s.endTime?.trim() || null,
-        label: s.label?.trim() || "Paciente",
+        label: s.isFree ? "" : s.label?.trim() || "Paciente",
         sortOrder: s.sortOrder ?? i,
-        patientId: s.patientId || null,
+        patientId: s.isFree ? null : s.patientId || null,
+        isFree: Boolean(s.isFree),
       }));
 
     await this.prisma.$transaction([

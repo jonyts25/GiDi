@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -7,6 +8,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
@@ -27,9 +29,11 @@ export class ScheduleSlotDto {
   @MaxLength(20)
   endTime?: string | null;
 
+  @IsOptional()
+  @ValidateIf((o: ScheduleSlotDto) => !o.isFree)
   @IsString()
   @MaxLength(200)
-  label: string;
+  label?: string;
 
   @IsOptional()
   @IsInt()
@@ -38,6 +42,10 @@ export class ScheduleSlotDto {
   @IsOptional()
   @IsUUID()
   patientId?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isFree?: boolean;
 }
 
 export class ReplaceScheduleDto {
