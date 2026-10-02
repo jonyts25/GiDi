@@ -14,9 +14,14 @@ import {
   type IncomeEntryRow,
   type IncomeMethod,
 } from "@/lib/income-helpers";
-import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
+import {
+  GIDI_CENTER_OPTIONS,
+  labelForCenter,
+  type CenterFilter,
+  type GidiCenterKey,
+} from "@/lib/centers";
 
-type PatientMini = { id: string; firstName: string; lastName: string };
+type PatientMini = { id: string; firstName: string; lastName: string; center?: string };
 
 export type IncomeFormPrefill = {
   patientId?: string;
@@ -27,7 +32,7 @@ export type IncomeFormPrefill = {
 };
 
 type Props = {
-  center: GidiCenterKey;
+  pageCenter: CenterFilter;
   year: number;
   month: number;
   patients: PatientMini[];
@@ -40,8 +45,12 @@ type Props = {
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
+function defaultEntryCenter(pageCenter: CenterFilter): GidiCenterKey {
+  return pageCenter === "ALL" ? "SAN_AGUSTIN" : pageCenter;
+}
+
 export function IncomeEntryForm({
-  center,
+  pageCenter,
   year,
   month,
   patients,
@@ -51,6 +60,7 @@ export function IncomeEntryForm({
   onSaved,
   onCancel,
 }: Props) {
+  const isAllCenters = pageCenter === "ALL";
   const [receivedAt, setReceivedAt] = useState(todayIso());
   const [concept, setConcept] = useState<IncomeConcept>("MENSUALIDAD");
   const [patientQuery, setPatientQuery] = useState("");
@@ -62,7 +72,7 @@ export function IncomeEntryForm({
   const [method, setMethod] = useState<IncomeMethod>("EFECTIVO");
   const [invoiced, setInvoiced] = useState(false);
   const [notes, setNotes] = useState("");
-  const [entryCenter, setEntryCenter] = useState<GidiCenterKey>(center);
+  const [entryCenter, setEntryCenter] = useState<GidiCenterKey>(defaultEntryCenter(pageCenter));
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -91,8 +101,8 @@ export function IncomeEntryForm({
     setMethod("EFECTIVO");
     setInvoiced(false);
     setNotes("");
-    setEntryCenter(center);
-  }, [editing, prefill, center, year, month]);
+    setEntryCenter(defaultEntryCenter(pageCenter));
+  }, [editing, prefill, pageCenter, year, month]);
 
   const filteredPatients = useMemo(
     () => filterByQuery(patients, patientQuery, (p) => `${p.firstName} ${p.lastName}`),
@@ -101,14 +111,19 @@ export function IncomeEntryForm({
 
   const needsPatient = conceptRequiresPatient(concept);
   const needsPeriod = conceptRequiresPeriod(concept);
+  const showCenterSelect = isAllCenters ? !patientId : true;
+  const centerSelectDisabled = !isAllCenters && !!patientId;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isAllCenters && !patientId && !entryCenter) {
+      setMsg("Selecciona la sede");
+      return;
+    }
     setBusy(true);
     setMsg("");
     try {
-      const body = {
-        center: entryCenter,
+      const body: Record<string, unknown> = {
         receivedAt: new Date(receivedAt).toISOString(),
         concept,
         patientId: patientId || undefined,
@@ -120,6 +135,12 @@ export function IncomeEntryForm({
         invoiced,
         notes: notes.trim() || undefined,
       };
+
+      if (patientId) {
+        // API toma la sede del paciente.
+      } else if (isAllCenters || !centerSelectDisabled) {
+        body.center = entryCenter;
+      }
 
       if (editing) {
         await apiFetch(`/admin/income/${editing.id}`, { method: "PATCH", body: JSON.stringify(body) });
@@ -182,7 +203,10 @@ export function IncomeEntryForm({
             <select className="select" value={patientId} onChange={(e) => setPatientId(e.target.value)} required>
               <option value="">— Seleccionar —</option>
               {filteredPatients.map((p) => (
-                <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
+                <option key={p.id} value={p.id}>
+                  {p.firstName} {p.lastName}
+                  {isAllCenters && p.center ? ` (${labelForCenter(p.center)})` : ""}
+                </option>
               ))}
             </select>
           </div>
@@ -194,7 +218,10 @@ export function IncomeEntryForm({
               <select className="select" value={patientId} onChange={(e) => setPatientId(e.target.value)}>
                 <option value="">— Sin paciente —</option>
                 {filteredPatients.map((p) => (
-                  <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.firstName} {p.lastName}
+                    {isAllCenters && p.center ? ` (${labelForCenter(p.center)})` : ""}
+                  </option>
                 ))}
               </select>
             </div>
@@ -231,19 +258,22 @@ export function IncomeEntryForm({
           </>
         ) : null}
 
-        <label className="grid gap-1 text-sm">
-          <span className="font-medium">Dónde se recibió</span>
-          <select
-            className="select"
-            value={entryCenter}
-            onChange={(e) => setEntryCenter(e.target.value as GidiCenterKey)}
-            disabled={!!patientId}
-          >
-            {GIDI_CENTER_OPTIONS.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-        </label>
+        {showCenterSelect ? (
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">{isAllCenters ? "Sede (requerido)" : "Dónde se recibió"}</span>
+            <select
+              className="select"
+              value={entryCenter}
+              onChange={(e) => setEntryCenter(e.target.value as GidiCenterKey)}
+              disabled={centerSelectDisabled}
+              required={isAllCenters && !patientId}
+            >
+              {GIDI_CENTER_OPTIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
 
         <label className="grid gap-1 text-sm">
           <span className="font-medium">Medio de pago</span>

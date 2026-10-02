@@ -23,7 +23,7 @@ import {
   type IncomeEntryRow,
   type MonthSheetResponse,
 } from "@/lib/income-helpers";
-import { GIDI_CENTER_OPTIONS, type GidiCenterKey } from "@/lib/centers";
+import { GIDI_CENTER_OPTIONS, labelForCenter, type CenterFilter } from "@/lib/centers";
 import { canRegisterIncome, canViewRevenueOverview, hasFullAdminRole } from "@/lib/role-permissions";
 
 const now = new Date();
@@ -42,7 +42,7 @@ export default function AdminPaymentsOverviewPage() {
   const [tab, setTab] = useState<Tab>("mensualidades");
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
+  const [center, setCenter] = useState<CenterFilter>("SAN_AGUSTIN");
   const [query, setQuery] = useState("");
   const [conceptFilter, setConceptFilter] = useState<"" | IncomeConcept>("");
   const [sheet, setSheet] = useState<MonthSheetResponse | null>(null);
@@ -57,9 +57,16 @@ export default function AdminPaymentsOverviewPage() {
   const isAdmin = hasFullAdminRole(myRoles);
   const showKpis = canViewRevenueOverview(myRoles);
 
+  const isAllCenters = center === "ALL";
+
   const centerPatients = useMemo(
-    () => patients.filter((p) => !p.center || p.center === center),
-    [patients, center],
+    () => (isAllCenters ? patients : patients.filter((p) => !p.center || p.center === center)),
+    [patients, center, isAllCenters],
+  );
+
+  const patientCenterById = useMemo(
+    () => new Map(patients.map((p) => [p.id, p.center])),
+    [patients],
   );
 
   const filteredSheetRows = useMemo(() => {
@@ -93,18 +100,19 @@ export default function AdminPaymentsOverviewPage() {
     const params = new URLSearchParams({
       year: String(year),
       month: String(month),
-      center,
     });
+    if (!isAllCenters) params.set("center", center);
     const res = (await apiFetch(`/admin/payments/month-sheet?${params.toString()}`)) as MonthSheetResponse;
     setSheet(res);
-  }, [year, month, center]);
+  }, [year, month, center, isAllCenters]);
 
   const reloadIncome = useCallback(async () => {
     const { from, to } = monthRange(year, month);
-    const params = new URLSearchParams({ center, from, to });
+    const params = new URLSearchParams({ from, to });
+    if (!isAllCenters) params.set("center", center);
     const rows = (await apiFetch(`/admin/income?${params.toString()}`)) as IncomeEntryRow[];
     setIncomeRows(rows);
-  }, [year, month, center]);
+  }, [year, month, center, isAllCenters]);
 
   const reloadAll = useCallback(async () => {
     setMsg("");
@@ -257,7 +265,8 @@ export default function AdminPaymentsOverviewPage() {
       <section className="card flex flex-wrap items-end gap-3">
         <label className="grid gap-1 text-sm">
           <span className="text-subtle">Sede</span>
-          <select className="select w-40" value={center} onChange={(e) => setCenter(e.target.value as GidiCenterKey)}>
+          <select className="select w-44" value={center} onChange={(e) => setCenter(e.target.value as CenterFilter)}>
+            <option value="ALL">Todas las sedes</option>
             {GIDI_CENTER_OPTIONS.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
@@ -281,9 +290,11 @@ export default function AdminPaymentsOverviewPage() {
           <button type="button" className="btn rounded-xl px-3 py-2 text-sm" onClick={() => void exportCsv("month")}>
             Exportar mes
           </button>
-          <button type="button" className="btn rounded-xl px-3 py-2 text-sm" onClick={() => void exportCsv("center")}>
-            Exportar sede (todo)
-          </button>
+          {!isAllCenters ? (
+            <button type="button" className="btn rounded-xl px-3 py-2 text-sm" onClick={() => void exportCsv("center")}>
+              Exportar sede (todo)
+            </button>
+          ) : null}
           {isAdmin ? (
             <button type="button" className="btn rounded-xl px-3 py-2 text-sm" onClick={() => void exportCsv("all")}>
               Exportar histórico completo
@@ -335,6 +346,7 @@ export default function AdminPaymentsOverviewPage() {
             <thead>
               <tr className="border-b border-border text-left text-subtle">
                 <th className="py-2 pr-3">Paciente</th>
+                {isAllCenters ? <th className="py-2 pr-3">Sede</th> : null}
                 <th className="py-2 pr-3">Notas</th>
                 <th className="py-2 pr-3">Cuánto deben</th>
                 <th className="py-2 pr-3">Revisión</th>
@@ -348,7 +360,7 @@ export default function AdminPaymentsOverviewPage() {
             <tbody>
               {filteredSheetRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-4 text-subtle">
+                  <td colSpan={isAllCenters ? 10 : 9} className="py-4 text-subtle">
                     {sheet?.rows.length ? "Sin coincidencias." : "Sin pacientes este mes."}
                   </td>
                 </tr>
@@ -363,6 +375,11 @@ export default function AdminPaymentsOverviewPage() {
                           {row.firstName} {row.lastName}
                         </Link>
                       </td>
+                      {isAllCenters ? (
+                        <td className="py-2 pr-3 text-subtle">
+                          {labelForCenter(patientCenterById.get(row.patientId))}
+                        </td>
+                      ) : null}
                       <td className="py-2 pr-3">
                         <input
                           className="input min-w-[8rem] text-xs"
@@ -434,7 +451,7 @@ export default function AdminPaymentsOverviewPage() {
             {filteredSheetRows.length > 0 ? (
               <tfoot>
                 <tr className="border-t-2 border-border font-semibold">
-                  <td className="py-3 pr-3" colSpan={2}>TOTALES</td>
+                  <td className="py-3 pr-3" colSpan={isAllCenters ? 3 : 2}>TOTALES</td>
                   <td className="py-3 pr-3">{formatMoney(sheetTotals.totalDue)}</td>
                   <td className="py-3 pr-3" colSpan={2} />
                   <td className="py-3 pr-3">{formatMoney(sheetTotals.totalPaid)}</td>
@@ -456,7 +473,7 @@ export default function AdminPaymentsOverviewPage() {
 
           {showIncomeForm ? (
             <IncomeEntryForm
-              center={center}
+              pageCenter={center}
               year={year}
               month={month}
               patients={centerPatients}
@@ -485,6 +502,7 @@ export default function AdminPaymentsOverviewPage() {
               <thead>
                 <tr className="border-b border-border text-left text-subtle">
                   <th className="py-2 pr-3">Fecha</th>
+                  {isAllCenters ? <th className="py-2 pr-3">Sede</th> : null}
                   <th className="py-2 pr-3">Concepto</th>
                   <th className="py-2 pr-3">Paciente / pagador</th>
                   <th className="py-2 pr-3">Monto</th>
@@ -495,11 +513,14 @@ export default function AdminPaymentsOverviewPage() {
               </thead>
               <tbody>
                 {filteredIncome.length === 0 ? (
-                  <tr><td colSpan={7} className="py-4 text-subtle">Sin ingresos este mes.</td></tr>
+                  <tr><td colSpan={isAllCenters ? 8 : 7} className="py-4 text-subtle">Sin ingresos este mes.</td></tr>
                 ) : (
                   filteredIncome.map((row) => (
                     <tr key={row.id} className="border-b border-border/60">
                       <td className="py-2 pr-3">{formatShortDate(row.receivedAt)}</td>
+                      {isAllCenters ? (
+                        <td className="py-2 pr-3 text-subtle">{labelForCenter(row.center)}</td>
+                      ) : null}
                       <td className="py-2 pr-3">{labelIncomeConcept(row.concept)}</td>
                       <td className="py-2 pr-3">
                         {row.patient

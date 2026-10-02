@@ -1,5 +1,8 @@
 export type GidiCenterKey = "SAN_AGUSTIN" | "VALLARTA" | "COLEGIOS";
 
+/** Filtro de sede en ingresos; ALL = todas las sedes (sin parámetro center en API). */
+export type CenterFilter = GidiCenterKey | "ALL";
+
 export const GIDI_CENTER_OPTIONS: { value: GidiCenterKey; label: string }[] = [
   { value: "SAN_AGUSTIN", label: "San Agustín" },
   { value: "VALLARTA", label: "Vallarta" },
