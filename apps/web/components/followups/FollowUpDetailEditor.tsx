@@ -5,7 +5,11 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
-import { resolveTrackingMode, areaSupportsObjectiveSuggestions } from "@/lib/followup-area";
+import {
+  resolveTrackingMode,
+  areaSupportsObjectiveSuggestions,
+  isInternalOnlyAreaKey,
+} from "@/lib/followup-area";
 import { suggestionsForArea } from "@/lib/followup-suggestions";
 import { MonthlyFollowUpGrid } from "@/components/followups/MonthlyFollowUpGrid";
 import { NewFollowUpSessionForm } from "@/components/followups/NewFollowUpSessionForm";
@@ -170,6 +174,7 @@ export function FollowUpDetailEditor(props: {
   const tracking = useMemo(() => (fu?.area ? resolveTrackingMode(fu.area) : "MONTHLY_GRID"), [fu?.area]);
   const showSuggestions = useMemo(() => (fu?.area ? areaSupportsObjectiveSuggestions(fu.area) : false), [fu?.area]);
   const isAdmin = useMemo(() => hasFullAdminRole(loggedUser?.roles ?? []), [loggedUser]);
+  const isInternalArea = useMemo(() => isInternalOnlyAreaKey(fu?.area.key ?? ""), [fu?.area.key]);
   const isOfficeStaff = useMemo(() => hasOfficeStaffRole(loggedUser?.roles ?? []), [loggedUser]);
   const isLocked = fu?.status === "CLOSED" && !isOfficeStaff;
   const canDelete =
@@ -471,7 +476,12 @@ export function FollowUpDetailEditor(props: {
 
       <SaveBanner message={msg} type={msgType} />
 
-      {isAdmin ? (
+      {isInternalArea ? (
+        <section className="card border-l-4 border-l-violet-500/80 bg-violet-500/5 px-4 py-3 text-sm">
+          🔒 Comunicación interna: solo visible para dirección, secretaría y terapeutas. No aparece en el
+          expediente ni en reportes para papás o escuela.
+        </section>
+      ) : isAdmin ? (
         <section className="card space-y-3 border-l-4 border-l-accent-blue">
           <div>
             <h2 className="text-lg font-semibold">¿Quién puede ver este seguimiento?</h2>

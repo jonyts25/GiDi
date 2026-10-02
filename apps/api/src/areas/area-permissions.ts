@@ -8,7 +8,7 @@ export function filterAreasForUserRoles(roles: string[], areas: AreaLike[]): Are
   if (isAdmin) return areas;
 
   if (roles.includes("THERAPIST")) {
-    return areas.filter((a) => a.trackingMode === "MONTHLY_GRID");
+    return areas.filter((a) => a.trackingMode === "MONTHLY_GRID" || a.key === "COMUNICACION_INTERNA");
   }
 
   if (roles.includes("PARENT")) {
@@ -16,7 +16,7 @@ export function filterAreasForUserRoles(roles: string[], areas: AreaLike[]): Are
   }
 
   if (roles.includes("SECRETARY")) {
-    return areas.filter((a) => a.key === "ADMINISTRATIVO");
+    return areas.filter((a) => a.key === "ADMINISTRATIVO" || a.key === "COMUNICACION_INTERNA");
   }
 
   return [];

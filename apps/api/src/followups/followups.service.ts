@@ -9,6 +9,7 @@ import { UpsertMarkDto } from "./dto/upsert-mark.dto";
 import { UpdateObjectiveNotesDto } from "./dto/update-objective-notes.dto";
 import { AuthUser } from "../auth/auth-user";
 import { FollowUpAccessService } from "./followup-access.service";
+import { INTERNAL_ONLY_AREA_KEYS, isInternalOnlyAreaKey } from "../areas/area-catalog";
 import {
   computeAttendancePercent,
   lastObjectiveScores,
@@ -18,6 +19,19 @@ import {
 
 /** Objetivos archivados (con datos en cuadrícula pero fuera de la lista activa). */
 const ARCHIVED_OBJECTIVE_IDX = 1000;
+
+const NOT_INTERNAL_AREA_WHERE = {
+  area: { key: { notIn: [...INTERNAL_ONLY_AREA_KEYS] } },
+} satisfies Prisma.FollowUpWhereInput;
+
+function internalAreaForcedVisibility(areaKey: string) {
+  if (!isInternalOnlyAreaKey(areaKey)) return {};
+  return {
+    visibleToParent: false,
+    visibleToSchool: false,
+    visibleToTherapist: true,
+  };
+}
 
 function nowYear(): number {
   return new Date().getFullYear();
@@ -72,6 +86,10 @@ export class FollowUpsService {
       ];
     }
 
+    if (this.isExternalAudience(user)) {
+      Object.assign(where, NOT_INTERNAL_AREA_WHERE);
+    }
+
     return this.prisma.followUp.findMany({
       where,
       orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }, { createdAt: "desc" }],
@@ -122,6 +140,7 @@ export class FollowUpsService {
       include: followUpInclude,
     });
     if (!fu) throw new NotFoundException("FollowUp not found");
+    this.assertCanViewInternalFollowUp(user, fu.area.key);
     return fu;
   }
 
@@ -158,6 +177,7 @@ export class FollowUpsService {
           where: {
             status: FollowUpStatus.CLOSED,
             ...visibilityFilter,
+            ...NOT_INTERNAL_AREA_WHERE,
           },
           include: this.parentSummaryFollowUpInclude(),
           orderBy: { createdAt: "asc" },
@@ -211,6 +231,7 @@ export class FollowUpsService {
         ...(month ? { periodMonth: month } : {}),
         status: FollowUpStatus.CLOSED,
         ...this.parentVisibilityFilter(user),
+        ...NOT_INTERNAL_AREA_WHERE,
       },
       include: {
         ...this.parentSummaryFollowUpInclude(),
@@ -325,6 +346,11 @@ export class FollowUpsService {
     const orderedIds = ids.filter((id, idx) => ids.indexOf(id) === idx);
     const reports: ReturnType<FollowUpsService["buildFollowUpReport"]>[] = [];
     for (const id of orderedIds) {
+      const meta = await this.prisma.followUp.findUnique({
+        where: { id },
+        select: { area: { select: { key: true } } },
+      });
+      if (!meta || isInternalOnlyAreaKey(meta.area.key)) continue;
       const fu = await this.get(user, id);
       reports.push(this.buildFollowUpReport(fu));
     }
@@ -349,6 +375,7 @@ export class FollowUpsService {
         patientId,
         status: FollowUpStatus.CLOSED,
         visibleToParent: true,
+        ...NOT_INTERNAL_AREA_WHERE,
       },
       orderBy: [
         { periodYear: "desc" },
@@ -409,7 +436,7 @@ export class FollowUpsService {
     if (!patient) throw new NotFoundException("Paciente no encontrado");
 
     const followUps = await this.prisma.followUp.findMany({
-      where: { patientId },
+      where: { patientId, ...NOT_INTERNAL_AREA_WHERE },
       orderBy: [
         { periodYear: "desc" },
         { periodMonth: "desc" },
@@ -594,6 +621,7 @@ export class FollowUpsService {
           generalGoal: dto.generalGoal ?? null,
           generalNotes: dto.generalNotes ?? null,
           homeWork: dto.homeWork ?? null,
+          ...internalAreaForcedVisibility(area.key),
         },
         select: { id: true },
       });
@@ -656,6 +684,7 @@ export class FollowUpsService {
       await this.access.assertCanEditFollowUp(user, id);
     }
 
+    const forcedVisibility = internalAreaForcedVisibility(fu.area.key);
     await this.prisma.followUp.update({
       where: { id },
       data: {
@@ -665,12 +694,29 @@ export class FollowUpsService {
         parentComments: dto.parentComments ?? undefined,
         observationsAuthor: dto.observationsAuthor ?? undefined,
         status: dto.status ?? undefined,
-        visibleToParent: dto.visibleToParent ?? undefined,
-        visibleToTherapist: dto.visibleToTherapist ?? undefined,
-        visibleToSchool: dto.visibleToSchool ?? undefined,
+        ...(Object.keys(forcedVisibility).length
+          ? forcedVisibility
+          : {
+              visibleToParent: dto.visibleToParent ?? undefined,
+              visibleToTherapist: dto.visibleToTherapist ?? undefined,
+              visibleToSchool: dto.visibleToSchool ?? undefined,
+            }),
       },
     });
     return this.get(user, id);
+  }
+
+  private isExternalAudience(user: AuthUser): boolean {
+    if (this.access.isOfficeStaff(user) && !user.roles.includes("FINANCE")) return false;
+    if (user.roles.includes("THERAPIST")) return false;
+    return user.roles.some((r) => r === "PARENT" || r === "SCHOOL" || r === "FINANCE");
+  }
+
+  private assertCanViewInternalFollowUp(user: AuthUser, areaKey: string): void {
+    if (!isInternalOnlyAreaKey(areaKey)) return;
+    if (user.roles.some((r) => r === "PARENT" || r === "SCHOOL" || r === "FINANCE")) {
+      throw new ForbiddenException("No tiene acceso a este seguimiento");
+    }
   }
 
   async deleteFollowUp(user: AuthUser, id: string) {

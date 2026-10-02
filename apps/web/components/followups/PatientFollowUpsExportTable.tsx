@@ -15,6 +15,7 @@ import {
   type FollowUpDisplayRow,
   type FollowUpProgramListRow,
 } from "@/lib/followup-list-display";
+import { isInternalOnlyAreaKey } from "@/lib/followup-area";
 
 export type FollowUpListRow = {
   id: string;
@@ -48,7 +49,7 @@ export function PatientFollowUpsExportTable(props: {
     areaFilter = "",
     onAreaFilterChange,
     areas = [],
-    exportable = () => true,
+    exportable = (row) => !isInternalOnlyAreaKey(row.area.key ?? ""),
     isOfficeStaff = false,
     onRowsChanged,
   } = props;
@@ -95,6 +96,16 @@ export function PatientFollowUpsExportTable(props: {
   }, [rows, areaFilter]);
 
   const displayRows = useMemo(() => groupFollowUpListRows(filtered), [filtered]);
+
+  function rowIsInternal(item: FollowUpDisplayRow): boolean {
+    if (item.kind === "program") {
+      return item.followUpIds.some((id) => {
+        const row = rows.find((r) => r.id === id);
+        return row ? isInternalOnlyAreaKey(row.area.key ?? "") : false;
+      });
+    }
+    return isInternalOnlyAreaKey(item.row.area.key ?? "");
+  }
 
   const exportableFollowUpIds = useMemo(() => {
     const ids = new Set<string>();
@@ -347,6 +358,7 @@ export function PatientFollowUpsExportTable(props: {
             {displayRows.map((item) => {
               const canSelect = canSelectRow(item);
               const key = item.kind === "program" ? item.programId : item.row.id;
+              const internal = rowIsInternal(item);
               const label =
                 item.kind === "program"
                   ? formatProgramListLabel(
@@ -363,7 +375,10 @@ export function PatientFollowUpsExportTable(props: {
               const periodMonth = item.kind === "program" ? item.periodMonth : item.row.periodMonth;
 
               return (
-                <tr key={key} className="border-t border-border">
+                <tr
+                  key={key}
+                  className={`border-t border-border ${internal ? "border-l-4 border-l-violet-500/70 bg-violet-500/5" : ""}`}
+                >
                   <td className="py-2">
                     <input
                       type="checkbox"
@@ -373,7 +388,14 @@ export function PatientFollowUpsExportTable(props: {
                       aria-label={`Seleccionar ${label}`}
                     />
                   </td>
-                  <td className="py-2 font-medium">{label}</td>
+                  <td className="py-2 font-medium">
+                    {label}
+                    {internal ? (
+                      <span className="ml-2 text-xs font-normal text-violet-700 dark:text-violet-300">
+                        🔒 Solo personal
+                      </span>
+                    ) : null}
+                  </td>
                   {allMonths ? (
                     <td className="py-2 capitalize">
                       {new Date(periodYear, periodMonth - 1, 1).toLocaleDateString("es-MX", {

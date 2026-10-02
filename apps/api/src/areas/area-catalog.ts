@@ -15,7 +15,15 @@ export const TEXT_ONLY_AREA_KEYS = new Set([
   "TRATAMIENTO_PSICOLOGICO",
   "TRATAMIENTO_MEDICO",
   "SEGUIMIENTO_ESCOLAR",
+  "COMUNICACION_INTERNA",
 ]);
+
+/** Áreas visibles solo para personal interno (nunca papás, escuela ni exportaciones). */
+export const INTERNAL_ONLY_AREA_KEYS = new Set(["COMUNICACION_INTERNA"]);
+
+export function isInternalOnlyAreaKey(key: string): boolean {
+  return INTERNAL_ONLY_AREA_KEYS.has(key);
+}
 
 export const AREA_CATALOG: AreaCatalogEntry[] = [
   { key: "ADMINISTRATIVO", name: "Administrativo", category: "Gestión", sortOrder: 0, trackingMode: AreaTrackingMode.TEXT_ONLY },
@@ -23,6 +31,13 @@ export const AREA_CATALOG: AreaCatalogEntry[] = [
   { key: "TRATAMIENTO_PSICOLOGICO", name: "Tratamiento psicológico", category: "Gestión", sortOrder: 2, trackingMode: AreaTrackingMode.TEXT_ONLY },
   { key: "TRATAMIENTO_MEDICO", name: "Tratamiento médico", category: "Gestión", sortOrder: 3, trackingMode: AreaTrackingMode.TEXT_ONLY },
   { key: "SEGUIMIENTO_ESCOLAR", name: "Seguimiento escolar", category: "Gestión", sortOrder: 4, trackingMode: AreaTrackingMode.TEXT_ONLY },
+  {
+    key: "COMUNICACION_INTERNA",
+    name: "Comunicación interna",
+    category: "Gestión",
+    sortOrder: 5,
+    trackingMode: AreaTrackingMode.TEXT_ONLY,
+  },
   { key: "LECTURA", name: "Lectura", category: "Tratamiento", sortOrder: 10, trackingMode: AreaTrackingMode.MONTHLY_GRID },
   { key: "VISUALES", name: "Visuales", category: "Tratamiento", sortOrder: 11, trackingMode: AreaTrackingMode.MONTHLY_GRID },
   { key: "AUDITIVAS", name: "Auditivas", category: "Tratamiento", sortOrder: 12, trackingMode: AreaTrackingMode.MONTHLY_GRID },

@@ -9,7 +9,7 @@ import { hasOfficeStaffRole } from "@/lib/role-permissions";
 import { labelForCenter } from "@/lib/centers";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { openDataUrlInNewTab } from "@/lib/open-data-url";
-import { resolveTrackingMode } from "@/lib/followup-area";
+import { isInternalOnlyAreaKey, resolveTrackingMode } from "@/lib/followup-area";
 import {
   formatMoney,
   monthLabel,
@@ -74,10 +74,20 @@ function FollowUpList({ rows }: { rows: FollowUpRow[] }) {
 
   return (
     <ul className="space-y-2">
-      {rows.map((r) => (
-        <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+      {rows.map((r) => {
+        const internal = isInternalOnlyAreaKey(r.area.key);
+        return (
+        <li
+          key={r.id}
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${
+            internal ? "border-violet-500/60 bg-violet-500/5 border-l-4 border-l-violet-500/70" : "border-border"
+          }`}
+        >
           <span className="min-w-0">
             <strong>{r.area.name}</strong>
+            {internal ? (
+              <span className="ml-2 text-xs font-normal text-violet-700 dark:text-violet-300">🔒 Solo personal</span>
+            ) : null}
             <span className="text-subtle">
               {" "}
               · {monthLabel(r.periodYear, r.periodMonth)} · {r.therapist.fullName} · {followUpStatusLabel(r.status)}
@@ -87,7 +97,8 @@ function FollowUpList({ rows }: { rows: FollowUpRow[] }) {
             Ver
           </Link>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

@@ -6,7 +6,15 @@ export const TEXT_ONLY_AREA_KEYS = new Set([
   "TRATAMIENTO_PSICOLOGICO",
   "TRATAMIENTO_MEDICO",
   "SEGUIMIENTO_ESCOLAR",
+  "COMUNICACION_INTERNA",
 ]);
+
+/** Áreas visibles solo para personal interno (nunca papás, escuela ni exportaciones). */
+export const INTERNAL_ONLY_AREA_KEYS = new Set(["COMUNICACION_INTERNA"]);
+
+export function isInternalOnlyAreaKey(key: string): boolean {
+  return INTERNAL_ONLY_AREA_KEYS.has(key);
+}
 
 /** Coincide con `Area.trackingMode` del API; si falta, infiere por clave/nombre. */
 export function resolveTrackingMode(area: {
@@ -26,7 +34,9 @@ export function resolveTrackingMode(area: {
     n.includes("tratamiento psicológico") ||
     n.includes("tratamiento medico") ||
     n.includes("tratamiento médico") ||
-    n.includes("seguimiento escolar")
+    n.includes("seguimiento escolar") ||
+    n.includes("comunicación interna") ||
+    n.includes("comunicacion interna")
   ) {
     return "TEXT_ONLY";
   }

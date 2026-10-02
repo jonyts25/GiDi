@@ -71,7 +71,10 @@ export class FollowUpAccessService {
       if (ok && (!areaKey || areaKey === "FAMILIAR")) return;
     }
 
-    if (user.roles.includes("SECRETARY") && areaKey === "ADMINISTRATIVO") {
+    if (
+      user.roles.includes("SECRETARY") &&
+      (areaKey === "ADMINISTRATIVO" || areaKey === "COMUNICACION_INTERNA")
+    ) {
       return;
     }
 
@@ -113,7 +116,10 @@ export class FollowUpAccessService {
       throw new ForbiddenException("No puede editar este seguimiento");
     }
 
-    if (user.roles.includes("SECRETARY") && fu.area.key === "ADMINISTRATIVO") {
+    if (
+      user.roles.includes("SECRETARY") &&
+      (fu.area.key === "ADMINISTRATIVO" || fu.area.key === "COMUNICACION_INTERNA")
+    ) {
       return;
     }
 
