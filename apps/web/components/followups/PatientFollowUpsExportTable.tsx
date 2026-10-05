@@ -222,10 +222,14 @@ export function PatientFollowUpsExportTable(props: {
     }
     setExporting(true);
     try {
-      const data = (await apiFetch("/followups/bulk-report", {
-        method: "POST",
-        body: JSON.stringify({ ids }),
-      })) as { reports: FollowUpReport[]; generatedAt: string };
+      const data = (await apiFetch(
+        "/followups/bulk-report",
+        {
+          method: "POST",
+          body: JSON.stringify({ ids }),
+        },
+        30_000,
+      )) as { reports: FollowUpReport[]; generatedAt: string };
 
       if (!data.reports?.length) {
         showToast("No se pudieron cargar los seguimientos seleccionados", "error");

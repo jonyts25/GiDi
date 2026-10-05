@@ -1,17 +1,35 @@
 import { getApiBaseUrl } from "./get-api-base-url";
 
-export async function apiFetch(path: string, init?: RequestInit) {
+export async function apiFetch(path: string, init?: RequestInit, timeoutMs?: number) {
   const base = getApiBaseUrl();
   const token = typeof window !== "undefined" ? localStorage.getItem("gidi_token") : null;
 
-  const res = await fetch(`${base}${path.startsWith("/") ? path : `/${path}`}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
+  const controller = timeoutMs != null ? new AbortController() : null;
+  const timeoutId =
+    controller && timeoutMs != null
+      ? setTimeout(() => controller.abort(), timeoutMs)
+      : null;
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path.startsWith("/") ? path : `/${path}`}`, {
+      ...init,
+      signal: controller?.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("La solicitud tardó demasiado. Intente de nuevo con menos áreas seleccionadas.");
+    }
+    throw err;
+  }
+
+  if (timeoutId) clearTimeout(timeoutId);
 
   const ct = res.headers.get("content-type") ?? "";
   if (!ct.includes("application/json")) {

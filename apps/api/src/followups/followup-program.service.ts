@@ -9,6 +9,7 @@ import {
   CreateProgramSessionDto,
   ProgramAreaRowDto,
 } from "./dto/followup-program.dto";
+import { ProgramMarkItemDto } from "./dto/program-marks.dto";
 
 const ARCHIVED_OBJECTIVE_IDX = 1000;
 
@@ -392,6 +393,71 @@ export class FollowUpProgramService {
     return this.putRows(user, programId, rows);
   }
 
+  async upsertMarks(user: AuthUser, programId: string, marks: ProgramMarkItemDto[]) {
+    if (marks.length > 500) {
+      throw new BadRequestException("Máximo 500 marcas por petición");
+    }
+
+    await this.access.assertCanEditProgram(user, programId);
+
+    const program = await this.prisma.followUpProgram.findUnique({
+      where: { id: programId },
+      include: { followUps: { select: { id: true } } },
+    });
+    if (!program) throw new NotFoundException("Programación no encontrada");
+
+    const allowedFollowUpIds = new Set(program.followUps.map((fu) => fu.id));
+    for (const item of marks) {
+      if (!allowedFollowUpIds.has(item.followUpId)) {
+        throw new BadRequestException("Marca fuera de la programación");
+      }
+    }
+
+    if (marks.length === 0) {
+      return this.get(user, programId);
+    }
+
+    const sessionIds = [...new Set(marks.map((m) => m.sessionId))];
+    const objectiveIds = [...new Set(marks.map((m) => m.objectiveId))];
+
+    const [sessions, objectives] = await Promise.all([
+      this.prisma.followUpSession.findMany({
+        where: { id: { in: sessionIds } },
+        select: { id: true, followUpId: true },
+      }),
+      this.prisma.followUpObjective.findMany({
+        where: { id: { in: objectiveIds } },
+        select: { id: true, followUpId: true },
+      }),
+    ]);
+
+    const sessionById = new Map(sessions.map((s) => [s.id, s]));
+    const objectiveById = new Map(objectives.map((o) => [o.id, o]));
+
+    for (const item of marks) {
+      const session = sessionById.get(item.sessionId);
+      if (!session || session.followUpId !== item.followUpId) {
+        throw new NotFoundException("Sesión no encontrada");
+      }
+      const objective = objectiveById.get(item.objectiveId);
+      if (!objective || objective.followUpId !== item.followUpId) {
+        throw new NotFoundException("Objetivo no encontrado");
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of marks) {
+        const parsed = this.followUps.parseProgramMarkValue(item.value);
+        await this.followUps.upsertMarkInternal(tx, item.sessionId, {
+          objectiveId: item.objectiveId,
+          ...parsed,
+        });
+      }
+    }, { timeout: 20000 });
+
+    return this.get(user, programId);
+  }
+
   async publish(user: AuthUser, programId: string) {
     await this.access.assertCanEditProgram(user, programId);
 
@@ -404,11 +470,15 @@ export class FollowUpProgramService {
       throw new BadRequestException("La programación no tiene áreas para publicar");
     }
 
-    await this.prisma.$transaction(async () => {
+    for (const fu of program.followUps) {
+      await this.access.assertCanEditFollowUp(user, fu.id);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
       for (const fu of program.followUps) {
-        await this.followUps.publishFollowUp(user, fu.id);
+        await this.followUps.publishFollowUp(user, fu.id, tx);
       }
-    });
+    }, { timeout: 20000 });
 
     return this.get(user, programId);
   }

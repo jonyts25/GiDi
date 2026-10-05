@@ -48,11 +48,32 @@ export function programPeriodOptions(now = new Date()): ProgramPeriodOption[] {
   });
 }
 
+/** Formatea fechas de solo día (sesiones, documentos) sin desfase por zona horaria. */
+export function formatDateOnly(
+  value: string | Date | null | undefined,
+  opts?: Intl.DateTimeFormatOptions,
+): string {
+  if (value == null || value === "") return "—";
+
+  let date: Date;
+  if (value instanceof Date) {
+    date = value;
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split("-").map(Number);
+    date = new Date(Date.UTC(y, m - 1, d));
+  } else {
+    date = new Date(value);
+  }
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleDateString("es-MX", {
+    timeZone: "UTC",
+    ...(opts ?? { day: "numeric", month: "short", year: "numeric" }),
+  });
+}
+
 /** Muestra fecha de sesión sin desfase por zona horaria. */
 export function formatCalendarDate(iso: string, opts?: Intl.DateTimeFormatOptions): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-MX", {
-    timeZone: "UTC",
-    ...(opts ?? { weekday: "short", day: "2-digit", month: "short", year: "numeric" }),
-  });
+  return formatDateOnly(iso, opts ?? { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
 }

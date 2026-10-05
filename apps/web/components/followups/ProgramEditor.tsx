@@ -465,7 +465,10 @@ export function ProgramEditor(props: {
 
   async function deleteProgram() {
     if (!data || !backHref) return;
-    if (!confirm(DELETE_PROGRAM_CONFIRM)) return;
+    const confirmMessage = isLocked
+      ? "Este seguimiento ya está publicado y los papás pueden verlo. ¿Borrarlo de todos modos?"
+      : DELETE_PROGRAM_CONFIRM;
+    if (!confirm(confirmMessage)) return;
     setBusy(true);
     try {
       await apiFetch(`/programs/${programId}`, { method: "DELETE" });
@@ -490,10 +493,23 @@ export function ProgramEditor(props: {
     try {
       await persistRows();
       const { payload, notesDraft: freshNotes } = await reload();
-      await persistAllObservations(payload.areas, freshNotes, "DRAFT");
+
+      for (const area of payload.areas) {
+        const draft = freshNotes[area.followUpId];
+        if (!draft) continue;
+        await apiFetch(`/followups/${area.followUpId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            generalNotes: draft.generalNotes,
+            homeWork: draft.homeWork,
+            parentComments: draft.parentComments,
+          }),
+        });
+      }
+
       await apiFetch(`/programs/${programId}/publish`, { method: "POST" });
       await reload();
-      showToast("✅ Guardado correctamente");
+      showToast("✅ Publicado correctamente");
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al publicar", "error");
     } finally {
@@ -872,6 +888,7 @@ export function ProgramEditor(props: {
             readOnly={isLocked}
             showObjectiveNotes={false}
             programMode
+            programId={programId}
           />
         ) : (
           <p className="text-sm text-subtle">Guarde objetivos en la programación individual para habilitar la cuadrícula.</p>
@@ -988,7 +1005,7 @@ export function ProgramEditor(props: {
                     disabled={busy}
                     onClick={() => void deleteProgram()}
                   >
-                    Borrar borrador
+                    {isLocked ? "Borrar seguimiento publicado" : "Borrar borrador"}
                   </button>
                 ) : null}
               </div>
@@ -1001,7 +1018,7 @@ export function ProgramEditor(props: {
                 disabled={busy}
                 onClick={() => void deleteProgram()}
               >
-                Borrar borrador
+                {isLocked ? "Borrar seguimiento publicado" : "Borrar borrador"}
               </button>
             </div>
           ) : null}

@@ -1,5 +1,12 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { FollowUpStatus, Prisma } from "@prisma/client";
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { FollowUpMarkCode, FollowUpStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { CreateFollowUpDto } from "./dto/create-followup.dto";
 import { UpdateFollowUpDto } from "./dto/update-followup.dto";
@@ -59,6 +66,8 @@ const followUpInclude = {
 
 @Injectable()
 export class FollowUpsService {
+  private readonly logger = new Logger(FollowUpsService.name);
+
   constructor(
     private prisma: PrismaService,
     private access: FollowUpAccessService,
@@ -345,14 +354,22 @@ export class FollowUpsService {
   async getBulkReport(user: AuthUser, ids: string[]) {
     const orderedIds = ids.filter((id, idx) => ids.indexOf(id) === idx);
     const reports: ReturnType<FollowUpsService["buildFollowUpReport"]>[] = [];
-    for (const id of orderedIds) {
-      const meta = await this.prisma.followUp.findUnique({
-        where: { id },
-        select: { area: { select: { key: true } } },
-      });
-      if (!meta || isInternalOnlyAreaKey(meta.area.key)) continue;
-      const fu = await this.get(user, id);
-      reports.push(this.buildFollowUpReport(fu));
+    try {
+      for (const id of orderedIds) {
+        const meta = await this.prisma.followUp.findUnique({
+          where: { id },
+          select: { area: { select: { key: true } } },
+        });
+        if (!meta || isInternalOnlyAreaKey(meta.area.key)) continue;
+        const fu = await this.get(user, id);
+        reports.push(this.buildFollowUpReport(fu));
+      }
+    } catch (err) {
+      this.logger.error(
+        `bulk-report failed for ${orderedIds.length} id(s): ${err instanceof Error ? err.message : String(err)}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw err;
     }
     return {
       generatedAt: new Date().toISOString(),
@@ -650,22 +667,30 @@ export class FollowUpsService {
   }
 
   /** Publica un seguimiento (status CLOSED). Reutilizado por programación mensual. */
-  async publishFollowUp(user: AuthUser, id: string) {
-    await this.access.assertCanEditFollowUp(user, id);
-    await this.prisma.followUp.update({
+  async publishFollowUp(user: AuthUser, id: string, tx?: Prisma.TransactionClient) {
+    if (!tx) {
+      await this.access.assertCanEditFollowUp(user, id);
+      await this.prisma.followUp.update({
+        where: { id },
+        data: { status: FollowUpStatus.CLOSED },
+      });
+      return;
+    }
+    await tx.followUp.update({
       where: { id },
       data: { status: FollowUpStatus.CLOSED },
     });
   }
 
   /** Revierte un seguimiento publicado a borrador (solo ADMIN). */
-  async unpublishFollowUp(user: AuthUser, id: string) {
+  async unpublishFollowUp(user: AuthUser, id: string, tx?: Prisma.TransactionClient) {
     const fu = await this.access.getFollowUpForAccess(id);
     if (fu.status !== FollowUpStatus.CLOSED) return;
     if (!this.access.isAdmin(user)) {
       throw new ForbiddenException("Solo administradores pueden reabrir seguimientos");
     }
-    await this.prisma.followUp.update({
+    const client = tx ?? this.prisma;
+    await client.followUp.update({
       where: { id },
       data: { status: FollowUpStatus.DRAFT },
     });
@@ -917,26 +942,53 @@ export class FollowUpsService {
     });
     if (!objective) throw new NotFoundException("Objetivo no encontrado");
 
+    await this.upsertMarkInternal(this.prisma, sessionId, dto);
+    return this.get(user, followUpId);
+  }
+
+  async upsertMarkInternal(
+    tx: Prisma.TransactionClient,
+    sessionId: string,
+    dto: { objectiveId: string; code?: string | null; progressScale?: number | null },
+  ) {
     if (dto.code != null && dto.progressScale != null) {
       throw new BadRequestException("Indique código (A–X) o escala 0–4, no ambos");
     }
 
-    await this.prisma.followUpMark.deleteMany({
+    await tx.followUpMark.deleteMany({
       where: { followUpSessionId: sessionId, objectiveId: dto.objectiveId },
     });
 
     if (dto.code != null || dto.progressScale != null) {
-      await this.prisma.followUpMark.create({
+      await tx.followUpMark.create({
         data: {
           followUpSessionId: sessionId,
           objectiveId: dto.objectiveId,
-          code: dto.code ?? null,
+          code: dto.code != null ? (dto.code as FollowUpMarkCode) : null,
           progressScale: dto.progressScale ?? null,
         },
       });
     }
+  }
 
-    return this.get(user, followUpId);
+  parseProgramMarkValue(value: string | number | null | undefined): {
+    code?: string | null;
+    progressScale?: number | null;
+  } {
+    if (value == null || value === "") {
+      return { code: null, progressScale: null };
+    }
+    if (typeof value === "number") {
+      if (!Number.isInteger(value) || value < 0 || value > 4) {
+        throw new BadRequestException("La escala debe ser un entero entre 0 y 4");
+      }
+      return { progressScale: value };
+    }
+    const trimmed = String(value).trim();
+    if (/^[0-4]$/.test(trimmed)) {
+      return { progressScale: Number(trimmed) };
+    }
+    return { code: trimmed };
   }
 
   private async getOrCreateProgramRecord(

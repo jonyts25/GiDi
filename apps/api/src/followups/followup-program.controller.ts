@@ -8,6 +8,7 @@ import {
   CreateProgramSessionDto,
   ProgramAreaRowDto,
 } from "./dto/followup-program.dto";
+import { ProgramMarksDto } from "./dto/program-marks.dto";
 
 @Controller()
 @UseGuards(JwtGuard)
@@ -69,6 +70,15 @@ export class FollowUpProgramController {
   @Post("/programs/:id/copy-from-previous")
   copyFromPrevious(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.service.copyFromPrevious(user, id);
+  }
+
+  @Post("/programs/:id/marks")
+  upsertMarks(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() dto: ProgramMarksDto,
+  ) {
+    return this.service.upsertMarks(user, id, dto.marks);
   }
 
   @Post("/programs/:id/publish")

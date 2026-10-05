@@ -1,6 +1,7 @@
 "use client";
 
 import { areaHeaderClass } from "@/lib/area-display";
+import { formatDateOnly } from "@/lib/date-utils";
 
 type Attendance = {
   percent: number | null;
@@ -154,7 +155,7 @@ function FollowUpAreaBody({ data, compactHeader = false }: { data: ParentFollowU
                   </div>
                   {obj.lastSessionDate ? (
                     <p className="mt-1 text-[11px] text-subtle">
-                      Última evaluación: {new Date(obj.lastSessionDate).toLocaleDateString("es-MX")}
+                      Última evaluación: {formatDateOnly(obj.lastSessionDate)}
                     </p>
                   ) : null}
                   {obj.monthlyNotes ? (

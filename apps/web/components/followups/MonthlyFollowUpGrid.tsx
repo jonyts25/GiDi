@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { areaBorderClass, areaChipClass, areaHeaderClass, areaShortLabel } from "@/lib/area-display";
@@ -55,6 +55,13 @@ function markPayload(mark: Mark | null | undefined): { code?: string; progressSc
   }
   if (mark.code) return { code: mark.code };
   return null;
+}
+
+function markToApiValue(mark: Mark | null | undefined): string | number | null {
+  const payload = markPayload(mark);
+  if (payload === null) return null;
+  if (payload.progressScale !== undefined) return payload.progressScale;
+  return payload.code ?? null;
 }
 
 function marksEqual(a: Mark | null | undefined, b: Mark | null | undefined): boolean {
@@ -125,6 +132,7 @@ export function MonthlyFollowUpGrid(props: {
   readOnly?: boolean;
   showObjectiveNotes?: boolean;
   programMode?: boolean;
+  programId?: string;
 }) {
   const {
     objectives,
@@ -136,6 +144,7 @@ export function MonthlyFollowUpGrid(props: {
     readOnly = false,
     showObjectiveNotes = true,
     programMode = false,
+    programId,
   } = props;
 
   const columns = programMode ? sessionColumns : sessions;
@@ -151,6 +160,9 @@ export function MonthlyFollowUpGrid(props: {
   const [savedNotes, setSavedNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlightPromiseRef = useRef<Promise<void> | null>(null);
+  const savedMarksRef = useRef<Record<string, Mark>>({});
 
   useEffect(() => {
     const initialMarks = programMode
@@ -167,6 +179,7 @@ export function MonthlyFollowUpGrid(props: {
       return next;
     });
     setSavedMarks(initialMarks);
+    savedMarksRef.current = initialMarks;
 
     const initialNotes: Record<string, string> = {};
     for (const o of objectives) {
@@ -237,17 +250,127 @@ export function MonthlyFollowUpGrid(props: {
     [draftMarks],
   );
 
-  const hasUnsavedChanges = useMemo(() => {
+  const hasUnsavedMarkChanges = useMemo(() => {
     for (const key of new Set([...Object.keys(draftMarks), ...Object.keys(savedMarks)])) {
       if (!marksEqual(draftMarks[key], savedMarks[key])) return true;
     }
+    return false;
+  }, [draftMarks, savedMarks]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (hasUnsavedMarkChanges) return true;
     if (showObjectiveNotes) {
       for (const o of objectives) {
         if ((notesDraft[o.id] ?? "") !== (savedNotes[o.id] ?? "")) return true;
       }
     }
     return false;
-  }, [draftMarks, savedMarks, notesDraft, savedNotes, objectives, showObjectiveNotes]);
+  }, [hasUnsavedMarkChanges, notesDraft, savedNotes, objectives, showObjectiveNotes]);
+
+  const collectChangedMarks = useCallback(() => {
+    const changes: {
+      followUpId: string;
+      sessionId: string;
+      objectiveId: string;
+      value: string | number | null;
+    }[] = [];
+    const keys = new Set([...Object.keys(draftMarks), ...Object.keys(savedMarksRef.current)]);
+
+    for (const key of keys) {
+      const draft = draftMarks[key];
+      const saved = savedMarksRef.current[key];
+      if (marksEqual(draft, saved)) continue;
+
+      const colon = key.indexOf(":");
+      const sessionId = key.slice(0, colon);
+      const objectiveId = key.slice(colon + 1);
+      const followUpId = followUpByObjective.get(objectiveId);
+      if (!followUpId) continue;
+
+      changes.push({
+        followUpId,
+        sessionId,
+        objectiveId,
+        value: markToApiValue(draft),
+      });
+    }
+    return changes;
+  }, [draftMarks, followUpByObjective]);
+
+  const flushProgramMarks = useCallback(async () => {
+    if (!programMode || !programId || readOnly) return;
+
+    if (inFlightPromiseRef.current) {
+      await inFlightPromiseRef.current;
+      if (collectChangedMarks().length === 0) return;
+    }
+
+    const changes = collectChangedMarks();
+    if (changes.length === 0) return;
+
+    const flushPromise = (async () => {
+      setBusy(true);
+      setErr("");
+      onToast?.("Guardando…");
+
+      try {
+        await apiFetch(`/programs/${programId}/marks`, {
+          method: "POST",
+          body: JSON.stringify({ marks: changes }),
+        });
+
+        const nextSaved = { ...savedMarksRef.current };
+        for (const change of changes) {
+          const key = cellKey(change.sessionId, change.objectiveId);
+          if (change.value == null) {
+            delete nextSaved[key];
+          } else {
+            nextSaved[key] =
+              typeof change.value === "number"
+                ? { objectiveId: change.objectiveId, progressScale: change.value }
+                : { objectiveId: change.objectiveId, code: String(change.value) };
+          }
+        }
+        savedMarksRef.current = nextSaved;
+        setSavedMarks(nextSaved);
+        await onSaved();
+        onToast?.("✅ Guardado", "success");
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Error al guardar";
+        setErr(message);
+        onToast?.(message, "error");
+        throw e;
+      } finally {
+        setBusy(false);
+      }
+    })();
+
+    inFlightPromiseRef.current = flushPromise;
+    try {
+      await flushPromise;
+    } finally {
+      if (inFlightPromiseRef.current === flushPromise) {
+        inFlightPromiseRef.current = null;
+      }
+    }
+
+    if (collectChangedMarks().length > 0) {
+      await flushProgramMarks();
+    }
+  }, [programMode, programId, readOnly, collectChangedMarks, onSaved, onToast]);
+
+  useEffect(() => {
+    if (!programMode || readOnly || !hasUnsavedMarkChanges) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void flushProgramMarks();
+    }, 800);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [programMode, readOnly, hasUnsavedMarkChanges, draftMarks, flushProgramMarks]);
 
   function setDraftCell(sessionId: string, objectiveId: string, payload: { code?: string; progressScale?: number } | null) {
     const key = cellKey(sessionId, objectiveId);
@@ -264,36 +387,51 @@ export function MonthlyFollowUpGrid(props: {
   }
 
   async function saveGrid() {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+
     setBusy(true);
     setErr("");
     try {
-      const markJobs: Promise<unknown>[] = [];
-      const keys = new Set([...Object.keys(draftMarks), ...Object.keys(savedMarks)]);
+      if (programMode && programId) {
+        await flushProgramMarks();
+      } else {
+        const markJobs: Promise<unknown>[] = [];
+        const keys = new Set([...Object.keys(draftMarks), ...Object.keys(savedMarks)]);
 
-      for (const key of keys) {
-        const draft = draftMarks[key];
-        const saved = savedMarks[key];
-        if (marksEqual(draft, saved)) continue;
+        for (const key of keys) {
+          const draft = draftMarks[key];
+          const saved = savedMarks[key];
+          if (marksEqual(draft, saved)) continue;
 
-        const colon = key.indexOf(":");
-        const sessionId = key.slice(0, colon);
-        const objectiveId = key.slice(colon + 1);
-        const followUpId = followUpByObjective.get(objectiveId);
-        if (!followUpId) continue;
+          const colon = key.indexOf(":");
+          const sessionId = key.slice(0, colon);
+          const objectiveId = key.slice(colon + 1);
+          const followUpId = followUpByObjective.get(objectiveId);
+          if (!followUpId) continue;
 
-        const payload = markPayload(draft);
-        markJobs.push(
-          apiFetch(`/followups/${followUpId}/sessions/${sessionId}/marks`, {
-            method: "POST",
-            body: JSON.stringify(
-              payload === null
-                ? { objectiveId }
-                : payload.progressScale !== undefined
-                  ? { objectiveId, progressScale: payload.progressScale }
-                  : { objectiveId, code: payload.code },
-            ),
-          }),
-        );
+          const payload = markPayload(draft);
+          markJobs.push(
+            apiFetch(`/followups/${followUpId}/sessions/${sessionId}/marks`, {
+              method: "POST",
+              body: JSON.stringify(
+                payload === null
+                  ? { objectiveId }
+                  : payload.progressScale !== undefined
+                    ? { objectiveId, progressScale: payload.progressScale }
+                    : { objectiveId, code: payload.code },
+              ),
+            }),
+          );
+        }
+
+        await Promise.all(markJobs);
+        savedMarksRef.current = { ...draftMarks };
+        setSavedMarks({ ...draftMarks });
+        await onSaved();
+        onToast?.("✅ Guardado correctamente", "success");
       }
 
       if (showObjectiveNotes) {
@@ -304,19 +442,23 @@ export function MonthlyFollowUpGrid(props: {
           list.push({ objectiveId: o.id, monthlyNotes: notesDraft[o.id] ?? "" });
           notesByFollowUp.set(o.followUpId, list);
         }
+        const noteJobs: Promise<unknown>[] = [];
         for (const [followUpId, notes] of notesByFollowUp) {
-          markJobs.push(
+          noteJobs.push(
             apiFetch(`/followups/${followUpId}/objective-notes`, {
               method: "PATCH",
               body: JSON.stringify({ notes }),
             }),
           );
         }
+        await Promise.all(noteJobs);
+        if (!programMode) {
+          await onSaved();
+          onToast?.("✅ Guardado correctamente", "success");
+        } else {
+          onToast?.("✅ Guardado", "success");
+        }
       }
-
-      await Promise.all(markJobs);
-      await onSaved();
-      onToast?.("✅ Guardado correctamente", "success");
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Error al guardar";
       setErr(message);
@@ -415,7 +557,13 @@ export function MonthlyFollowUpGrid(props: {
     <div className="relative space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm text-subtle">
-          {hasUnsavedChanges ? "Hay cambios sin guardar en la cuadrícula." : "Cuadrícula sincronizada."}
+          {busy
+            ? "Guardando…"
+            : hasUnsavedChanges
+              ? programMode
+                ? "Hay cambios sin guardar; se guardarán automáticamente."
+                : "Hay cambios sin guardar en la cuadrícula."
+              : "Cuadrícula sincronizada."}
         </p>
         {!readOnly ? (
           <button

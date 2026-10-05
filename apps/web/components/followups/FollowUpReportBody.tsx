@@ -2,15 +2,7 @@
 
 import type { FollowUpReport } from "@/lib/followup-report.types";
 import { resolveTrackingMode } from "@/lib/followup-area";
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-MX", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+import { formatDateOnly } from "@/lib/date-utils";
 
 function markLabel(m: { code: string | null; progressScale: number | null; progressPercent: number | null }) {
   if (m.progressScale != null) return String(m.progressScale);
@@ -146,7 +138,7 @@ export function FollowUpReportBody({
                   <td>
                     <ProgressBar percent={obj.lastProgressPercent} />
                     {obj.lastSessionDate ? (
-                      <span className="gidi-report-cell-note">Última marca: {formatDate(obj.lastSessionDate)}</span>
+                      <span className="gidi-report-cell-note">Última marca: {formatDateOnly(obj.lastSessionDate)}</span>
                     ) : null}
                   </td>
                   <td className="gidi-report-td-notes">{obj.monthlyNotes?.trim() || "—"}</td>
@@ -179,7 +171,7 @@ export function FollowUpReportBody({
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id}>
-                  <td className="gidi-report-td-date">{formatDate(s.sessionDate)}</td>
+                  <td className="gidi-report-td-date">{formatDateOnly(s.sessionDate, { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}</td>
                   <td>{s.therapist.fullName}</td>
                   <td>
                     <span className={`gidi-report-badge gidi-report-badge--${s.attendance}`}>

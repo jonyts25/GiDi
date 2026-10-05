@@ -4,6 +4,7 @@ import type { PatientDossierReport } from "@/lib/followup-report.types";
 import { FollowUpReportBody } from "@/components/followups/FollowUpReportBody";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
 import { GiDiPrintPageLogo } from "@/components/branding/GiDiPrintPageLogo";
+import { formatDateOnly } from "@/lib/date-utils";
 
 const DOC_LABELS: Record<string, string> = {
   EVALUACION: "Evaluación",
@@ -16,8 +17,7 @@ function formatPeriod(year: number, month: number) {
 }
 
 function formatDate(iso: string | null | undefined) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("es-MX", { dateStyle: "long" });
+  return formatDateOnly(iso, { dateStyle: "long" });
 }
 
 function formatGeneratedAt(iso: string) {
