@@ -2,7 +2,12 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { IncomeConcept, PaymentStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
-import { billingAmountFor, CENTER_PAYMENT_INFO } from "./payment-config";
+import {
+  billingAmountFor,
+  CENTER_PAYMENT_INFO,
+  isOnOrAfterDebtStart,
+  priorPeriodDebtPeriodFilter,
+} from "./payment-config";
 import { incomeMethodLabel } from "./income-config";
 import { IncomeService } from "./income.service";
 import { previousPeriod, resolveAmountDueFromBilling } from "./recompute-payment";
@@ -59,10 +64,7 @@ export class PaymentsService {
       where: {
         patientId: { in: patientIds },
         status: { not: PaymentStatus.PAUSA_VACACIONES },
-        OR: [
-          { periodYear: { lt: beforeYear } },
-          { periodYear: beforeYear, periodMonth: { lt: beforeMonth } },
-        ],
+        ...priorPeriodDebtPeriodFilter(beforeYear, beforeMonth),
       },
       select: { patientId: true, amountDue: true, amountPaid: true, status: true },
     });
@@ -163,10 +165,10 @@ export class PaymentsService {
       entries: entriesByPeriod.get(`${p.periodYear}-${p.periodMonth}`) ?? [],
     }));
 
-    const outstanding = payments.reduce(
-      (acc, p) => acc + Math.max(p.amountDue - p.amountPaid, 0),
-      0,
-    );
+    const outstanding = payments.reduce((acc, p) => {
+      if (!isOnOrAfterDebtStart(p.periodYear, p.periodMonth)) return acc;
+      return acc + Math.max(p.amountDue - p.amountPaid, 0);
+    }, 0);
 
     return {
       patient: {

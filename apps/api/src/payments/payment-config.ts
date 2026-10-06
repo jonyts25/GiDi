@@ -1,4 +1,40 @@
-import { GidiCenter } from "@prisma/client";
+import { GidiCenter, Prisma } from "@prisma/client";
+import { periodYm } from "./payment-period";
+
+/** Los meses anteriores a esta fecha no cuentan como deuda arrastrada (datos legacy). */
+export const DEBT_TRACKING_START = { year: 2026, month: 8 } as const;
+
+const DEBT_START_YM = periodYm(DEBT_TRACKING_START.year, DEBT_TRACKING_START.month);
+
+export function isOnOrAfterDebtStart(year: number, month: number): boolean {
+  return periodYm(year, month) >= DEBT_START_YM;
+}
+
+/** Periodos anteriores al consultado y en o después del inicio de deuda arrastrada. */
+export function priorPeriodDebtPeriodFilter(
+  beforeYear: number,
+  beforeMonth: number,
+): Prisma.PaymentWhereInput {
+  return {
+    AND: [
+      {
+        OR: [
+          { periodYear: { lt: beforeYear } },
+          { periodYear: beforeYear, periodMonth: { lt: beforeMonth } },
+        ],
+      },
+      {
+        OR: [
+          { periodYear: { gt: DEBT_TRACKING_START.year } },
+          {
+            periodYear: DEBT_TRACKING_START.year,
+            periodMonth: { gte: DEBT_TRACKING_START.month },
+          },
+        ],
+      },
+    ],
+  };
+}
 
 /** Mensualidad por frecuencia semanal (pesos). Tarifas vigentes 2026. */
 export const MONTHLY_RATES: Record<number, number> = {

@@ -11,7 +11,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
-import { billingAmountFor } from "./payment-config";
+import { billingAmountFor, priorPeriodDebtPeriodFilter } from "./payment-config";
 import { PAYMENT_COUNTING_CONCEPTS } from "./income-config";
 import {
   aggregatePaymentFromEntries,
@@ -512,10 +512,7 @@ export class IncomeService {
       where: {
         patientId: { in: patientIds },
         status: { not: PaymentStatus.PAUSA_VACACIONES },
-        OR: [
-          { periodYear: { lt: beforeYear } },
-          { periodYear: beforeYear, periodMonth: { lt: beforeMonth } },
-        ],
+        ...priorPeriodDebtPeriodFilter(beforeYear, beforeMonth),
       },
       select: { patientId: true, amountDue: true, amountPaid: true },
     });
