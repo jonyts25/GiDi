@@ -40,6 +40,10 @@ export type FlatMark = {
 const LETTERS = ["V", "E", "F", "R", "X"] as const;
 const ARCHIVED_OBJECTIVE_IDX = 1000;
 
+export const EMPTY_SESSIONS: Session[] = [];
+export const EMPTY_COLUMNS: ProgramSessionColumn[] = [];
+export const EMPTY_FLAT_MARKS: FlatMark[] = [];
+
 function cellKey(sessionId: string, objectiveId: string) {
   return `${sessionId}:${objectiveId}`;
 }
@@ -136,9 +140,9 @@ export function MonthlyFollowUpGrid(props: {
 }) {
   const {
     objectives,
-    sessions = [],
-    sessionColumns = [],
-    flatMarks = [],
+    sessions = EMPTY_SESSIONS,
+    sessionColumns = EMPTY_COLUMNS,
+    flatMarks = EMPTY_FLAT_MARKS,
     onSaved,
     onToast,
     readOnly = false,

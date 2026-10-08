@@ -28,6 +28,7 @@ export type FollowUpReport = {
       objectiveId: string;
       idx: number;
       text: string;
+      activities: string | null;
       monthlyNotes: string | null;
       lastProgressScale: number | null;
       lastProgressPercent: number | null;
@@ -40,6 +41,7 @@ export type FollowUpReport = {
     id: string;
     idx: number;
     text: string;
+    activities: string | null;
     monthlyNotes: string | null;
   }[];
   sessions: {

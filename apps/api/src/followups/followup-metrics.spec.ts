@@ -1,7 +1,20 @@
 import {
   computeAttendancePercent,
+  lastObjectiveScores,
   sessionAttendanceFromMarks,
 } from "./followup-metrics";
+
+describe("lastObjectiveScores", () => {
+  it("includes activities and monthlyNotes on each row", () => {
+    const rows = lastObjectiveScores(
+      [{ id: "o1", idx: 1, text: "Obj", activities: "Actividades del mes", monthlyNotes: "Nota" }],
+      [{ sessionDate: "2026-01-05", marks: [{ objectiveId: "o1", progressScale: 2 }] }],
+    );
+    expect(rows[0].activities).toBe("Actividades del mes");
+    expect(rows[0].monthlyNotes).toBe("Nota");
+    expect(rows[0].lastProgressScale).toBe(2);
+  });
+});
 
 describe("followup-metrics attendance", () => {
   it("counts session with progress scales as present", () => {

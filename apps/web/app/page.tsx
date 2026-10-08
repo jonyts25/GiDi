@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getApiBaseUrl } from "../lib/get-api-base-url";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
 import { USERNAME_LABEL } from "@/lib/user-labels";
+import { readStoredUser } from "@/lib/stored-user";
 
 export default function Home() {
   const [email, setEmail] = useState("");
@@ -12,7 +13,18 @@ export default function Home() {
   const [show, setShow] = useState(false);
   const [msg, setMsg] = useState("");
   const router = useRouter();
-  
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem("gidi_token");
+    const user = readStoredUser();
+    if (!token || !user) return;
+    if (user.mustChangePassword) {
+      router.replace("/change-password");
+    } else {
+      router.replace("/dashboard");
+    }
+  }, [router]);
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();

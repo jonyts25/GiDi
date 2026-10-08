@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { resolveTrackingMode } from "@/lib/followup-area";
 import { calendarDateToUtcIso, formatCalendarDate, localDateInputValue } from "@/lib/date-utils";
 import { areaChipClass, areaHeaderClass } from "@/lib/area-display";
-import { hasOfficeStaffRole } from "@/lib/role-permissions";
+import { hasFullAdminRole, hasOfficeStaffRole } from "@/lib/role-permissions";
 import { useToast } from "@/components/ui/Toast";
 import { MultiDatePicker } from "@/components/ui/MultiDatePicker";
 import {
@@ -125,6 +125,7 @@ export function ProgramEditor(props: {
   const [bankByArea, setBankByArea] = useState<Record<string, BankObjective[]>>({});
   const [bankQuery, setBankQuery] = useState<Record<string, string>>({});
   const [bankOpen, setBankOpen] = useState<string | null>(null);
+  const [bankAddBusy, setBankAddBusy] = useState<Record<string, boolean>>({});
   const bankRef = useRef<HTMLDivElement>(null);
   const [sessionMode, setSessionMode] = useState<"single" | "multi">("single");
   const [singleSessionDate, setSingleSessionDate] = useState(localDateInputValue());
@@ -205,6 +206,18 @@ export function ProgramEditor(props: {
     }
   }, []);
 
+  const canAddToBank = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const raw = localStorage.getItem("gidi_user");
+    if (!raw) return false;
+    try {
+      const roles: string[] = JSON.parse(raw).roles ?? [];
+      return roles.includes("THERAPIST") || hasFullAdminRole(roles);
+    } catch {
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     if (!bankOpen) return;
 
@@ -227,13 +240,58 @@ export function ProgramEditor(props: {
     };
   }, [bankOpen]);
 
-  async function loadBankForArea(areaId: string) {
-    if (!canLoadBank || bankByArea[areaId]) return;
+  async function ensureBankLoaded(areaId: string): Promise<BankObjective[]> {
+    if (bankByArea[areaId]) return bankByArea[areaId];
     try {
       const rows = await apiFetch(`/therapist/objective-bank?areaId=${encodeURIComponent(areaId)}`);
-      setBankByArea((prev) => ({ ...prev, [areaId]: Array.isArray(rows) ? rows : [] }));
+      const list = Array.isArray(rows) ? (rows as BankObjective[]) : [];
+      setBankByArea((prev) => ({ ...prev, [areaId]: list }));
+      return list;
     } catch {
       setBankByArea((prev) => ({ ...prev, [areaId]: [] }));
+      return [];
+    }
+  }
+
+  async function loadBankForArea(areaId: string) {
+    if (!canLoadBank) return;
+    await ensureBankLoaded(areaId);
+  }
+
+  async function addObjectiveToBank(areaId: string, text: string, isPublic: boolean, rowKey: string) {
+    const description = text.trim();
+    if (!description || bankAddBusy[rowKey] || !canAddToBank) return;
+
+    setBankAddBusy((prev) => ({ ...prev, [rowKey]: true }));
+    try {
+      const items = await ensureBankLoaded(areaId);
+      const normalized = description.toLowerCase();
+      const exists = items.some(
+        (item) => item.description.trim().toLowerCase() === normalized && item.isPublic === isPublic,
+      );
+      if (exists) {
+        showToast("Ese objetivo ya está en el banco", "error");
+        return;
+      }
+
+      const created = (await apiFetch("/therapist/objective-bank", {
+        method: "POST",
+        body: JSON.stringify({ description, areaId, isPublic }),
+      })) as BankObjective;
+
+      setBankByArea((prev) => ({
+        ...prev,
+        [areaId]: [...(prev[areaId] ?? []), created],
+      }));
+      showToast(isPublic ? "✅ Agregado al catálogo público" : "✅ Agregado al banco privado");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "No se pudo agregar al banco", "error");
+    } finally {
+      setBankAddBusy((prev) => {
+        const next = { ...prev };
+        delete next[rowKey];
+        return next;
+      });
     }
   }
 
@@ -271,6 +329,21 @@ export function ProgramEditor(props: {
   }, [data]);
 
   const areaIdsInOrder = useMemo(() => draftBlocks.map((b) => b.areaId), [draftBlocks]);
+
+  const gridObjectives = useMemo(() => {
+    if (!data) return [];
+    return data.areas.flatMap((area) =>
+      area.objectives.map((o) => ({
+        id: o.id,
+        idx: o.idx,
+        globalNo: o.globalNo,
+        text: o.text,
+        followUpId: area.followUpId,
+        areaId: area.areaId,
+        areaName: area.areaName,
+      })),
+    );
+  }, [data]);
 
   const programEmpty = data ? data.areas.length === 0 : false;
 
@@ -635,7 +708,7 @@ export function ProgramEditor(props: {
                           <tr className="border-b border-border text-left text-subtle">
                             <th className="w-12 px-2 py-2 font-semibold">No.</th>
                             <th className="min-w-[220px] px-2 py-2 font-semibold">Objetivo específico</th>
-                            <th className="min-w-[180px] px-2 py-2 font-semibold">Actividades</th>
+                            <th className="min-w-[180px] px-2 py-2 font-semibold">Actividades / Notas</th>
                             {!isLocked ? <th className="w-10" /> : null}
                           </tr>
                         </thead>
@@ -697,16 +770,60 @@ export function ProgramEditor(props: {
                                       </>
                                     ) : null}
                                     {canLoadBank && !isLocked ? (
-                                      <button
-                                        type="button"
-                                        className="mt-1 text-xs text-primary hover:underline"
-                                        onClick={() => {
-                                          void loadBankForArea(block.areaId);
-                                          setBankOpen(`${block.areaId}:${objIdx}`);
-                                        }}
-                                      >
-                                        Elegir del banco
-                                      </button>
+                                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                        <button
+                                          type="button"
+                                          className="text-xs text-primary hover:underline"
+                                          onClick={() => {
+                                            void loadBankForArea(block.areaId);
+                                            setBankOpen(`${block.areaId}:${objIdx}`);
+                                          }}
+                                        >
+                                          Elegir del banco
+                                        </button>
+                                        {canAddToBank ? (
+                                          <>
+                                            <button
+                                              type="button"
+                                              className="text-xs text-primary hover:underline disabled:opacity-50"
+                                              disabled={
+                                                busy ||
+                                                !obj.text.trim() ||
+                                                !!bankAddBusy[`${block.areaId}:${objIdx}`]
+                                              }
+                                              onClick={() =>
+                                                void addObjectiveToBank(
+                                                  block.areaId,
+                                                  obj.text,
+                                                  false,
+                                                  `${block.areaId}:${objIdx}`,
+                                                )
+                                              }
+                                            >
+                                              Agregar al banco privado
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="text-xs text-primary hover:underline disabled:opacity-50"
+                                              disabled={
+                                                busy ||
+                                                !obj.text.trim() ||
+                                                !!bankAddBusy[`${block.areaId}:${objIdx}`]
+                                              }
+                                              onClick={() =>
+                                                void addObjectiveToBank(
+                                                  block.areaId,
+                                                  obj.text,
+                                                  true,
+                                                  `${block.areaId}:${objIdx}`,
+                                                )
+                                              }
+                                            >
+                                              Agregar al catálogo público
+                                            </button>
+                                          </>
+                                        ) : null}
+                                      </div>
                                     ) : null}
                                   </div>
                                 </td>
@@ -715,7 +832,7 @@ export function ProgramEditor(props: {
                                     className="textarea min-h-[56px] w-full text-sm"
                                     value={obj.activities}
                                     disabled={busy || isLocked}
-                                    placeholder="Actividades…"
+                                    placeholder="Actividades / notas…"
                                     onChange={(e) => updateObjective(block.areaId, objIdx, { activities: e.target.value })}
                                   />
                                 </td>
@@ -868,17 +985,7 @@ export function ProgramEditor(props: {
         {data.areas.some((a) => a.objectives.length > 0) ? (
           <MonthlyFollowUpGrid
             key={gridKey}
-            objectives={data.areas.flatMap((area) =>
-              area.objectives.map((o) => ({
-                id: o.id,
-                idx: o.idx,
-                globalNo: o.globalNo,
-                text: o.text,
-                followUpId: area.followUpId,
-                areaId: area.areaId,
-                areaName: area.areaName,
-              })),
-            )}
+            objectives={gridObjectives}
             sessionColumns={sessionColumns}
             flatMarks={flatMarks}
             onSaved={() => {
