@@ -31,6 +31,14 @@ export async function apiFetch(path: string, init?: RequestInit, timeoutMs?: num
 
   if (timeoutId) clearTimeout(timeoutId);
 
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (res.status === 401 && token && !normalizedPath.startsWith("/auth/")) {
+    localStorage.removeItem("gidi_token");
+    localStorage.removeItem("gidi_user");
+    window.location.replace("/");
+    throw new Error("Su sesión expiró. Inicie sesión de nuevo.");
+  }
+
   const ct = res.headers.get("content-type") ?? "";
   if (!ct.includes("application/json")) {
     const text = await res.text();
