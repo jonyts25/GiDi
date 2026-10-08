@@ -15,6 +15,7 @@ type ObjectiveSummary = {
   objectiveId: string;
   idx: number;
   text: string;
+  activities: string | null;
   monthlyNotes: string | null;
   lastProgressScale: number | null;
   lastProgressPercent: number | null;
@@ -158,10 +159,10 @@ function FollowUpAreaBody({ data, compactHeader = false }: { data: ParentFollowU
                       Última evaluación: {formatDateOnly(obj.lastSessionDate)}
                     </p>
                   ) : null}
-                  {obj.monthlyNotes ? (
+                  {obj.activities?.trim() || obj.monthlyNotes?.trim() ? (
                     <p className="mt-3 rounded-lg bg-card p-3 text-sm leading-relaxed text-subtle">
-                      <span className="font-semibold text-ink">Observaciones: </span>
-                      {obj.monthlyNotes}
+                      <span className="font-semibold text-ink">Actividades / Notas: </span>
+                      {obj.activities?.trim() || obj.monthlyNotes?.trim()}
                     </p>
                   ) : null}
                 </li>

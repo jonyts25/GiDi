@@ -73,6 +73,7 @@ export type ObjectiveProgressInput = {
   id: string;
   idx: number;
   text: string;
+  activities?: string | null;
   monthlyNotes?: string | null;
 };
 
@@ -83,6 +84,7 @@ export function lastObjectiveScores(
   objectiveId: string;
   idx: number;
   text: string;
+  activities: string | null;
   monthlyNotes: string | null;
   lastProgressScale: number | null;
   lastProgressPercent: number | null;
@@ -109,6 +111,7 @@ export function lastObjectiveScores(
       objectiveId: obj.id,
       idx: obj.idx,
       text: obj.text,
+      activities: obj.activities ?? null,
       monthlyNotes: obj.monthlyNotes ?? null,
       lastProgressScale: lastScale,
       lastProgressPercent: progressScaleToPercent(lastScale),

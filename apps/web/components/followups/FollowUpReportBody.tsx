@@ -50,6 +50,7 @@ export function FollowUpReportBody({
         objectiveId: o.id,
         idx: o.idx,
         text: o.text,
+        activities: o.activities,
         monthlyNotes: o.monthlyNotes,
         lastProgressScale: null as number | null,
         lastProgressPercent: null as number | null,
@@ -120,7 +121,7 @@ export function FollowUpReportBody({
               <th className="gidi-report-th-num">#</th>
               <th>Objetivo terapéutico</th>
               <th className="gidi-report-th-progress">Progreso</th>
-              <th>Observaciones del objetivo</th>
+              <th>Actividades / Notas</th>
             </tr>
           </thead>
           <tbody>
@@ -141,7 +142,9 @@ export function FollowUpReportBody({
                       <span className="gidi-report-cell-note">Última marca: {formatDateOnly(obj.lastSessionDate)}</span>
                     ) : null}
                   </td>
-                  <td className="gidi-report-td-notes">{obj.monthlyNotes?.trim() || "—"}</td>
+                  <td className="gidi-report-td-notes">
+                    {obj.activities?.trim() || obj.monthlyNotes?.trim() || "—"}
+                  </td>
                 </tr>
               ))
             )}

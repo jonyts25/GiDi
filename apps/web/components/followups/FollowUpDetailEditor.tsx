@@ -11,7 +11,7 @@ import {
   isInternalOnlyAreaKey,
 } from "@/lib/followup-area";
 import { suggestionsForArea } from "@/lib/followup-suggestions";
-import { MonthlyFollowUpGrid } from "@/components/followups/MonthlyFollowUpGrid";
+import { EMPTY_SESSIONS, MonthlyFollowUpGrid } from "@/components/followups/MonthlyFollowUpGrid";
 import { NewFollowUpSessionForm } from "@/components/followups/NewFollowUpSessionForm";
 import { FollowUpReportPrint } from "@/components/followups/FollowUpReportPrint";
 import { SaveBanner } from "@/components/ui/SaveBanner";
@@ -201,6 +201,13 @@ export function FollowUpDetailEditor(props: {
     }
     return backHref;
   }, [fu?.patient?.id, patientFollowUpsPrefix, backHref]);
+
+  const gridSessions = useMemo(() => fu?.sessions ?? EMPTY_SESSIONS, [fu?.sessions]);
+
+  const gridObjectives = useMemo(() => {
+    if (!fu) return [];
+    return fu.objectives.map((o) => ({ ...o, followUpId: fu.id }));
+  }, [fu]);
 
   const reload = useCallback(
     async (opts?: { skipObjectives?: boolean; skipHeader?: boolean; skipAudience?: boolean }) => {
@@ -694,8 +701,8 @@ export function FollowUpDetailEditor(props: {
             <h2 className="text-lg font-semibold">Cuadrícula</h2>
             {fu.objectives?.length ? (
               <MonthlyFollowUpGrid
-                objectives={(fu.objectives ?? []).map((o) => ({ ...o, followUpId: fu.id }))}
-                sessions={fu.sessions ?? []}
+                objectives={gridObjectives}
+                sessions={gridSessions}
                 onSaved={() => void reload()}
                 readOnly={isLocked}
               />

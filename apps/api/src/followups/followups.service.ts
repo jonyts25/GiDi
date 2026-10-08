@@ -306,7 +306,13 @@ export class FollowUpsService {
     observationsAuthor: string | null;
     area: { id: string; key: string; name: string; trackingMode: string };
     therapist: { id: string; fullName: string };
-    objectives: { id: string; idx: number; text: string; monthlyNotes: string | null }[];
+    objectives: {
+      id: string;
+      idx: number;
+      text: string;
+      activities: string | null;
+      monthlyNotes: string | null;
+    }[];
     sessions: { id: string; sessionDate: Date; marks: { objectiveId: string; code: string | null; progressScale: number | null }[] }[];
   }) {
     const attendance = computeAttendancePercent(
