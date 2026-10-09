@@ -128,4 +128,11 @@ export const AREA_CATALOG: AreaCatalogEntry[] = [
     sortOrder: 54,
     trackingMode: AreaTrackingMode.MONTHLY_GRID,
   },
+  {
+    key: "VISOESPACIAL",
+    name: "Visoespacial",
+    category: "Aprendizaje",
+    sortOrder: 55,
+    trackingMode: AreaTrackingMode.MONTHLY_GRID,
+  },
 ];
