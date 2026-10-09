@@ -36,6 +36,8 @@ model User {
 
   patientDocumentsUploaded PatientDocument[] @relation("PatientDocumentUploader")
 
+  centerDocumentsUploaded CenterDocument[] @relation("CenterDocumentUploader")
+
   announcementsCreated Announcement[] @relation("AnnouncementAuthor")
 
   paymentsCreated Payment[] @relation("PaymentCreatedBy")
@@ -559,6 +561,29 @@ model Payment {
   @@index([patientId])
   @@index([periodYear, periodMonth])
   @@index([status])
+}
+
+/// Documentos institucionales del centro (reglamentos, aviso de privacidad, etc.).
+model CenterDocument {
+  id           String    @id @default(uuid()) @db.Uuid
+  title        String
+  description  String?
+  fileName     String
+  mimeType     String
+  dataUrl      String    @db.Text
+  /// Papás y/o terapeutas que pueden ver el documento.
+  audience     RoleKey[]
+  sortOrder    Int       @default(0)
+  isActive     Boolean   @default(true)
+  uploadedById String    @db.Uuid
+
+  uploadedBy User @relation("CenterDocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
 }
 
 /// Avisos generales publicados por administración a uno o varios roles.
