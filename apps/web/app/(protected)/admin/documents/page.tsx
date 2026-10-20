@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { prepareFileForUpload } from "@/lib/compress-upload";
+import { openDataUrlInNewTab } from "@/lib/open-data-url";
 import { hasFullAdminRole } from "@/lib/role-permissions";
 import { useToast } from "@/components/ui/Toast";
 
@@ -215,6 +216,22 @@ export default function AdminCenterDocumentsPage() {
     }
   }
 
+  async function openDoc(id: string) {
+    setBusy(true);
+    try {
+      const data = (await apiFetch(`/center-documents/${id}/file`)) as {
+        dataUrl: string;
+        fileName: string;
+        mimeType: string;
+      };
+      openDataUrlInNewTab(data.dataUrl, data.mimeType, data.fileName);
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "No se pudo abrir el documento", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onDelete(doc: CenterDoc) {
     if (!window.confirm(`¿Eliminar «${doc.title}»? Esta acción no se puede deshacer.`)) return;
     setBusy(true);
@@ -330,7 +347,11 @@ export default function AdminCenterDocumentsPage() {
               className="sr-only"
               accept="image/jpeg,image/png,image/webp,image/*,.pdf,application/pdf"
               disabled={busy}
-              onChange={(e) => void onPickNewFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                e.target.value = "";
+                void onPickNewFile(file);
+              }}
             />
           </div>
           <p className="text-xs text-subtle">{UPLOAD_HINT}</p>
@@ -395,6 +416,14 @@ export default function AdminCenterDocumentsPage() {
                         <p className="text-xs text-subtle">Actualizado: {new Date(doc.updatedAt).toLocaleString("es-MX")}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn rounded-lg px-2 py-1 text-xs"
+                          disabled={busy}
+                          onClick={() => void openDoc(doc.id)}
+                        >
+                          Ver
+                        </button>
                         <button type="button" className="btn rounded-lg px-2 py-1 text-xs" onClick={() => startEdit(doc)}>
                           Editar
                         </button>
