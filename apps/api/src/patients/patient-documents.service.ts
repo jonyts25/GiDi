@@ -1,9 +1,8 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PatientDocumentCategory } from "@prisma/client";
+import { assertValidUploadDataUrl } from "../common/upload-file.validation";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
-
-const MAX_BYTES = 20 * 1024 * 1024;
 
 function isAdminUser(user: AuthUser): boolean {
   return user.roles.some((r) => r === "ADMIN" || r === "SUPERADMIN");
@@ -51,15 +50,7 @@ export class PatientDocumentsService {
       );
     }
 
-    if (!dataUrl.startsWith("data:")) {
-      throw new BadRequestException("Formato de archivo inválido");
-    }
-
-    const base64 = dataUrl.split(",")[1] ?? "";
-    const approxBytes = Math.ceil((base64.length * 3) / 4);
-    if (approxBytes > MAX_BYTES) {
-      throw new BadRequestException("Archivo demasiado grande (máx. 20 MB). Intente una foto más pequeña o comprima el PDF.");
-    }
+    assertValidUploadDataUrl(fileName, mimeType, dataUrl);
 
     return this.prisma.patientDocument.create({
       data: {

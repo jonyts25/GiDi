@@ -49,7 +49,12 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
         { href: "/admin/therapists", label: "Terapeutas" },
         { href: "/admin/announcements", label: "Avisos" },
         ...(canViewRevenueOverview(roles) ? [{ href: "/admin/payments", label: "Ingresos" }] : []),
-        ...(hasFullAdminRole(roles) ? [{ href: "/admin/branding", label: "Logo" }] : []),
+        ...(hasFullAdminRole(roles)
+          ? [
+              { href: "/admin/documents", label: "Documentos" },
+              { href: "/admin/branding", label: "Logo" },
+            ]
+          : [{ href: "/documents", label: "Documentos" }]),
       ]
     : roles.includes("THERAPIST")
       ? [
@@ -57,9 +62,13 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
           { href: "/therapist/patients", label: "Mis pacientes" },
           { href: "/therapist/schedule", label: "Mi horario" },
           { href: "/therapist/objective-bank", label: "Banco de objetivos" },
+          { href: "/documents", label: "Documentos" },
         ]
       : hasParentPortalAccess(roles)
-        ? [{ href: "/parent/patients", label: "Mis hijos" }]
+        ? [
+            { href: "/parent/patients", label: "Mis hijos" },
+            { href: "/documents", label: "Documentos" },
+          ]
         : roles.includes("SCHOOL")
           ? [{ href: "/school/patients", label: "Pacientes" }]
           : [{ href: "/dashboard", label: "Dashboard" }];

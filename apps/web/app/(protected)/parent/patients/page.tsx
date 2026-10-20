@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../../../lib/api";
 import { useRouter } from "next/navigation";
 import { hasOfficeStaffRole, hasParentPortalAccess } from "@/lib/role-permissions";
+import { openDataUrlInNewTab } from "@/lib/open-data-url";
 
 type Patient = {
   id: string;
@@ -14,9 +15,17 @@ type Patient = {
   notes?: string | null;
 };
 
+type CenterDoc = {
+  id: string;
+  title: string;
+  description: string | null;
+  updatedAt: string;
+};
+
 export default function ParentPatientsPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [centerDocs, setCenterDocs] = useState<CenterDoc[] | null>(null);
   const [msg, setMsg] = useState("Cargando...");
 
   useEffect(() => {
@@ -36,8 +45,28 @@ export default function ParentPatientsPage() {
       } catch (e: any) {
         setMsg(e.message);
       }
+
+      try {
+        const docs = (await apiFetch("/center-documents")) as CenterDoc[];
+        if (docs?.length) setCenterDocs(docs);
+      } catch {
+        /* omit card on failure */
+      }
     })();
   }, [router]);
+
+  async function openCenterDoc(id: string) {
+    try {
+      const data = (await apiFetch(`/center-documents/${id}/file`)) as {
+        dataUrl: string;
+        fileName: string;
+        mimeType: string;
+      };
+      openDataUrlInNewTab(data.dataUrl, data.mimeType, data.fileName);
+    } catch {
+      /* ignore — card is informational */
+    }
+  }
 
   return (
     <main style={{ paddingTop: 18 }}>
@@ -45,6 +74,25 @@ export default function ParentPatientsPage() {
         <div className="h1">Mis hijos</div>
         {msg && <p className="sub">{msg}</p>}
       </div>
+
+      {centerDocs && centerDocs.length > 0 ? (
+        <section className="card space-y-3" style={{ marginTop: 12 }}>
+          <h2 className="text-lg font-semibold">Documentos del centro</h2>
+          <ul className="space-y-2 text-sm">
+            {centerDocs.map((doc) => (
+              <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
+                <div>
+                  <div className="font-medium">{doc.title}</div>
+                  <div className="text-xs text-subtle">Actualizado: {new Date(doc.updatedAt).toLocaleString("es-MX")}</div>
+                </div>
+                <button type="button" className="btn rounded-lg px-2 py-1 text-xs" onClick={() => void openCenterDoc(doc.id)}>
+                  Ver
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="card" style={{ marginTop: 12 }}>
         {patients.length === 0 ? (
