@@ -16,6 +16,7 @@ import { UpsertMarkDto } from "./dto/upsert-mark.dto";
 import { UpdateObjectiveNotesDto } from "./dto/update-objective-notes.dto";
 import { AuthUser } from "../auth/auth-user";
 import { FollowUpAccessService } from "./followup-access.service";
+import { resolveExistingFollowUpForProgramArea } from "./followup-program-area.util";
 import { INTERNAL_ONLY_AREA_KEYS, isInternalOnlyAreaKey } from "../areas/area-catalog";
 import {
   computeAttendancePercent,
@@ -614,6 +615,33 @@ export class FollowUpsService {
             )
           ).id
         : null;
+
+    if (programId) {
+      const existingInProgram = await resolveExistingFollowUpForProgramArea(
+        this.prisma,
+        programId,
+        dto.areaId,
+      );
+      if (existingInProgram) {
+        return this.get(user, existingInProgram.id);
+      }
+    }
+
+    if (area.trackingMode === "TEXT_ONLY") {
+      const existingTextOnly = await this.prisma.followUp.findFirst({
+        where: {
+          patientId: dto.patientId,
+          therapistId,
+          areaId: dto.areaId,
+          periodYear: dto.periodYear,
+          periodMonth: dto.periodMonth,
+        },
+        select: { id: true },
+      });
+      if (existingTextOnly) {
+        return this.get(user, existingTextOnly.id);
+      }
+    }
 
     const { prevYear, prevMonth } = previousCalendarMonth(dto.periodYear, dto.periodMonth);
 

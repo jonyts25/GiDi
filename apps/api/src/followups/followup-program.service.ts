@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { AreaTrackingMode, FollowUpStatus } from "@prisma/client";
+import { AreaTrackingMode, FollowUpStatus, Prisma } from "@prisma/client";
+import { resolveExistingFollowUpForProgramArea } from "./followup-program-area.util";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
 import { FollowUpAccessService } from "./followup-access.service";
@@ -207,71 +208,79 @@ export class FollowUpProgramService {
   async putRows(user: AuthUser, programId: string, rows: ProgramAreaRowDto[]) {
     await this.access.assertCanEditProgram(user, programId);
 
-    const program = await this.prisma.followUpProgram.findUnique({
-      where: { id: programId },
-      include: {
-        followUps: {
-          include: {
-            area: { select: { id: true, name: true, trackingMode: true } },
-          },
-        },
-      },
-    });
-    if (!program) throw new NotFoundException("Programación no encontrada");
+    const programSessionDates = await this.existingProgramSessionDates(programId);
 
-    const payloadAreaIds = new Set(rows.map((r) => r.areaId));
-
-    for (const fu of program.followUps) {
-      if (payloadAreaIds.has(fu.areaId)) continue;
-      const markCount = await this.prisma.followUpMark.count({
-        where: { session: { followUpId: fu.id } },
-      });
-      if (markCount > 0) {
-        throw new BadRequestException(
-          `No se puede quitar el área «${fu.area.name}» porque ya tiene marcas registradas.`,
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT id FROM "FollowUpProgram" WHERE id = ${programId}::uuid FOR UPDATE`,
         );
-      }
-      await this.prisma.followUp.delete({ where: { id: fu.id } });
-    }
 
-    const programSessionDates = await this.existingProgramSessionDates(program.id);
-
-    for (const row of rows) {
-      const area = await this.prisma.area.findUnique({ where: { id: row.areaId } });
-      if (!area) throw new NotFoundException("Área no encontrada");
-      if (area.trackingMode !== AreaTrackingMode.MONTHLY_GRID) {
-        throw new BadRequestException(`El área «${area.name}» no admite programación en cuadrícula`);
-      }
-
-      let followUp = await this.prisma.followUp.findFirst({
-        where: {
-          programId: program.id,
-          areaId: row.areaId,
-        },
-      });
-
-      if (!followUp) {
-        followUp = await this.prisma.followUp.create({
-          data: {
-            patientId: program.patientId,
-            therapistId: program.therapistId,
-            areaId: row.areaId,
-            programId: program.id,
-            periodYear: program.periodYear,
-            periodMonth: program.periodMonth,
+        const program = await tx.followUpProgram.findUnique({
+          where: { id: programId },
+          include: {
+            followUps: {
+              include: {
+                area: { select: { id: true, name: true, trackingMode: true } },
+              },
+            },
           },
         });
-        await this.createSessionsForNewFollowUp(
-          followUp.id,
-          program.therapistId,
-          programSessionDates,
-        );
-      }
+        if (!program) throw new NotFoundException("Programación no encontrada");
 
-      await this.followUps.replaceObjectivesWithMeta(user, followUp.id, row.objectives, {
-        skipAccessCheck: true,
-      });
-    }
+        const payloadAreaIds = new Set(rows.map((r) => r.areaId));
+
+        for (const fu of program.followUps) {
+          if (payloadAreaIds.has(fu.areaId)) continue;
+          const markCount = await tx.followUpMark.count({
+            where: { session: { followUpId: fu.id } },
+          });
+          if (markCount > 0) {
+            throw new BadRequestException(
+              `No se puede quitar el área «${fu.area.name}» porque ya tiene marcas registradas.`,
+            );
+          }
+          await tx.followUp.delete({ where: { id: fu.id } });
+        }
+
+        for (const row of rows) {
+          const area = await tx.area.findUnique({ where: { id: row.areaId } });
+          if (!area) throw new NotFoundException("Área no encontrada");
+          if (area.trackingMode !== AreaTrackingMode.MONTHLY_GRID) {
+            throw new BadRequestException(`El área «${area.name}» no admite programación en cuadrícula`);
+          }
+
+          let followUpId: string;
+          const existing = await resolveExistingFollowUpForProgramArea(tx, program.id, row.areaId);
+          if (existing) {
+            followUpId = existing.id;
+          } else {
+            const created = await tx.followUp.create({
+              data: {
+                patientId: program.patientId,
+                therapistId: program.therapistId,
+                areaId: row.areaId,
+                programId: program.id,
+                periodYear: program.periodYear,
+                periodMonth: program.periodMonth,
+              },
+            });
+            followUpId = created.id;
+            await this.createSessionsForNewFollowUp(
+              followUpId,
+              program.therapistId,
+              programSessionDates,
+              tx,
+            );
+          }
+
+          await this.followUps.replaceObjectivesWithMeta(user, followUpId, row.objectives, {
+            skipAccessCheck: true,
+          });
+        }
+      },
+      { timeout: 60_000 },
+    );
 
     return this.get(user, programId);
   }
@@ -546,10 +555,11 @@ export class FollowUpProgramService {
     followUpId: string,
     therapistId: string,
     sessionDates: Date[],
+    tx: Prisma.TransactionClient = this.prisma,
   ) {
     if (sessionDates.length === 0) return;
 
-    await this.prisma.followUpSession.createMany({
+    await tx.followUpSession.createMany({
       data: sessionDates.map((sessionDate) => ({
         followUpId,
         therapistId,

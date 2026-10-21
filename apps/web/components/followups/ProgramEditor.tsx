@@ -133,6 +133,7 @@ export function ProgramEditor(props: {
   const [busy, setBusy] = useState(false);
   const [gridKey, setGridKey] = useState(0);
   const [isOfficeStaff, setIsOfficeStaff] = useState(false);
+  const saveInFlightRef = useRef(false);
 
   const monthlyAreas = useMemo(
     () => allAreas.filter((a) => resolveTrackingMode(a) === "MONTHLY_GRID"),
@@ -347,6 +348,26 @@ export function ProgramEditor(props: {
 
   const programEmpty = data ? data.areas.length === 0 : false;
 
+  const repeatedProgramAreaNames = useMemo(() => {
+    if (!data) return [] as string[];
+    const counts = new Map<string, { name: string; count: number }>();
+    for (const a of data.areas) {
+      const cur = counts.get(a.areaId) ?? { name: a.areaName, count: 0 };
+      cur.count += 1;
+      counts.set(a.areaId, cur);
+    }
+    return [...counts.values()].filter((c) => c.count > 1).map((c) => c.name);
+  }, [data]);
+
+  const visibleDraftBlocks = useMemo(() => {
+    const seen = new Set<string>();
+    return draftBlocks.filter((b) => {
+      if (seen.has(b.areaId)) return false;
+      seen.add(b.areaId);
+      return true;
+    });
+  }, [draftBlocks]);
+
   function buildRowsPayload() {
     return draftBlocks
       .filter((b) => b.objectives.some((o) => o.text.trim()))
@@ -432,6 +453,8 @@ export function ProgramEditor(props: {
   }
 
   async function saveRows() {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setBusy(true);
     try {
       await persistRows();
@@ -440,11 +463,14 @@ export function ProgramEditor(props: {
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al guardar", "error");
     } finally {
+      saveInFlightRef.current = false;
       setBusy(false);
     }
   }
 
   async function copyFromPrevious() {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setBusy(true);
     try {
       await apiFetch(`/programs/${programId}/copy-from-previous`, { method: "POST" });
@@ -453,6 +479,7 @@ export function ProgramEditor(props: {
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al copiar", "error");
     } finally {
+      saveInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -522,6 +549,8 @@ export function ProgramEditor(props: {
   }
 
   async function saveDraft() {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setBusy(true);
     try {
       await persistRows();
@@ -532,6 +561,7 @@ export function ProgramEditor(props: {
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al guardar borrador", "error");
     } finally {
+      saveInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -562,6 +592,8 @@ export function ProgramEditor(props: {
     ) {
       return;
     }
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setBusy(true);
     try {
       await persistRows();
@@ -586,6 +618,7 @@ export function ProgramEditor(props: {
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al publicar", "error");
     } finally {
+      saveInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -614,6 +647,18 @@ export function ProgramEditor(props: {
 
   return (
     <div className="max-w-[1200px] space-y-6">
+      {repeatedProgramAreaNames.length > 0 ? (
+        <div
+          className="rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-ink"
+          role="alert"
+        >
+          {repeatedProgramAreaNames.map((name) => (
+            <p key={name}>
+              Esta programación tiene el área «{name}» repetida; avise a administración.
+            </p>
+          ))}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">
@@ -670,11 +715,11 @@ export function ProgramEditor(props: {
           ) : null}
         </div>
 
-        {draftBlocks.length === 0 ? (
+        {visibleDraftBlocks.length === 0 ? (
           <p className="text-sm text-subtle">Agregue al menos un área para definir objetivos.</p>
         ) : (
           <div className="space-y-6">
-            {draftBlocks.map((block) => {
+            {visibleDraftBlocks.map((block) => {
               const areaName =
                 data.areas.find((a) => a.areaId === block.areaId)?.areaName ??
                 monthlyAreas.find((a) => a.id === block.areaId)?.name ??
