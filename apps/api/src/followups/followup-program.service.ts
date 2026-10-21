@@ -1,6 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { AreaTrackingMode, FollowUpStatus, Prisma } from "@prisma/client";
-import { resolveExistingFollowUpForProgramArea } from "./followup-program-area.util";
+import {
+  loadFollowUpAreaCandidates,
+  pickCanonicalFollowUpId,
+  resolveExistingFollowUpForProgramArea,
+} from "./followup-program-area.util";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
 import { FollowUpAccessService } from "./followup-access.service";
@@ -119,10 +123,39 @@ export class FollowUpProgramService {
 
     if (!program) throw new NotFoundException("Programación no encontrada");
 
+    const followUpsByArea = new Map<string, typeof program.followUps>();
+    for (const fu of program.followUps) {
+      const group = followUpsByArea.get(fu.areaId) ?? [];
+      group.push(fu);
+      followUpsByArea.set(fu.areaId, group);
+    }
+
+    const duplicatedAreaNames: string[] = [];
+    const canonicalFollowUps: typeof program.followUps = [];
+
+    for (const group of followUpsByArea.values()) {
+      if (group.length === 1) {
+        canonicalFollowUps.push(group[0]!);
+        continue;
+      }
+      duplicatedAreaNames.push(group[0]!.area.name);
+      const candidates = await loadFollowUpAreaCandidates(
+        this.prisma,
+        group.map((fu) => fu.id),
+      );
+      const keepId = pickCanonicalFollowUpId(candidates);
+      const kept = group.find((fu) => fu.id === keepId);
+      if (kept) canonicalFollowUps.push(kept);
+    }
+
+    canonicalFollowUps.sort(
+      (a, b) => a.area.sortOrder - b.area.sortOrder || a.createdAt.getTime() - b.createdAt.getTime(),
+    );
+
     const globalNoByObjectiveId = new Map<string, number>();
     let globalNo = 1;
 
-    const areas = program.followUps.map((fu) => {
+    const areas = canonicalFollowUps.map((fu) => {
       const objectives = fu.objectives.map((o) => {
         globalNoByObjectiveId.set(o.id, globalNo);
         return {
@@ -158,7 +191,7 @@ export class FollowUpProgramService {
       note: string | null;
     }[] = [];
 
-    for (const fu of program.followUps) {
+    for (const fu of canonicalFollowUps) {
       for (const session of fu.sessions) {
         const key = dateKey(session.sessionDate);
         const bucket = sessionMap.get(key) ?? { date: key, entries: [] };
@@ -202,11 +235,22 @@ export class FollowUpProgramService {
       areas,
       sessions,
       marks,
+      duplicatedAreaNames,
     };
   }
 
   async putRows(user: AuthUser, programId: string, rows: ProgramAreaRowDto[]) {
     await this.access.assertCanEditProgram(user, programId);
+
+    const seenAreaIds = new Set<string>();
+    for (const row of rows) {
+      if (seenAreaIds.has(row.areaId)) {
+        throw new BadRequestException(
+          "La solicitud incluye el mismo área más de una vez. Guarde una sola fila por área.",
+        );
+      }
+      seenAreaIds.add(row.areaId);
+    }
 
     const programSessionDates = await this.existingProgramSessionDates(programId);
 
@@ -251,7 +295,31 @@ export class FollowUpProgramService {
           }
 
           let followUpId: string;
-          const existing = await resolveExistingFollowUpForProgramArea(tx, program.id, row.areaId);
+          let existing = await resolveExistingFollowUpForProgramArea(tx, program.id, row.areaId);
+          if (!existing) {
+            const samePeriod = await tx.followUp.findMany({
+              where: {
+                patientId: program.patientId,
+                therapistId: program.therapistId,
+                areaId: row.areaId,
+                periodYear: program.periodYear,
+                periodMonth: program.periodMonth,
+              },
+              select: { id: true },
+            });
+            if (samePeriod.length > 0) {
+              const candidates = await loadFollowUpAreaCandidates(
+                tx,
+                samePeriod.map((r) => r.id),
+              );
+              const canonicalId = pickCanonicalFollowUpId(candidates);
+              await tx.followUp.update({
+                where: { id: canonicalId },
+                data: { programId: program.id },
+              });
+              existing = { id: canonicalId };
+            }
+          }
           if (existing) {
             followUpId = existing.id;
           } else {
@@ -276,6 +344,7 @@ export class FollowUpProgramService {
 
           await this.followUps.replaceObjectivesWithMeta(user, followUpId, row.objectives, {
             skipAccessCheck: true,
+            tx,
           });
         }
       },

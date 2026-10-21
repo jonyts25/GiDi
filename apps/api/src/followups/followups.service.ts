@@ -810,19 +810,20 @@ export class FollowUpsService {
     user: AuthUser,
     followUpId: string,
     objectives: { id?: string; text: string; activities?: string | null }[],
-    options?: { skipAccessCheck?: boolean },
+    options?: { skipAccessCheck?: boolean; tx?: Prisma.TransactionClient },
   ) {
     if (!options?.skipAccessCheck) {
       await this.access.assertCanEditFollowUp(user, followUpId);
     }
-    return this.replaceObjectivesInternal(followUpId, objectives);
+    return this.replaceObjectivesInternal(followUpId, objectives, options?.tx);
   }
 
   private async replaceObjectivesInternal(
     id: string,
     objectives: { id?: string; text: string; activities?: string | null }[],
+    outerTx?: Prisma.TransactionClient,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const run = async (tx: Prisma.TransactionClient) => {
       const fu = await tx.followUp.findUnique({
         where: { id },
         include: {
@@ -910,7 +911,12 @@ export class FollowUpsService {
       }
 
       return { ok: true };
-    }, { timeout: 15000 });
+    };
+
+    if (outerTx) {
+      return run(outerTx);
+    }
+    return this.prisma.$transaction(run, { timeout: 15000 });
   }
 
   async updateObjectiveNotes(user: AuthUser, id: string, dto: UpdateObjectiveNotesDto) {

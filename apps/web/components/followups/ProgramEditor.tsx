@@ -56,6 +56,7 @@ type ProgramPayload = {
   areas: ProgramArea[];
   sessions: ProgramSessionColumn[];
   marks: (FlatMark & { followUpId?: string; globalNo?: number })[];
+  duplicatedAreaNames?: string[];
 };
 
 type FollowUpNotes = {
@@ -358,29 +359,17 @@ export function ProgramEditor(props: {
 
   const programEmpty = data ? data.areas.length === 0 : false;
 
-  const repeatedProgramAreaNames = useMemo(() => {
-    if (!data) return [] as string[];
-    const counts = new Map<string, { name: string; count: number }>();
-    for (const a of data.areas) {
-      const cur = counts.get(a.areaId) ?? { name: a.areaName, count: 0 };
-      cur.count += 1;
-      counts.set(a.areaId, cur);
-    }
-    return [...counts.values()].filter((c) => c.count > 1).map((c) => c.name);
-  }, [data]);
-
-  const visibleDraftBlocks = useMemo(() => {
-    const seen = new Set<string>();
-    return draftBlocks.filter((b) => {
-      if (seen.has(b.areaId)) return false;
-      seen.add(b.areaId);
-      return true;
-    });
-  }, [draftBlocks]);
+  const duplicatedAreaNames = data?.duplicatedAreaNames ?? [];
 
   function buildRowsPayload() {
+    const seenAreaIds = new Set<string>();
     return draftBlocks
       .filter((b) => b.objectives.some((o) => o.text.trim()))
+      .filter((b) => {
+        if (seenAreaIds.has(b.areaId)) return false;
+        seenAreaIds.add(b.areaId);
+        return true;
+      })
       .map((b) => ({
         areaId: b.areaId,
         objectives: b.objectives
@@ -657,12 +646,12 @@ export function ProgramEditor(props: {
 
   return (
     <div className="max-w-[1200px] space-y-6">
-      {repeatedProgramAreaNames.length > 0 ? (
+      {duplicatedAreaNames.length > 0 ? (
         <div
           className="rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-ink"
           role="alert"
         >
-          {repeatedProgramAreaNames.map((name) => (
+          {duplicatedAreaNames.map((name) => (
             <p key={name}>
               Esta programación tiene el área «{name}» repetida; avise a administración.
             </p>
@@ -725,11 +714,11 @@ export function ProgramEditor(props: {
           ) : null}
         </div>
 
-        {visibleDraftBlocks.length === 0 ? (
+        {draftBlocks.length === 0 ? (
           <p className="text-sm text-subtle">Agregue al menos un área para definir objetivos.</p>
         ) : (
           <div className="space-y-6">
-            {visibleDraftBlocks.map((block) => {
+            {draftBlocks.map((block) => {
               const areaName =
                 data.areas.find((a) => a.areaId === block.areaId)?.areaName ??
                 monthlyAreas.find((a) => a.id === block.areaId)?.name ??
