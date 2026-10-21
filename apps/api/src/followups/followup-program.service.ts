@@ -148,9 +148,7 @@ export class FollowUpProgramService {
       if (kept) canonicalFollowUps.push(kept);
     }
 
-    canonicalFollowUps.sort(
-      (a, b) => a.area.sortOrder - b.area.sortOrder || a.createdAt.getTime() - b.createdAt.getTime(),
-    );
+    canonicalFollowUps.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     const globalNoByObjectiveId = new Map<string, number>();
     let globalNo = 1;
