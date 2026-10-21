@@ -3,6 +3,7 @@ import { JwtGuard } from "../auth/jwt.guard";
 import { RolesGuard } from "../auth/roles.guard";
 import { Roles } from "../auth/roles.decorator";
 import { CurrentUser } from "../auth/current-user.decorator";
+import { AuthUser } from "../auth/auth-user";
 import { ObjectiveBankService } from "./objective-bank.service";
 import { CreateObjectiveBankDto } from "./dto/create-objective-bank.dto";
 import { UpdateObjectiveBankDto } from "./dto/update-objective-bank.dto";
@@ -15,8 +16,12 @@ export class TherapistObjectiveBankController {
 
   /** Banco: objetivos propios + públicos (admin / catálogo compartido). */
   @Get()
-  list(@CurrentUser() user: { sub: string }, @Query("areaId") areaId?: string) {
-    return this.objectives.listTherapistBank(user.sub, areaId);
+  list(
+    @CurrentUser() user: AuthUser,
+    @Query("areaId") areaId?: string,
+    @Query("ownerId") ownerId?: string,
+  ) {
+    return this.objectives.listTherapistBank(user.sub, user.roles ?? [], areaId, ownerId);
   }
 
   @Post()
