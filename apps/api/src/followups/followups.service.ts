@@ -16,6 +16,7 @@ import { UpsertMarkDto } from "./dto/upsert-mark.dto";
 import { UpdateObjectiveNotesDto } from "./dto/update-objective-notes.dto";
 import { AuthUser } from "../auth/auth-user";
 import { FollowUpAccessService } from "./followup-access.service";
+import { resolveExistingFollowUpForProgramArea } from "./followup-program-area.util";
 import { INTERNAL_ONLY_AREA_KEYS, isInternalOnlyAreaKey } from "../areas/area-catalog";
 import {
   computeAttendancePercent,
@@ -615,6 +616,33 @@ export class FollowUpsService {
           ).id
         : null;
 
+    if (programId) {
+      const existingInProgram = await resolveExistingFollowUpForProgramArea(
+        this.prisma,
+        programId,
+        dto.areaId,
+      );
+      if (existingInProgram) {
+        return this.get(user, existingInProgram.id);
+      }
+    }
+
+    if (area.trackingMode === "TEXT_ONLY") {
+      const existingTextOnly = await this.prisma.followUp.findFirst({
+        where: {
+          patientId: dto.patientId,
+          therapistId,
+          areaId: dto.areaId,
+          periodYear: dto.periodYear,
+          periodMonth: dto.periodMonth,
+        },
+        select: { id: true },
+      });
+      if (existingTextOnly) {
+        return this.get(user, existingTextOnly.id);
+      }
+    }
+
     const { prevYear, prevMonth } = previousCalendarMonth(dto.periodYear, dto.periodMonth);
 
     const prevFu = await this.prisma.followUp.findFirst({
@@ -782,19 +810,20 @@ export class FollowUpsService {
     user: AuthUser,
     followUpId: string,
     objectives: { id?: string; text: string; activities?: string | null }[],
-    options?: { skipAccessCheck?: boolean },
+    options?: { skipAccessCheck?: boolean; tx?: Prisma.TransactionClient },
   ) {
     if (!options?.skipAccessCheck) {
       await this.access.assertCanEditFollowUp(user, followUpId);
     }
-    return this.replaceObjectivesInternal(followUpId, objectives);
+    return this.replaceObjectivesInternal(followUpId, objectives, options?.tx);
   }
 
   private async replaceObjectivesInternal(
     id: string,
     objectives: { id?: string; text: string; activities?: string | null }[],
+    outerTx?: Prisma.TransactionClient,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const run = async (tx: Prisma.TransactionClient) => {
       const fu = await tx.followUp.findUnique({
         where: { id },
         include: {
@@ -882,7 +911,12 @@ export class FollowUpsService {
       }
 
       return { ok: true };
-    }, { timeout: 15000 });
+    };
+
+    if (outerTx) {
+      return run(outerTx);
+    }
+    return this.prisma.$transaction(run, { timeout: 15000 });
   }
 
   async updateObjectiveNotes(user: AuthUser, id: string, dto: UpdateObjectiveNotesDto) {

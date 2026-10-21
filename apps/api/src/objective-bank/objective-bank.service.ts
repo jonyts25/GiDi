@@ -11,10 +11,37 @@ export class ObjectiveBankService {
     return roles.includes("ADMIN") || roles.includes("SUPERADMIN");
   }
 
-  async listTherapistBank(therapistId: string, areaId?: string) {
-    return this.prisma.objectiveBank.findMany({
+  private isOfficeStaff(roles: string[]) {
+    return this.isAdminLike(roles) || roles.includes("SECRETARY");
+  }
+
+  async listTherapistBank(
+    viewerId: string,
+    viewerRoles: string[],
+    areaId?: string,
+    ownerId?: string,
+  ) {
+    const normalizedOwnerId = ownerId?.trim() || undefined;
+    let includeOwnerPrivates: string | undefined;
+
+    if (normalizedOwnerId && normalizedOwnerId !== viewerId) {
+      if (this.isOfficeStaff(viewerRoles)) {
+        includeOwnerPrivates = normalizedOwnerId;
+      }
+      // THERAPIST: ignorar ownerId ajeno (no exponer privados de otras terapeutas).
+    }
+
+    const visibilityOr = includeOwnerPrivates
+      ? [
+          { isPublic: true },
+          { creatorId: viewerId },
+          { creatorId: includeOwnerPrivates, isPublic: false },
+        ]
+      : [{ creatorId: viewerId }, { isPublic: true }];
+
+    const rows = await this.prisma.objectiveBank.findMany({
       where: {
-        OR: [{ creatorId: therapistId }, { isPublic: true }],
+        OR: visibilityOr,
         ...(areaId ? { areaId } : {}),
       },
       orderBy: [{ isPublic: "desc" }, { createdAt: "desc" }],
@@ -23,6 +50,9 @@ export class ObjectiveBankService {
         creator: { select: { id: true, fullName: true, email: true } },
       },
     });
+
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return [...byId.values()];
   }
 
   async createForTherapist(therapistId: string, dto: CreateObjectiveBankDto) {

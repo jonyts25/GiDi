@@ -56,6 +56,7 @@ type ProgramPayload = {
   areas: ProgramArea[];
   sessions: ProgramSessionColumn[];
   marks: (FlatMark & { followUpId?: string; globalNo?: number })[];
+  duplicatedAreaNames?: string[];
 };
 
 type FollowUpNotes = {
@@ -133,6 +134,7 @@ export function ProgramEditor(props: {
   const [busy, setBusy] = useState(false);
   const [gridKey, setGridKey] = useState(0);
   const [isOfficeStaff, setIsOfficeStaff] = useState(false);
+  const saveInFlightRef = useRef(false);
 
   const monthlyAreas = useMemo(
     () => allAreas.filter((a) => resolveTrackingMode(a) === "MONTHLY_GRID"),
@@ -240,10 +242,23 @@ export function ProgramEditor(props: {
     };
   }, [bankOpen]);
 
-  async function ensureBankLoaded(areaId: string): Promise<BankObjective[]> {
-    if (bankByArea[areaId]) return bankByArea[areaId];
+  function invalidateBankArea(areaId: string) {
+    setBankByArea((prev) => {
+      if (!(areaId in prev)) return prev;
+      const next = { ...prev };
+      delete next[areaId];
+      return next;
+    });
+  }
+
+  async function ensureBankLoaded(areaId: string, opts?: { bypassCache?: boolean }): Promise<BankObjective[]> {
+    if (!opts?.bypassCache && bankByArea[areaId]) return bankByArea[areaId];
+    if (!data) return [];
     try {
-      const rows = await apiFetch(`/therapist/objective-bank?areaId=${encodeURIComponent(areaId)}`);
+      const ownerId = encodeURIComponent(data.program.therapistId);
+      const rows = await apiFetch(
+        `/therapist/objective-bank?areaId=${encodeURIComponent(areaId)}&ownerId=${ownerId}`,
+      );
       const list = Array.isArray(rows) ? (rows as BankObjective[]) : [];
       setBankByArea((prev) => ({ ...prev, [areaId]: list }));
       return list;
@@ -274,15 +289,12 @@ export function ProgramEditor(props: {
         return;
       }
 
-      const created = (await apiFetch("/therapist/objective-bank", {
+      await apiFetch("/therapist/objective-bank", {
         method: "POST",
         body: JSON.stringify({ description, areaId, isPublic }),
-      })) as BankObjective;
+      });
 
-      setBankByArea((prev) => ({
-        ...prev,
-        [areaId]: [...(prev[areaId] ?? []), created],
-      }));
+      invalidateBankArea(areaId);
       showToast(isPublic ? "✅ Agregado al catálogo público" : "✅ Agregado al banco privado");
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "No se pudo agregar al banco", "error");
@@ -347,9 +359,17 @@ export function ProgramEditor(props: {
 
   const programEmpty = data ? data.areas.length === 0 : false;
 
+  const duplicatedAreaNames = data?.duplicatedAreaNames ?? [];
+
   function buildRowsPayload() {
+    const seenAreaIds = new Set<string>();
     return draftBlocks
       .filter((b) => b.objectives.some((o) => o.text.trim()))
+      .filter((b) => {
+        if (seenAreaIds.has(b.areaId)) return false;
+        seenAreaIds.add(b.areaId);
+        return true;
+      })
       .map((b) => ({
         areaId: b.areaId,
         objectives: b.objectives
@@ -432,6 +452,8 @@ export function ProgramEditor(props: {
   }
 
   async function saveRows() {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setBusy(true);
     try {
       await persistRows();
@@ -440,11 +462,14 @@ export function ProgramEditor(props: {
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al guardar", "error");
     } finally {
+      saveInFlightRef.current = false;
       setBusy(false);
     }
   }
 
   async function copyFromPrevious() {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setBusy(true);
     try {
       await apiFetch(`/programs/${programId}/copy-from-previous`, { method: "POST" });
@@ -453,6 +478,7 @@ export function ProgramEditor(props: {
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al copiar", "error");
     } finally {
+      saveInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -522,6 +548,8 @@ export function ProgramEditor(props: {
   }
 
   async function saveDraft() {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setBusy(true);
     try {
       await persistRows();
@@ -532,6 +560,7 @@ export function ProgramEditor(props: {
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al guardar borrador", "error");
     } finally {
+      saveInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -562,6 +591,8 @@ export function ProgramEditor(props: {
     ) {
       return;
     }
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
     setBusy(true);
     try {
       await persistRows();
@@ -586,6 +617,7 @@ export function ProgramEditor(props: {
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Error al publicar", "error");
     } finally {
+      saveInFlightRef.current = false;
       setBusy(false);
     }
   }
@@ -614,6 +646,18 @@ export function ProgramEditor(props: {
 
   return (
     <div className="max-w-[1200px] space-y-6">
+      {duplicatedAreaNames.length > 0 ? (
+        <div
+          className="rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm text-ink"
+          role="alert"
+        >
+          {duplicatedAreaNames.map((name) => (
+            <p key={name}>
+              Esta programación tiene el área «{name}» repetida; avise a administración.
+            </p>
+          ))}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">
@@ -681,10 +725,18 @@ export function ProgramEditor(props: {
                 "Área";
               const headerClass = areaHeaderClass(block.areaId, areaIdsInOrder);
               const query = bankQuery[block.areaId] ?? "";
-              const bankItems = (bankByArea[block.areaId] ?? []).filter((item) => {
-                if (!query.trim()) return true;
-                return item.description.toLowerCase().includes(query.toLowerCase());
+              const queryTrim = query.trim();
+              const allBankForArea = bankByArea[block.areaId] ?? [];
+              const bankItemsFiltered = allBankForArea.filter((item) => {
+                if (!queryTrim) return true;
+                return item.description.toLowerCase().includes(queryTrim.toLowerCase());
               });
+              const bankItemsSorted = [...bankItemsFiltered].sort((a, b) => {
+                if (a.isPublic === b.isPublic) return 0;
+                return a.isPublic ? 1 : -1;
+              });
+              const bankItemsVisible = queryTrim ? bankItemsSorted : bankItemsSorted.slice(0, 50);
+              const bankShowSearchHint = !queryTrim && allBankForArea.length > 50;
 
               return (
                 <div key={block.areaId} className="overflow-hidden rounded-xl border border-border">
@@ -752,15 +804,31 @@ export function ProgramEditor(props: {
                                               setBankQuery((prev) => ({ ...prev, [block.areaId]: e.target.value }))
                                             }
                                           />
-                                          {bankItems.length ? (
-                                            bankItems.slice(0, 20).map((item) => (
+                                          {bankShowSearchHint ? (
+                                            <p className="border-b border-border px-3 py-2 text-[11px] text-subtle">
+                                              Escriba para buscar entre {allBankForArea.length} objetivos
+                                            </p>
+                                          ) : null}
+                                          {bankItemsVisible.length ? (
+                                            bankItemsVisible.map((item) => (
                                               <button
                                                 key={item.id}
                                                 type="button"
                                                 className="block w-full px-3 py-2 text-left text-xs hover:bg-primary/10"
                                                 onClick={() => appendBankObjective(block.areaId, objIdx, item.description)}
                                               >
-                                                {item.description}
+                                                <span className="flex items-start gap-2">
+                                                  <span
+                                                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                                                      item.isPublic
+                                                        ? "bg-primary/15 text-primary"
+                                                        : "bg-surface text-subtle"
+                                                    }`}
+                                                  >
+                                                    {item.isPublic ? "Público" : "Privado"}
+                                                  </span>
+                                                  <span className="min-w-0 flex-1">{item.description}</span>
+                                                </span>
                                               </button>
                                             ))
                                           ) : (
