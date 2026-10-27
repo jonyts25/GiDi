@@ -37,6 +37,7 @@ export type ParentPortalDossier = {
   }[];
   totalFollowUps: number;
   totalMonths: number;
+  therapists?: { therapistId: string; fullName: string }[];
 };
 
 export function ParentPatientDossierPrint({ dossier }: { dossier: ParentPortalDossier }) {
@@ -62,6 +63,14 @@ export function ParentPatientDossierPrint({ dossier }: { dossier: ParentPortalDo
             <div>
               <dt>Fecha de nacimiento</dt>
               <dd>{formatDate(dossier.patient.birthDate)}</dd>
+            </div>
+            <div>
+              <dt>Terapeuta(s)</dt>
+              <dd>
+                {dossier.therapists?.length
+                  ? dossier.therapists.map((t) => t.fullName).join(", ")
+                  : "Sin asignar"}
+              </dd>
             </div>
             <div>
               <dt>Periodos registrados</dt>

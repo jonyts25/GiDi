@@ -85,10 +85,10 @@ function buildCreateOrGetService(opts: {
       upsert: async () => ({ id: PROGRAM_ID }),
     },
     patientTherapist: {
-      findMany: async () => [{ therapistId: "therapist-1" }],
-      deleteMany: async () => ({ count: 0 }),
-      create: async () => ({}),
+      upsert: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn(),
     },
+    internalNoteRead: { upsert: jest.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
 
   const access = {

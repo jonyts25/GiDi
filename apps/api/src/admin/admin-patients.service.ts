@@ -474,9 +474,10 @@ export class AdminPatientsService {
     await this.ensurePatient(patientId);
     await this.ensureUserExists(therapistId);
 
-    await this.prisma.patientTherapist.deleteMany({ where: { patientId } });
-    await this.prisma.patientTherapist.create({
-      data: { patientId, therapistId },
+    await this.prisma.patientTherapist.upsert({
+      where: { patientId_therapistId: { patientId, therapistId } },
+      update: {},
+      create: { patientId, therapistId },
     });
     return { ok: true };
   }

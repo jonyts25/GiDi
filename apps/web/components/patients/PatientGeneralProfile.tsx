@@ -104,15 +104,9 @@ export function PatientGeneralProfile({
       <section className="card space-y-2 border-l-4 border-l-success">
         <h2 className="text-lg font-semibold">Terapeuta(s)</h2>
         {profile.therapists.length === 0 ? (
-          <p className="text-sm text-subtle">Sin terapeuta asignado.</p>
+          <p className="text-sm text-subtle">Sin terapeutas asignados.</p>
         ) : (
-          <ul className="space-y-1 text-sm">
-            {profile.therapists.map((t) => (
-              <li key={t.therapistId}>
-                {t.fullName} · <span className="text-subtle">{t.email}</span>
-              </li>
-            ))}
-          </ul>
+          <p className="text-sm">{profile.therapists.map((t) => t.fullName).join(", ")}</p>
         )}
       </section>
 

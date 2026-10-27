@@ -43,7 +43,7 @@ export class PatientsService {
 
   async create(dto: CreatePatientBody) {
     return this.prisma.$transaction(async (tx) => {
-      const therapistId = dto.therapistIds?.[0];
+      const therapistIds = [...new Set(dto.therapistIds ?? [])];
       const patient = await tx.patient.create({
         data: {
           firstName: dto.firstName,
@@ -54,9 +54,9 @@ export class PatientsService {
           sessionsPerWeek: dto.sessionsPerWeek ?? undefined,
           discountPercent: dto.discountPercent ?? undefined,
           agreedMonthlyAmount: dto.agreedMonthlyAmount ?? undefined,
-          assignments: therapistId
+          assignments: therapistIds.length
             ? {
-                create: { therapistId },
+                create: therapistIds.map((therapistId) => ({ therapistId })),
               }
             : undefined,
         },

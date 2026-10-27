@@ -565,14 +565,11 @@ export default function AdminPatientEditPage() {
       {/* -------- terapeutas -------- */}
       <section className="card mt-6 space-y-4 border-l-4 border-l-success">
         <div>
-          <h2 className="text-lg font-semibold">Terapeuta asignado</h2>
-          <p className="text-sm text-subtle">
-            Solo un terapeuta por paciente. Asignar uno nuevo reemplaza al anterior.
-          </p>
+          <h2 className="text-lg font-semibold">Terapeutas asignados</h2>
         </div>
 
         {data.therapists.length === 0 ? (
-          <p className="text-sm text-subtle">No hay terapeuta asignado.</p>
+          <p className="text-sm text-subtle">No hay terapeutas asignados.</p>
         ) : (
           <ul className="space-y-2">
             {data.therapists.map((t) => (
@@ -590,7 +587,7 @@ export default function AdminPatientEditPage() {
 
         <div className="flex flex-wrap gap-3">
           <select className="select max-w-md flex-1" value={pickedTherapist} onChange={(e) => setPickedTherapist(e.target.value)}>
-            <option value="">{data.therapists.length ? "— Cambiar terapeuta —" : "— Asignar terapeuta —"}</option>
+            <option value="">— Agregar terapeuta —</option>
             {allTherapists.map((t) => (
               <option key={t.id} value={t.id} disabled={assignedTherapistIds.has(t.id)}>
                 {t.fullName} ({t.email})
@@ -598,7 +595,7 @@ export default function AdminPatientEditPage() {
             ))}
           </select>
           <button type="button" className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold" onClick={onAssignTherapist} disabled={!pickedTherapist}>
-            {data.therapists.length ? "Cambiar" : "Asignar"}
+            Agregar
           </button>
         </div>
       </section>

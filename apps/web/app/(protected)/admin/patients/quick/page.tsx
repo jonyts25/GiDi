@@ -165,7 +165,7 @@ export default function AdminQuickPatientPage() {
         </div>
         <div style={{ marginTop: 10 }}>
           <label className="grid gap-1 text-sm">
-            <span className="text-subtle">Terapeuta</span>
+            <span className="text-subtle">Terapeuta inicial (opcional)</span>
             <select
               className="select"
               value={therapistId}

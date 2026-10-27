@@ -464,9 +464,24 @@ export class FollowUpsService {
 
     const patient = await this.prisma.patient.findUnique({
       where: { id: patientId },
-      select: { id: true, firstName: true, lastName: true, birthDate: true, notes: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        birthDate: true,
+        notes: true,
+        assignments: {
+          select: { therapist: { select: { id: true, fullName: true } } },
+          orderBy: { therapist: { fullName: "asc" } },
+        },
+      },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
+
+    const therapists = patient.assignments.map((a) => ({
+      therapistId: a.therapist.id,
+      fullName: a.therapist.fullName,
+    }));
 
     const followUps = await this.prisma.followUp.findMany({
       where: {
@@ -515,9 +530,12 @@ export class FollowUpsService {
         };
       });
 
+    const { assignments: _assignments, ...patientPublic } = patient;
+
     return {
       generatedAt: new Date().toISOString(),
-      patient,
+      patient: patientPublic,
+      therapists,
       documents,
       months,
       totalFollowUps: followUps.length,
@@ -675,7 +693,7 @@ export class FollowUpsService {
     }
 
     if (area.trackingMode === "MONTHLY_GRID") {
-      await this.ensureSingleTherapistAssignment(dto.patientId, therapistId);
+      await this.ensureTherapistAssignment(dto.patientId, therapistId);
     }
 
     const programId =
@@ -733,6 +751,14 @@ export class FollowUpsService {
       },
     });
 
+    const internalNoteOnCreate =
+      area.key === "COMUNICACION_INTERNA" && dto.generalNotes?.trim()
+        ? {
+            lastNoteAt: new Date(),
+            lastNoteById: user.sub,
+          }
+        : {};
+
     let createdId: string;
     try {
       const created = await this.prisma.followUp.create({
@@ -747,6 +773,7 @@ export class FollowUpsService {
           generalNotes: dto.generalNotes ?? null,
           homeWork: dto.homeWork ?? null,
           ...internalAreaForcedVisibility(area.key),
+          ...internalNoteOnCreate,
         },
         select: { id: true },
       });
@@ -1143,17 +1170,11 @@ export class FollowUpsService {
     });
   }
 
-  private async ensureSingleTherapistAssignment(patientId: string, therapistId: string) {
-    const existing = await this.prisma.patientTherapist.findMany({
-      where: { patientId },
-      select: { therapistId: true },
-    });
-
-    if (existing.some((a) => a.therapistId === therapistId)) return;
-
-    await this.prisma.patientTherapist.deleteMany({ where: { patientId } });
-    await this.prisma.patientTherapist.create({
-      data: { patientId, therapistId },
+  private async ensureTherapistAssignment(patientId: string, therapistId: string) {
+    await this.prisma.patientTherapist.upsert({
+      where: { patientId_therapistId: { patientId, therapistId } },
+      update: {},
+      create: { patientId, therapistId },
     });
   }
 }
