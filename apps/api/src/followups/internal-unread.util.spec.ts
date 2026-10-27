@@ -1,4 +1,8 @@
-import { internalUnreadPatientScope, isInternalFollowUpUnread } from "./internal-unread.util";
+import {
+  internalNoteTextChanged,
+  internalUnreadPatientScope,
+  isInternalFollowUpUnread,
+} from "./internal-unread.util";
 
 describe("internalUnreadPatientScope", () => {
   it("devuelve all_active para admin y secretaria", () => {
@@ -22,23 +26,37 @@ describe("internalUnreadPatientScope", () => {
 });
 
 describe("isInternalFollowUpUnread", () => {
-  const updated = new Date("2026-10-27T12:00:00Z");
+  const lastNoteAt = new Date("2026-10-27T12:00:00Z");
 
-  it("ignora notas vacías", () => {
-    expect(isInternalFollowUpUnread("  ", updated, null)).toBe(false);
-    expect(isInternalFollowUpUnread(null, updated, null)).toBe(false);
+  it("ignora sin lastNoteAt o notas vacías", () => {
+    expect(isInternalFollowUpUnread("  ", null, null)).toBe(false);
+    expect(isInternalFollowUpUnread("Hola", null, null)).toBe(false);
+    expect(isInternalFollowUpUnread(null, lastNoteAt, null)).toBe(false);
   });
 
   it("marca no leído sin registro seenAt", () => {
-    expect(isInternalFollowUpUnread("Hola", updated, null)).toBe(true);
+    expect(isInternalFollowUpUnread("Hola", lastNoteAt, null)).toBe(true);
   });
 
-  it("marca leído si seenAt >= updatedAt", () => {
-    expect(isInternalFollowUpUnread("Hola", updated, new Date("2026-10-27T12:00:00Z"))).toBe(false);
-    expect(isInternalFollowUpUnread("Hola", updated, new Date("2026-10-27T13:00:00Z"))).toBe(false);
+  it("marca leído si seenAt >= lastNoteAt", () => {
+    expect(isInternalFollowUpUnread("Hola", lastNoteAt, new Date("2026-10-27T12:00:00Z"))).toBe(
+      false,
+    );
+    expect(isInternalFollowUpUnread("Hola", lastNoteAt, new Date("2026-10-27T13:00:00Z"))).toBe(
+      false,
+    );
   });
 
-  it("marca no leído si el mensaje se editó después de seenAt", () => {
-    expect(isInternalFollowUpUnread("Hola", updated, new Date("2026-10-26T12:00:00Z"))).toBe(true);
+  it("marca no leído si la nota se editó después de seenAt", () => {
+    expect(isInternalFollowUpUnread("Hola", lastNoteAt, new Date("2026-10-26T12:00:00Z"))).toBe(
+      true,
+    );
+  });
+});
+
+describe("internalNoteTextChanged", () => {
+  it("detecta cambio real ignorando espacios", () => {
+    expect(internalNoteTextChanged("hola", " hola ")).toBe(false);
+    expect(internalNoteTextChanged("hola", "adiós")).toBe(true);
   });
 });

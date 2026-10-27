@@ -89,6 +89,7 @@ export class FollowUpAccessService {
         patientId: true,
         therapistId: true,
         status: true,
+        generalNotes: true,
         area: { select: { key: true, trackingMode: true } },
       },
     });

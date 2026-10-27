@@ -30,6 +30,8 @@ model User {
 
   followUpsAsTherapist FollowUp[]
 
+  followUpsLastInternalNote FollowUp[] @relation("FollowUpLastInternalNote")
+
   followUpPrograms FollowUpProgram[]
 
   objectivesCreated ObjectiveBank[]
@@ -320,6 +322,11 @@ model FollowUp {
   homeWork     String?
   parentComments String?
   observationsAuthor String?
+
+  /// Última edición del texto de comunicación interna (no el updatedAt del registro).
+  lastNoteAt   DateTime?
+  lastNoteById String? @db.Uuid
+  lastNoteBy   User?   @relation("FollowUpLastInternalNote", fields: [lastNoteById], references: [id], onDelete: SetNull)
 
   // Audiencia: a quién se publica el seguimiento (el admin siempre ve).
   visibleToParent    Boolean @default(true)

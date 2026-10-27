@@ -25,6 +25,7 @@ import {
   sessionAttendanceFromMarks,
 } from "./followup-metrics";
 import {
+  internalNoteTextChanged,
   internalUnreadPatientScope,
   isInternalFollowUpUnread,
 } from "./internal-unread.util";
@@ -175,20 +176,21 @@ export class FollowUpsService {
 
     const candidates = await this.prisma.followUp.findMany({
       where: {
-        therapistId: { not: user.sub },
+        lastNoteAt: { not: null },
+        lastNoteById: { not: user.sub },
         area: { key: "COMUNICACION_INTERNA" },
         NOT: [{ generalNotes: null }, { generalNotes: "" }],
         patient: patientWhere,
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: { lastNoteAt: "desc" },
       take: 200,
       select: {
         id: true,
         patientId: true,
         generalNotes: true,
-        updatedAt: true,
+        lastNoteAt: true,
         patient: { select: { firstName: true, lastName: true } },
-        therapist: { select: { fullName: true } },
+        lastNoteBy: { select: { fullName: true } },
         internalNoteReads: {
           where: { userId: user.sub },
           select: { seenAt: true },
@@ -201,7 +203,7 @@ export class FollowUpsService {
       .filter((fu) =>
         isInternalFollowUpUnread(
           fu.generalNotes,
-          fu.updatedAt,
+          fu.lastNoteAt,
           fu.internalNoteReads[0]?.seenAt,
         ),
       )
@@ -210,8 +212,8 @@ export class FollowUpsService {
         followUpId: fu.id,
         patientId: fu.patientId,
         patientName: `${fu.patient.firstName} ${fu.patient.lastName}`.trim(),
-        authorName: fu.therapist.fullName,
-        updatedAt: fu.updatedAt.toISOString(),
+        authorName: fu.lastNoteBy?.fullName ?? "Desconocido",
+        updatedAt: fu.lastNoteAt!.toISOString(),
       }));
 
     return rows;
@@ -816,6 +818,23 @@ export class FollowUpsService {
     }
 
     const forcedVisibility = internalAreaForcedVisibility(fu.area.key);
+    let noteMetadata: Prisma.FollowUpUpdateInput = {};
+    if (
+      fu.area.key === "COMUNICACION_INTERNA" &&
+      dto.generalNotes !== undefined &&
+      internalNoteTextChanged(fu.generalNotes, dto.generalNotes)
+    ) {
+      const trimmed = dto.generalNotes.trim();
+      if (trimmed.length > 0) {
+        noteMetadata = {
+          lastNoteAt: new Date(),
+          lastNoteBy: { connect: { id: user.sub } },
+        };
+      } else {
+        noteMetadata = { lastNoteAt: null, lastNoteBy: { disconnect: true } };
+      }
+    }
+
     await this.prisma.followUp.update({
       where: { id },
       data: {
@@ -832,6 +851,7 @@ export class FollowUpsService {
               visibleToTherapist: dto.visibleToTherapist ?? undefined,
               visibleToSchool: dto.visibleToSchool ?? undefined,
             }),
+        ...noteMetadata,
       },
     });
     return this.get(user, id);
