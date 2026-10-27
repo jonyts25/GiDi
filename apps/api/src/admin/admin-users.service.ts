@@ -30,6 +30,8 @@ export class AdminUsersService {
         fullName: true,
         phone: true,
         status: true,
+        coordinatorId: true,
+        coordinator: { select: { id: true, fullName: true } },
         roles: { select: { role: { select: { key: true, name: true } } } },
         createdAt: true,
       },
@@ -123,6 +125,8 @@ export class AdminUsersService {
         fullName: true,
         phone: true,
         status: true,
+        coordinatorId: true,
+        coordinator: { select: { id: true, fullName: true, email: true } },
         roles: { select: { role: { select: { key: true, name: true } } } },
         createdAt: true,
         parentAssignments: {
@@ -179,6 +183,29 @@ export class AdminUsersService {
       throw new BadRequestException("Solo administración puede reactivar perfiles inactivos");
     }
 
+    if (dto.coordinatorId !== undefined) {
+      const isTherapist = current.roles.some((r) => r.role.key === RoleKey.THERAPIST);
+      if (!isTherapist) {
+        throw new BadRequestException("Solo terapeutas pueden tener coordinadora asignada");
+      }
+      if (dto.coordinatorId === null) {
+        // ok
+      } else {
+        const coord = await this.prisma.user.findUnique({
+          where: { id: dto.coordinatorId },
+          select: {
+            id: true,
+            roles: { select: { role: { select: { key: true } } } },
+          },
+        });
+        if (!coord) throw new NotFoundException("Coordinadora no encontrada");
+        const hasCoordRole = coord.roles.some((r) => r.role.key === RoleKey.COORDINATOR);
+        if (!hasCoordRole) {
+          throw new BadRequestException("El usuario seleccionado no tiene rol COORDINATOR");
+        }
+      }
+    }
+
     try {
       const updated = await this.prisma.user.update({
         where: { id },
@@ -187,6 +214,7 @@ export class AdminUsersService {
           fullName: dto.fullName,
           phone: dto.phone === undefined ? undefined : (dto.phone?.trim() || null),
           status: dto.status,
+          ...(dto.coordinatorId !== undefined ? { coordinatorId: dto.coordinatorId } : {}),
         },
         select: { id: true, email: true, fullName: true, phone: true, status: true, createdAt: true },
       });

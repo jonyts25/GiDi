@@ -8,8 +8,13 @@ export const STAFF_ROLE_KEYS: RoleKey[] = [
   RoleKey.ADMIN,
   RoleKey.SECRETARY,
   RoleKey.THERAPIST,
+  RoleKey.COORDINATOR,
   RoleKey.FINANCE,
 ];
+
+export function hasCoordinatorRole(roles: string[] = []): boolean {
+  return roles.includes("COORDINATOR");
+}
 
 export function hasFullAdminRole(roles: string[] = []): boolean {
   return roles.some((r) => r === "ADMIN" || r === "SUPERADMIN");

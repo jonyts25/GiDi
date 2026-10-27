@@ -5,7 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { AnnouncementBanner } from "@/components/announcements/AnnouncementBanner";
 import { GiDiLogo } from "@/components/branding/GiDiLogo";
-import { canViewRevenueOverview, hasFullAdminRole, hasOfficeStaffRole, hasParentPortalAccess, primaryRoleLabel } from "@/lib/role-permissions";
+import {
+  canViewRevenueOverview,
+  hasCoordinatorRole,
+  hasFullAdminRole,
+  hasOfficeStaffRole,
+  hasParentPortalAccess,
+  primaryRoleLabel,
+} from "@/lib/role-permissions";
 import { readStoredUser } from "@/lib/stored-user";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
@@ -56,13 +63,18 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             ]
           : [{ href: "/documents", label: "Documentos" }]),
       ]
-    : roles.includes("THERAPIST")
+    : roles.includes("THERAPIST") || hasCoordinatorRole(roles)
       ? [
-          { href: "/therapist/followups", label: "Seguimientos" },
-          { href: "/therapist/patients", label: "Mis pacientes" },
-          { href: "/therapist/schedule", label: "Mi horario" },
-          { href: "/therapist/objective-bank", label: "Banco de objetivos" },
-          { href: "/documents", label: "Documentos" },
+          ...(roles.includes("THERAPIST")
+            ? [
+                { href: "/therapist/followups", label: "Seguimientos" },
+                { href: "/therapist/patients", label: "Mis pacientes" },
+                { href: "/therapist/schedule", label: "Mi horario" },
+                { href: "/therapist/objective-bank", label: "Banco de objetivos" },
+                { href: "/documents", label: "Documentos" },
+              ]
+            : []),
+          ...(hasCoordinatorRole(roles) ? [{ href: "/coordinator", label: "Mi equipo" }] : []),
         ]
       : hasParentPortalAccess(roles)
         ? [

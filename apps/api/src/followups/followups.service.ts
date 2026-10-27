@@ -94,7 +94,8 @@ export class FollowUpsService {
       ...(month ? { periodMonth: month } : {}),
     };
 
-    if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user)) {
+    const coordinatorTeamView = await this.access.canViewPatientAsCoordinator(user, patientId);
+    if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user) && !coordinatorTeamView) {
       where.OR = [
         { therapistId: user.sub },
         { visibleToTherapist: true, status: FollowUpStatus.CLOSED },

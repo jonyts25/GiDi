@@ -26,6 +26,16 @@ type InternalUnreadEntry = {
   updatedAt: string;
 };
 
+type FeedbackUnreadEntry = {
+  feedbackId: string;
+  programId: string;
+  patientName: string;
+  authorName: string;
+  periodYear: number;
+  periodMonth: number;
+  createdAt: string;
+};
+
 const DISMISS_KEY = "gidi_dismissed_announcements";
 const REVAL_PREFIX = "[REVALUACIÓN]";
 const REVAL_PATIENT_RE = /reval-patient:([0-9a-f-]{36})/i;
@@ -61,6 +71,13 @@ function internalUnreadSummary(count: number): string {
   return `${count} mensajes nuevos de comunicación interna`;
 }
 
+function feedbackUnreadSummary(count: number): string {
+  if (count === 1) return "1 retroalimentación nueva";
+  return `${count} retroalimentaciones nuevas`;
+}
+
+const MONTH_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
 function formatRelativeTime(iso: string): string {
   const date = new Date(iso);
   const diffMs = Date.now() - date.getTime();
@@ -93,6 +110,8 @@ export function AnnouncementBanner() {
   const [revalExpanded, setRevalExpanded] = useState(false);
   const [internalUnread, setInternalUnread] = useState<InternalUnreadEntry[]>([]);
   const [internalExpanded, setInternalExpanded] = useState(false);
+  const [feedbackUnread, setFeedbackUnread] = useState<FeedbackUnreadEntry[]>([]);
+  const [feedbackExpanded, setFeedbackExpanded] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -114,6 +133,23 @@ export function AnnouncementBanner() {
         setInternalUnread(Array.isArray(data) ? data : []);
       } catch {
         setInternalUnread([]);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = localStorage.getItem("gidi_user");
+        const roles: string[] = raw ? (JSON.parse(raw).roles ?? []) : [];
+        if (!roles.includes("THERAPIST")) {
+          setFeedbackUnread([]);
+          return;
+        }
+        const data = (await apiFetch("/feedback/unread")) as FeedbackUnreadEntry[];
+        setFeedbackUnread(Array.isArray(data) ? data : []);
+      } catch {
+        setFeedbackUnread([]);
       }
     })();
   }, []);
@@ -147,7 +183,8 @@ export function AnnouncementBanner() {
     setItems((prev) => prev.filter((x) => x.id !== a.id));
   }
 
-  if (!regularItems.length && !revalEntries.length && !internalUnread.length) return null;
+  if (!regularItems.length && !revalEntries.length && !internalUnread.length && !feedbackUnread.length)
+    return null;
 
   return (
     <div className="container space-y-3 pt-4">
@@ -175,6 +212,41 @@ export function AnnouncementBanner() {
           </div>
         </div>
       ))}
+
+      {feedbackUnread.length > 0 && (
+        <div className="rounded-xl border border-teal-400/40 bg-teal-500/10 px-4 py-2.5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <span aria-hidden>📝</span>
+              {feedbackUnreadSummary(feedbackUnread.length)}
+            </p>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg border border-border px-2 py-1 text-xs text-subtle hover:text-ink"
+              onClick={() => setFeedbackExpanded((v) => !v)}
+              aria-expanded={feedbackExpanded}
+            >
+              {feedbackExpanded ? "Ocultar" : "Ver"}
+            </button>
+          </div>
+
+          {feedbackExpanded && (
+            <ul className="mt-2 space-y-1 border-t border-teal-400/25 pt-2 text-sm">
+              {feedbackUnread.map((entry) => (
+                <li key={entry.feedbackId}>
+                  <Link
+                    href={`/therapist/programs/${entry.programId}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {entry.patientName} · {MONTH_SHORT[entry.periodMonth - 1] ?? entry.periodMonth} · de{" "}
+                    {entry.authorName} · {formatRelativeTime(entry.createdAt)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {internalUnread.length > 0 && (
         <div className="rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-2.5 shadow-sm">

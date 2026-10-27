@@ -3,7 +3,11 @@ import { FollowUpStatus } from "@prisma/client";
 import { PrismaService } from "../prisma.service";
 import { canRoleUseArea } from "../areas/area-permissions";
 import { AuthUser } from "../auth/auth-user";
-import { userHasFullAdminRole, userHasOfficeStaffRole } from "../auth/role-permissions";
+import {
+  hasCoordinatorRole,
+  userHasFullAdminRole,
+  userHasOfficeStaffRole,
+} from "../auth/role-permissions";
 
 export { AuthUser };
 
@@ -17,6 +21,57 @@ export class FollowUpAccessService {
 
   isOfficeStaff(user: AuthUser): boolean {
     return userHasOfficeStaffRole(user);
+  }
+
+  /** Coordinadora del terapeuta (User.coordinatorId). */
+  async isCoordinatorOf(user: AuthUser, therapistId: string): Promise<boolean> {
+    if (!hasCoordinatorRole(user.roles)) return false;
+    const therapist = await this.prisma.user.findUnique({
+      where: { id: therapistId },
+      select: { coordinatorId: true },
+    });
+    return therapist?.coordinatorId === user.sub;
+  }
+
+  async canViewPatientAsCoordinator(user: AuthUser, patientId: string): Promise<boolean> {
+    if (!hasCoordinatorRole(user.roles)) return false;
+    const link = await this.prisma.patientTherapist.findFirst({
+      where: {
+        patientId,
+        therapist: { coordinatorId: user.sub },
+      },
+      select: { patientId: true },
+    });
+    return !!link;
+  }
+
+  /** Terapeuta asignada al paciente y titular del recurso (programa/seguimiento). */
+  private isOwningAssignedTherapist(
+    user: AuthUser,
+    patientId: string,
+    resourceTherapistId: string,
+  ): boolean {
+    return (
+      user.roles.includes("THERAPIST") &&
+      user.sub === resourceTherapistId
+    );
+  }
+
+  private async assertOwningTherapistCanEdit(
+    user: AuthUser,
+    patientId: string,
+    resourceTherapistId: string,
+  ): Promise<void> {
+    if (!user.roles.includes("THERAPIST")) {
+      throw new ForbiddenException("No puede editar este recurso");
+    }
+    const assigned = await this.prisma.patientTherapist.findFirst({
+      where: { patientId, therapistId: user.sub },
+    });
+    if (!assigned) throw new ForbiddenException("Paciente no asignado");
+    if (resourceTherapistId !== user.sub) {
+      throw new ForbiddenException("Solo el terapeuta titular puede editar este recurso");
+    }
   }
 
   async assertCanViewPatient(user: AuthUser, patientId: string): Promise<void> {
@@ -36,6 +91,8 @@ export class FollowUpAccessService {
       });
       if (ok) return;
     }
+
+    if (await this.canViewPatientAsCoordinator(user, patientId)) return;
 
     if (user.roles.includes("PARENT")) {
       const ok = await this.prisma.parentPatient.findFirst({
@@ -99,6 +156,10 @@ export class FollowUpAccessService {
 
   async assertCanViewFollowUp(user: AuthUser, followUpId: string): Promise<void> {
     const fu = await this.getFollowUpForAccess(followUpId);
+    if (await this.isCoordinatorOf(user, fu.therapistId)) {
+      await this.assertCanViewPatient(user, fu.patientId);
+      return;
+    }
     await this.assertCanViewPatient(user, fu.patientId);
   }
 
@@ -124,18 +185,7 @@ export class FollowUpAccessService {
       return;
     }
 
-    if (!user.roles.includes("THERAPIST")) {
-      throw new ForbiddenException("No puede editar este seguimiento");
-    }
-
-    const assigned = await this.prisma.patientTherapist.findFirst({
-      where: { patientId: fu.patientId, therapistId: user.sub },
-    });
-    if (!assigned) throw new ForbiddenException("Paciente no asignado");
-
-    if (fu.therapistId !== user.sub) {
-      throw new ForbiddenException("Solo el terapeuta titular puede editar este seguimiento");
-    }
+    await this.assertOwningTherapistCanEdit(user, fu.patientId, fu.therapistId);
   }
 
   assertFollowUpNotLocked(user: AuthUser, status: FollowUpStatus): void {
@@ -168,6 +218,10 @@ export class FollowUpAccessService {
 
   async assertCanViewProgram(user: AuthUser, programId: string) {
     const program = await this.getProgramForAccess(programId);
+    if (await this.isCoordinatorOf(user, program.therapistId)) {
+      await this.assertCanViewPatient(user, program.patientId);
+      return program;
+    }
     await this.assertCanViewPatient(user, program.patientId);
     return program;
   }
@@ -176,18 +230,8 @@ export class FollowUpAccessService {
     const program = await this.getProgramForAccess(programId);
     if (this.isOfficeStaff(user)) return program;
 
-    if (user.roles.includes("THERAPIST")) {
-      const assigned = await this.prisma.patientTherapist.findFirst({
-        where: { patientId: program.patientId, therapistId: user.sub },
-      });
-      if (!assigned) throw new ForbiddenException("Paciente no asignado");
-      if (program.therapistId !== user.sub) {
-        throw new ForbiddenException("Solo el terapeuta titular puede editar esta programación");
-      }
-      return program;
-    }
-
-    throw new ForbiddenException("No puede editar esta programación");
+    await this.assertOwningTherapistCanEdit(user, program.patientId, program.therapistId);
+    return program;
   }
 
   async assertCanCreateProgram(

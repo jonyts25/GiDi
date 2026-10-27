@@ -17,7 +17,7 @@ type UserRow = {
   roles?: { role: { key: string; name: string } }[];
 };
 
-const roles = ["ADMIN", "SECRETARY", "THERAPIST", "PARENT", "SCHOOL"] as const;
+const roles = ["ADMIN", "SECRETARY", "THERAPIST", "COORDINATOR", "PARENT", "SCHOOL"] as const;
 type RoleKey = (typeof roles)[number] | "ALL_INACTIVE";
 
 type StatusFilter = "ACTIVE" | "INACTIVE" | "ALL";

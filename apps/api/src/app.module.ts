@@ -20,6 +20,7 @@ import { SettingsModule } from "./settings/settings.module";
 import { TherapistScheduleModule } from "./therapist-schedule/therapist-schedule.module";
 import { RevaluationModule } from "./revaluation/revaluation.module";
 import { CenterDocumentsModule } from "./center-documents/center-documents.module";
+import { CoordinatorModule } from "./coordinator/coordinator.module";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { CenterDocumentsModule } from "./center-documents/center-documents.modul
     TherapistScheduleModule,
     RevaluationModule,
     CenterDocumentsModule,
+    CoordinatorModule,
   ],
   controllers: [AppController,],
   providers : [AppService],
