@@ -22,6 +22,7 @@ import {
 } from "./recompute-payment";
 import { isInactiveForPeriod, isPastOrCurrentPeriod } from "./payment-period";
 import { CreateIncomeEntryDto, UpdateIncomeEntryDto } from "./dto/income-entry.dto";
+import { includePaymentPatientInMonthSheet } from "./billing-month-patient.util";
 
 const incomeSelect = {
   id: true,
@@ -285,6 +286,7 @@ export class IncomeService {
             center: true,
             status: true,
             billingNotes: true,
+            monthlyBillingStatus: true,
           },
         },
       },
@@ -293,6 +295,7 @@ export class IncomeService {
     const activePatients = await this.prisma.patient.findMany({
       where: {
         status: "ACTIVE",
+        monthlyBillingStatus: { not: "NO_INTEGRADO" },
         ...(center ? { center } : {}),
       },
       select: {
@@ -305,9 +308,42 @@ export class IncomeService {
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
 
+    const noIntegradoNeedsEntryCheck = payments.filter(
+      (p) =>
+        p.patient.monthlyBillingStatus === "NO_INTEGRADO" &&
+        p.amountPaid === 0,
+    );
+    const noIntegradoIds = [...new Set(noIntegradoNeedsEntryCheck.map((p) => p.patientId))];
+    const noIntegradoWithEntry = new Set<string>();
+    if (noIntegradoIds.length > 0) {
+      const withEntry = await this.prisma.incomeEntry.findMany({
+        where: {
+          patientId: { in: noIntegradoIds },
+          periodYear: year,
+          periodMonth: month,
+        },
+        select: { patientId: true },
+        distinct: ["patientId"],
+      });
+      for (const row of withEntry) {
+        if (row.patientId) noIntegradoWithEntry.add(row.patientId);
+      }
+    }
+
     const patientIds = new Set<string>();
     for (const p of activePatients) patientIds.add(p.id);
-    for (const pay of payments) patientIds.add(pay.patientId);
+    for (const pay of payments) {
+      if (
+        !includePaymentPatientInMonthSheet(
+          pay.patient.monthlyBillingStatus,
+          pay.amountPaid,
+          noIntegradoWithEntry.has(pay.patientId),
+        )
+      ) {
+        continue;
+      }
+      patientIds.add(pay.patientId);
+    }
 
     const entries = await this.prisma.incomeEntry.findMany({
       where: {

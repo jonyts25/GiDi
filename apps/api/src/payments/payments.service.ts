@@ -16,6 +16,7 @@ import { SetBillingDto } from "./dto/set-billing.dto";
 import { UpsertPaymentDto } from "./dto/upsert-payment.dto";
 import { UploadReceiptDto } from "./dto/upload-receipt.dto";
 import { userHasOfficeStaffRole } from "../auth/role-permissions";
+import { includePaymentPatientInMonthSheet } from "./billing-month-patient.util";
 
 const MAX_RECEIPT_BYTES = 20 * 1024 * 1024;
 
@@ -378,6 +379,7 @@ export class PaymentsService {
       where,
       orderBy: [{ periodYear: "asc" }, { periodMonth: "asc" }],
       select: {
+        patientId: true,
         periodYear: true,
         periodMonth: true,
         amountDue: true,
@@ -394,14 +396,48 @@ export class PaymentsService {
             center: true,
             status: true,
             dischargedAt: true,
+            monthlyBillingStatus: true,
           },
         },
       },
     });
 
-    const rows = allRows.filter(
+    let rows = allRows.filter(
       (r) => !isInactiveForPeriod(r.patient, r.periodYear, r.periodMonth),
     );
+
+    if (filters.year != null && filters.month != null) {
+      const noIntegradoRows = rows.filter(
+        (r) =>
+          r.patient.monthlyBillingStatus === "NO_INTEGRADO" &&
+          r.amountPaid === 0 &&
+          r.periodYear === filters.year &&
+          r.periodMonth === filters.month,
+      );
+      const noIntegradoIds = [...new Set(noIntegradoRows.map((r) => r.patientId))];
+      const noIntegradoWithEntry = new Set<string>();
+      if (noIntegradoIds.length > 0) {
+        const withEntry = await this.prisma.incomeEntry.findMany({
+          where: {
+            patientId: { in: noIntegradoIds },
+            periodYear: filters.year,
+            periodMonth: filters.month,
+          },
+          select: { patientId: true },
+          distinct: ["patientId"],
+        });
+        for (const row of withEntry) {
+          if (row.patientId) noIntegradoWithEntry.add(row.patientId);
+        }
+      }
+      rows = rows.filter((r) =>
+        includePaymentPatientInMonthSheet(
+          r.patient.monthlyBillingStatus,
+          r.amountPaid,
+          noIntegradoWithEntry.has(r.patientId),
+        ),
+      );
+    }
 
     const sedeLabel: Record<string, string> = {
       SAN_AGUSTIN: "San Agustín",
