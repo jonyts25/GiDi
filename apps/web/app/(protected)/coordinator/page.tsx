@@ -111,7 +111,6 @@ export default function CoordinatorTeamPage() {
           (Array.isArray(followUpRows) ? followUpRows : []).filter(
             (fu) =>
               fu.area?.key === "COMUNICACION_INTERNA" &&
-              fu.therapistId === selectedPatient.therapistId &&
               (fu.generalNotes?.trim()?.length ?? 0) > 0,
           ),
         );
