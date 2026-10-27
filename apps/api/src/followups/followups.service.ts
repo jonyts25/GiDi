@@ -24,6 +24,10 @@ import {
   progressScaleToPercent,
   sessionAttendanceFromMarks,
 } from "./followup-metrics";
+import {
+  internalUnreadPatientScope,
+  isInternalFollowUpUnread,
+} from "./internal-unread.util";
 
 /** Objetivos archivados (con datos en cuadrícula pero fuera de la lista activa). */
 const ARCHIVED_OBJECTIVE_IDX = 1000;
@@ -151,7 +155,75 @@ export class FollowUpsService {
     });
     if (!fu) throw new NotFoundException("FollowUp not found");
     this.assertCanViewInternalFollowUp(user, fu.area.key);
+    if (fu.area.key === "COMUNICACION_INTERNA") {
+      await this.markInternalNoteSeen(user.sub, id);
+    }
     return fu;
+  }
+
+  async listInternalUnread(user: AuthUser) {
+    const scope = internalUnreadPatientScope(user);
+    if (!scope) return [];
+
+    const patientWhere: Prisma.PatientWhereInput =
+      scope === "all_active"
+        ? { status: "ACTIVE" }
+        : {
+            status: "ACTIVE",
+            assignments: { some: { therapistId: user.sub } },
+          };
+
+    const candidates = await this.prisma.followUp.findMany({
+      where: {
+        therapistId: { not: user.sub },
+        area: { key: "COMUNICACION_INTERNA" },
+        NOT: [{ generalNotes: null }, { generalNotes: "" }],
+        patient: patientWhere,
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        patientId: true,
+        generalNotes: true,
+        updatedAt: true,
+        patient: { select: { firstName: true, lastName: true } },
+        therapist: { select: { fullName: true } },
+        internalNoteReads: {
+          where: { userId: user.sub },
+          select: { seenAt: true },
+          take: 1,
+        },
+      },
+    });
+
+    const rows = candidates
+      .filter((fu) =>
+        isInternalFollowUpUnread(
+          fu.generalNotes,
+          fu.updatedAt,
+          fu.internalNoteReads[0]?.seenAt,
+        ),
+      )
+      .slice(0, 50)
+      .map((fu) => ({
+        followUpId: fu.id,
+        patientId: fu.patientId,
+        patientName: `${fu.patient.firstName} ${fu.patient.lastName}`.trim(),
+        authorName: fu.therapist.fullName,
+        updatedAt: fu.updatedAt.toISOString(),
+      }));
+
+    return rows;
+  }
+
+  private async markInternalNoteSeen(userId: string, followUpId: string) {
+    const now = new Date();
+    await this.prisma.internalNoteRead.upsert({
+      where: { userId_followUpId: { userId, followUpId } },
+      create: { userId, followUpId, seenAt: now },
+      update: { seenAt: now },
+    });
   }
 
   async getParentSummary(user: AuthUser, patientId: string, year?: number, month?: number) {

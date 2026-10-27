@@ -18,6 +18,14 @@ type RevalEntry = {
   patientId: string;
 };
 
+type InternalUnreadEntry = {
+  followUpId: string;
+  patientId: string;
+  patientName: string;
+  authorName: string;
+  updatedAt: string;
+};
+
 const DISMISS_KEY = "gidi_dismissed_announcements";
 const REVAL_PREFIX = "[REVALUACIÓN]";
 const REVAL_PATIENT_RE = /reval-patient:([0-9a-f-]{36})/i;
@@ -48,9 +56,43 @@ function revaluationSummary(count: number): string {
   return `${count} pacientes pendientes de revaloración`;
 }
 
+function internalUnreadSummary(count: number): string {
+  if (count === 1) return "1 mensaje nuevo de comunicación interna";
+  return `${count} mensajes nuevos de comunicación interna`;
+}
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.round(diffMs / 60_000);
+  if (diffMin < 1) return "hace un momento";
+  if (diffMin < 60) return `hace ${diffMin} min`;
+  const diffH = Math.round(diffMin / 60);
+  if (diffH < 24) return `hace ${diffH} h`;
+  const diffD = Math.round(diffH / 24);
+  if (diffD < 30) return `hace ${diffD} d`;
+  return date.toLocaleDateString("es-MX");
+}
+
+function followUpDetailPath(followUpId: string): string {
+  if (typeof window === "undefined") return `/admin/followups/${followUpId}`;
+  try {
+    const raw = localStorage.getItem("gidi_user");
+    const roles: string[] = raw ? (JSON.parse(raw).roles ?? []) : [];
+    const onlyTherapist = roles.length === 1 && roles[0] === "THERAPIST";
+    return onlyTherapist
+      ? `/therapist/followups/${followUpId}`
+      : `/admin/followups/${followUpId}`;
+  } catch {
+    return `/admin/followups/${followUpId}`;
+  }
+}
+
 export function AnnouncementBanner() {
   const [items, setItems] = useState<Announcement[]>([]);
   const [revalExpanded, setRevalExpanded] = useState(false);
+  const [internalUnread, setInternalUnread] = useState<InternalUnreadEntry[]>([]);
+  const [internalExpanded, setInternalExpanded] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -61,6 +103,17 @@ export function AnnouncementBanner() {
         setItems(data.filter((a) => dismissed[a.id] !== a.updatedAt));
       } catch {
         // Silencioso: un fallo de avisos no debe romper la navegación.
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = (await apiFetch("/followups/internal-unread")) as InternalUnreadEntry[];
+        setInternalUnread(Array.isArray(data) ? data : []);
+      } catch {
+        setInternalUnread([]);
       }
     })();
   }, []);
@@ -94,7 +147,7 @@ export function AnnouncementBanner() {
     setItems((prev) => prev.filter((x) => x.id !== a.id));
   }
 
-  if (!regularItems.length && !revalEntries.length) return null;
+  if (!regularItems.length && !revalEntries.length && !internalUnread.length) return null;
 
   return (
     <div className="container space-y-3 pt-4">
@@ -122,6 +175,41 @@ export function AnnouncementBanner() {
           </div>
         </div>
       ))}
+
+      {internalUnread.length > 0 && (
+        <div className="rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-2.5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+              <span aria-hidden>💬</span>
+              {internalUnreadSummary(internalUnread.length)}
+            </p>
+            <button
+              type="button"
+              className="shrink-0 rounded-lg border border-border px-2 py-1 text-xs text-subtle hover:text-ink"
+              onClick={() => setInternalExpanded((v) => !v)}
+              aria-expanded={internalExpanded}
+            >
+              {internalExpanded ? "Ocultar" : "Ver"}
+            </button>
+          </div>
+
+          {internalExpanded && (
+            <ul className="mt-2 space-y-1 border-t border-violet-400/25 pt-2 text-sm">
+              {internalUnread.map((entry) => (
+                <li key={entry.followUpId}>
+                  <Link
+                    href={followUpDetailPath(entry.followUpId)}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {entry.patientName} · escribió {entry.authorName} ·{" "}
+                    {formatRelativeTime(entry.updatedAt)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {revalEntries.length > 0 && (
         <div className="rounded-xl border border-accent-yellow/40 bg-accent-yellow/10 px-4 py-2.5 shadow-sm">

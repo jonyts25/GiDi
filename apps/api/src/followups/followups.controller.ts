@@ -46,6 +46,11 @@ export class FollowUpsController {
     return this.service.getBulkReport(user, dto.ids);
   }
 
+  @Get("/followups/internal-unread")
+  listInternalUnread(@CurrentUser() user: AuthUser) {
+    return this.service.listInternalUnread(user);
+  }
+
   @Get("/followups/:id")
   get(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.service.get(user, id);

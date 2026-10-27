@@ -44,6 +44,8 @@ model User {
 
   incomeEntriesCreated IncomeEntry[] @relation("IncomeEntryCreatedBy")
 
+  internalNoteReads InternalNoteRead[]
+
   lastLoginAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -336,6 +338,8 @@ model FollowUp {
   attachments FollowUpAttachment[]
   metrics     FollowUpMetric[]
 
+  internalNoteReads InternalNoteRead[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -345,6 +349,18 @@ model FollowUp {
   @@index([areaId])
   @@index([programId])
   @@index([periodYear, periodMonth])
+}
+
+model InternalNoteRead {
+  userId     String   @db.Uuid
+  followUpId String   @db.Uuid
+  seenAt     DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  followUp FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, followUpId])
+  @@index([followUpId])
 }
 
 enum FollowUpStatus {
