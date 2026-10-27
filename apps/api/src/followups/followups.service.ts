@@ -114,6 +114,7 @@ export class FollowUpsService {
         therapist: { select: { id: true, fullName: true, email: true, status: true } },
         patient: { select: { id: true, firstName: true, lastName: true } },
         program: { select: { id: true, therapist: { select: { fullName: true } } } },
+        lastNoteBy: { select: { fullName: true } },
       },
     });
   }

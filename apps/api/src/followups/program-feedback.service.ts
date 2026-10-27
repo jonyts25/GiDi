@@ -16,10 +16,23 @@ export class ProgramFeedbackService {
     private access: FollowUpAccessService,
   ) {}
 
+  private async canViewAsProgramTherapist(
+    user: AuthUser,
+    program: { patientId: string; therapistId: string },
+  ): Promise<boolean> {
+    if (!user.roles.includes("THERAPIST")) return false;
+    if (program.therapistId !== user.sub) return false;
+    const assigned = await this.prisma.patientTherapist.findFirst({
+      where: { patientId: program.patientId, therapistId: user.sub },
+      select: { patientId: true },
+    });
+    return !!assigned;
+  }
+
   private async assertCanViewFeedback(user: AuthUser, programId: string) {
     const program = await this.access.getProgramForAccess(programId);
     if (userHasFullAdminRole(user)) return program;
-    if (program.therapistId === user.sub) return program;
+    if (await this.canViewAsProgramTherapist(user, program)) return program;
     if (await this.access.isCoordinatorOf(user, program.therapistId)) {
       await this.access.assertCanViewPatient(user, program.patientId);
       return program;
@@ -48,7 +61,7 @@ export class ProgramFeedbackService {
       },
     });
 
-    if (program.therapistId === user.sub && user.roles.includes("THERAPIST")) {
+    if (await this.canViewAsProgramTherapist(user, program)) {
       const unseen = rows.filter((r) => r.seenByTherapistAt == null && r.authorId !== user.sub);
       if (unseen.length) {
         await this.prisma.programFeedback.updateMany({

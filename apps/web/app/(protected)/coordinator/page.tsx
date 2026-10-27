@@ -43,6 +43,17 @@ export default function CoordinatorTeamPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [programs, setPrograms] = useState<{ id: string; periodYear: number; periodMonth: number }[]>([]);
   const [programsLoading, setProgramsLoading] = useState(false);
+  const [internalNotes, setInternalNotes] = useState<
+    {
+      id: string;
+      generalNotes: string | null;
+      lastNoteAt: string | null;
+      lastNoteBy?: { fullName: string } | null;
+      therapistId: string;
+      area: { key: string };
+    }[]
+  >([]);
+  const [internalLoading, setInternalLoading] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -67,21 +78,49 @@ export default function CoordinatorTeamPage() {
   useEffect(() => {
     if (!selectedPatient) {
       setPrograms([]);
+      setInternalNotes([]);
       return;
     }
     setProgramsLoading(true);
+    setInternalLoading(true);
     (async () => {
       try {
-        const rows = (await apiFetch(
-          `/patients/${selectedPatient.patientId}/programs?year=${year}&month=${month}`,
-        )) as { id: string; periodYear: number; periodMonth: number; therapistId: string }[];
+        const [programRows, followUpRows] = await Promise.all([
+          apiFetch(
+            `/patients/${selectedPatient.patientId}/programs?year=${year}&month=${month}`,
+          ) as Promise<{ id: string; periodYear: number; periodMonth: number; therapistId: string }[]>,
+          apiFetch(
+            `/patients/${selectedPatient.patientId}/followups?year=${year}&month=${month}`,
+          ) as Promise<
+            {
+              id: string;
+              generalNotes: string | null;
+              lastNoteAt: string | null;
+              therapistId: string;
+              area: { key: string };
+              lastNoteBy?: { fullName: string } | null;
+            }[]
+          >,
+        ]);
         setPrograms(
-          (Array.isArray(rows) ? rows : []).filter((p) => p.therapistId === selectedPatient.therapistId),
+          (Array.isArray(programRows) ? programRows : []).filter(
+            (p) => p.therapistId === selectedPatient.therapistId,
+          ),
+        );
+        setInternalNotes(
+          (Array.isArray(followUpRows) ? followUpRows : []).filter(
+            (fu) =>
+              fu.area?.key === "COMUNICACION_INTERNA" &&
+              fu.therapistId === selectedPatient.therapistId &&
+              (fu.generalNotes?.trim()?.length ?? 0) > 0,
+          ),
         );
       } catch {
         setPrograms([]);
+        setInternalNotes([]);
       } finally {
         setProgramsLoading(false);
+        setInternalLoading(false);
       }
     })();
   }, [selectedPatient, year, month]);
@@ -203,6 +242,33 @@ export default function CoordinatorTeamPage() {
               ))}
             </ul>
           )}
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <h3 className="text-base font-semibold text-ink">
+              🔒 Comunicación interna
+            </h3>
+            {internalLoading ? (
+              <p className="text-sm text-subtle">Cargando comunicación interna…</p>
+            ) : internalNotes.length === 0 ? (
+              <p className="text-sm text-subtle">Sin mensajes de comunicación interna en este mes.</p>
+            ) : (
+              <ul className="space-y-3">
+                {internalNotes.map((fu) => {
+                  const when = fu.lastNoteAt ? new Date(fu.lastNoteAt) : null;
+                  const author = fu.lastNoteBy?.fullName ?? "Desconocido";
+                  return (
+                    <li key={fu.id} className="rounded-xl border border-violet-400/30 bg-violet-500/5 p-3">
+                      <p className="text-xs font-semibold text-subtle">
+                        escribió {author}
+                        {when ? ` · ${when.toLocaleString("es-MX")}` : ""}
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-ink">{fu.generalNotes}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </section>
       ) : null}
     </main>

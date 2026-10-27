@@ -28,6 +28,15 @@ function makeAccess(overrides: Partial<FollowUpAccessService> = {}): FollowUpAcc
   } as unknown as FollowUpAccessService;
 }
 
+function prismaWithAssignment(assigned: boolean): PrismaService {
+  return {
+    patientTherapist: {
+      findFirst: jest.fn().mockResolvedValue(assigned ? { patientId: PATIENT_ID } : null),
+    },
+    programFeedback: {},
+  } as unknown as PrismaService;
+}
+
 describe("ProgramFeedbackService access", () => {
   it("GET feedback: terapeuta del programa puede listar y marca visto", async () => {
     const findMany = jest.fn().mockResolvedValue([
@@ -44,6 +53,7 @@ describe("ProgramFeedbackService access", () => {
     ]);
     const updateMany = jest.fn().mockResolvedValue({ count: 1 });
     const prisma = {
+      ...prismaWithAssignment(true),
       programFeedback: { findMany, updateMany },
     } as unknown as PrismaService;
     const service = new ProgramFeedbackService(prisma, makeAccess());
@@ -56,7 +66,10 @@ describe("ProgramFeedbackService access", () => {
   });
 
   it("GET feedback: otra terapeuta del paciente recibe 403", async () => {
-    const prisma = { programFeedback: { findMany: jest.fn() } } as unknown as PrismaService;
+    const prisma = {
+      ...prismaWithAssignment(false),
+      programFeedback: { findMany: jest.fn() },
+    } as unknown as PrismaService;
     const access = makeAccess({
       isCoordinatorOf: jest.fn().mockResolvedValue(false),
     });
@@ -66,9 +79,40 @@ describe("ProgramFeedbackService access", () => {
     await expect(service.listForProgram(user, PROGRAM_ID)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it("GET feedback: titular del programa sin asignación PatientTherapist recibe 403", async () => {
+    const prisma = {
+      ...prismaWithAssignment(false),
+      programFeedback: { findMany: jest.fn() },
+    } as unknown as PrismaService;
+    const service = new ProgramFeedbackService(
+      prisma,
+      makeAccess({ isCoordinatorOf: jest.fn().mockResolvedValue(false) }),
+    );
+    const user: AuthUser = { sub: THERAPIST_ID, roles: ["THERAPIST"] };
+
+    await expect(service.listForProgram(user, PROGRAM_ID)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("GET feedback: solo COORDINATOR con sub del terapeuta del programa no accede como terapeuta", async () => {
+    const prisma = {
+      ...prismaWithAssignment(true),
+      programFeedback: { findMany: jest.fn() },
+    } as unknown as PrismaService;
+    const access = makeAccess({
+      isCoordinatorOf: jest.fn().mockResolvedValue(false),
+    });
+    const service = new ProgramFeedbackService(prisma, access);
+    const user: AuthUser = { sub: THERAPIST_ID, roles: ["COORDINATOR"] };
+
+    await expect(service.listForProgram(user, PROGRAM_ID)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it("GET feedback: coordinadora del terapeuta puede listar", async () => {
     const findMany = jest.fn().mockResolvedValue([]);
-    const prisma = { programFeedback: { findMany } } as unknown as PrismaService;
+    const prisma = {
+      ...prismaWithAssignment(false),
+      programFeedback: { findMany },
+    } as unknown as PrismaService;
     const service = new ProgramFeedbackService(prisma, makeAccess());
     const user: AuthUser = { sub: COORD_ID, roles: ["COORDINATOR"] };
 
@@ -118,6 +162,7 @@ describe("ProgramFeedbackService access", () => {
       author: { id: COORD_ID, fullName: "Coord" },
     });
     const prisma = {
+      ...prismaWithAssignment(false),
       programFeedback: {
         findUnique: jest.fn().mockResolvedValue({
           id: "fb-1",
@@ -142,7 +187,10 @@ describe("ProgramFeedbackService access", () => {
 
   it("unread excluye entradas del propio autor", async () => {
     const findMany = jest.fn().mockResolvedValue([]);
-    const prisma = { programFeedback: { findMany } } as unknown as PrismaService;
+    const prisma = {
+      ...prismaWithAssignment(true),
+      programFeedback: { findMany },
+    } as unknown as PrismaService;
     const service = new ProgramFeedbackService(prisma, makeAccess());
     const user: AuthUser = { sub: THERAPIST_ID, roles: ["THERAPIST"] };
 

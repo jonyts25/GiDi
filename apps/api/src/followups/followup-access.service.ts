@@ -45,18 +45,6 @@ export class FollowUpAccessService {
     return !!link;
   }
 
-  /** Terapeuta asignada al paciente y titular del recurso (programa/seguimiento). */
-  private isOwningAssignedTherapist(
-    user: AuthUser,
-    patientId: string,
-    resourceTherapistId: string,
-  ): boolean {
-    return (
-      user.roles.includes("THERAPIST") &&
-      user.sub === resourceTherapistId
-    );
-  }
-
   private async assertOwningTherapistCanEdit(
     user: AuthUser,
     patientId: string,
@@ -109,6 +97,29 @@ export class FollowUpAccessService {
     }
 
     throw new ForbiddenException("No tiene acceso a este paciente");
+  }
+
+  /** Subir documentos al expediente: office staff, padre vinculado o terapeuta asignada (no basta ser coordinadora). */
+  async assertCanUploadPatientDocuments(user: AuthUser, patientId: string): Promise<void> {
+    await this.assertCanViewPatient(user, patientId);
+
+    if (this.isOfficeStaff(user)) return;
+
+    if (user.roles.includes("PARENT")) {
+      const ok = await this.prisma.parentPatient.findFirst({
+        where: { patientId, parentId: user.sub },
+      });
+      if (ok) return;
+    }
+
+    if (user.roles.includes("THERAPIST")) {
+      const ok = await this.prisma.patientTherapist.findFirst({
+        where: { patientId, therapistId: user.sub },
+      });
+      if (ok) return;
+    }
+
+    throw new ForbiddenException("No puede subir documentos de este paciente");
   }
 
   async assertCanEditPatientFollowUps(user: AuthUser, patientId: string, areaKey?: string): Promise<void> {
