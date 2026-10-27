@@ -42,7 +42,8 @@ export default function AdminPaymentsOverviewPage() {
   const [tab, setTab] = useState<Tab>("mensualidades");
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [center, setCenter] = useState<CenterFilter>("SAN_AGUSTIN");
+  const [center, setCenter] = useState<CenterFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "CON_ADEUDO">("ALL");
   const [query, setQuery] = useState("");
   const [conceptFilter, setConceptFilter] = useState<"" | IncomeConcept>("");
   const [sheet, setSheet] = useState<MonthSheetResponse | null>(null);
@@ -70,9 +71,25 @@ export default function AdminPaymentsOverviewPage() {
   );
 
   const filteredSheetRows = useMemo(() => {
-    const rows = sheet?.rows ?? [];
+    let rows = sheet?.rows ?? [];
+    if (statusFilter === "CON_ADEUDO") {
+      rows = rows.filter((r) =>
+        r.status === "PARCIAL" || r.status === "PENDIENTE" || r.status === "DEUDA",
+      );
+    }
     return filterByQuery(rows, query, (r) => `${r.firstName} ${r.lastName}`);
-  }, [sheet, query]);
+  }, [sheet, query, statusFilter]);
+
+  const sheetEmptyMessage = useMemo(() => {
+    if (!sheet?.rows.length) return "Sin pacientes este mes.";
+    if (statusFilter === "CON_ADEUDO") {
+      const withDebt = sheet.rows.filter(
+        (r) => r.status === "PARCIAL" || r.status === "PENDIENTE" || r.status === "DEUDA",
+      );
+      if (!withDebt.length) return "Sin pacientes con adeudo.";
+    }
+    return "Sin coincidencias.";
+  }, [sheet, statusFilter]);
 
   const filteredIncome = useMemo(() => {
     let rows = incomeRows;
@@ -286,6 +303,17 @@ export default function AdminPaymentsOverviewPage() {
             ))}
           </select>
         </label>
+        <label className="grid gap-1 text-sm">
+          <span className="text-subtle">Estado</span>
+          <select
+            className="select w-52"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as "ALL" | "CON_ADEUDO")}
+          >
+            <option value="ALL">Todos</option>
+            <option value="CON_ADEUDO">Solo parcial y pendiente</option>
+          </select>
+        </label>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="btn rounded-xl px-3 py-2 text-sm" onClick={() => void exportCsv("month")}>
             Exportar mes
@@ -361,7 +389,7 @@ export default function AdminPaymentsOverviewPage() {
               {filteredSheetRows.length === 0 ? (
                 <tr>
                   <td colSpan={isAllCenters ? 10 : 9} className="py-4 text-subtle">
-                    {sheet?.rows.length ? "Sin coincidencias." : "Sin pacientes este mes."}
+                    {sheetEmptyMessage}
                   </td>
                 </tr>
               ) : (
