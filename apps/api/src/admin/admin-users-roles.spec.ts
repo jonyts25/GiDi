@@ -63,6 +63,27 @@ function buildService(opts: {
   return { service: new AdminUsersService(prisma), tx, prisma };
 }
 
+describe("AdminUsersService create", () => {
+  it("secretaría no puede crear ADMIN", async () => {
+    const prisma = {
+      role: { findUnique: jest.fn().mockResolvedValue({ id: "r1", key: RoleKey.ADMIN }) },
+      user: { create: jest.fn() },
+    } as unknown as PrismaService;
+    const service = new AdminUsersService(prisma);
+    await expect(
+      service.create(
+        {
+          email: "new@test.com",
+          fullName: "N",
+          role: RoleKey.ADMIN,
+        },
+        SECRETARY_ACTOR,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+});
+
 describe("AdminUsersService role updates", () => {
   it("secretaría no puede cambiar roles", async () => {
     const { service } = buildService({});

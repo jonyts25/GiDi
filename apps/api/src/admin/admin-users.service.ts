@@ -61,14 +61,23 @@ export class AdminUsersService {
     });
   }
 
-  async create(dto: CreateUserDto) {
+  async create(dto: CreateUserDto, actor: AuthUser) {
+    if (dto.role === RoleKey.ADMIN || dto.role === RoleKey.SUPERADMIN) {
+      if (!userHasFullAdminRole(actor)) {
+        throw new ForbiddenException("Solo administración puede crear usuarios administradores");
+      }
+    }
+    if (dto.role === RoleKey.SUPERADMIN && !actor.roles.includes(RoleKey.SUPERADMIN)) {
+      throw new ForbiddenException("Solo superadministración puede crear usuarios superadmin");
+    }
+
     const plain = dto.password ?? randomPassword();
     const passwordHash = await bcrypt.hash(plain, 10);
 
     const role = await this.prisma.role.findUnique({ where: { key: dto.role } });
-  if (!role) {
-    throw new BadRequestException(`Role ${dto.role} no existe`);
-  }
+    if (!role) {
+      throw new BadRequestException(`Role ${dto.role} no existe`);
+    }
 
     assertRoleSetCompatible([dto.role]);
 
@@ -177,13 +186,12 @@ export class AdminUsersService {
     };
   }
 
-  async update(id: string, dto: UpdateUserDto, actor?: AuthUser) {
+  async update(id: string, dto: UpdateUserDto, actor: AuthUser) {
     const current = await this.get(id); // fuerza 404 limpio si no existe
 
     if (
       current.status === UserStatus.INACTIVE &&
       dto.status === UserStatus.ACTIVE &&
-      actor &&
       !userHasFullAdminRole(actor)
     ) {
       throw new BadRequestException("Solo administración puede reactivar perfiles inactivos");
@@ -215,7 +223,7 @@ export class AdminUsersService {
     const currentRoleKeys = current.roles.map((r) => r.role.key as RoleKey);
 
     if (dto.roles !== undefined) {
-      if (!actor || !userHasFullAdminRole(actor)) {
+      if (!userHasFullAdminRole(actor)) {
         throw new ForbiddenException("Solo administración puede cambiar perfiles de usuario");
       }
       if (dto.roles.length === 0) {

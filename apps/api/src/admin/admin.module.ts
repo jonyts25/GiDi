@@ -1,5 +1,4 @@
 import { Module } from "@nestjs/common";
-import { AdminController } from "./admin.controller";
 import { AuthModule } from "../auth/auth.module";
 import { PrismaModule } from "../prisma/prisma.module";
 import { FollowUpsModule } from "../followups/followups.module";
@@ -11,7 +10,7 @@ import { AdminSchoolsController } from "./admin-schools.controller";
 
 @Module({
   imports: [AuthModule, PrismaModule, FollowUpsModule],
-  controllers: [AdminController, AdminUsersController, AdminPatientsController, AdminSchoolsController],
+  controllers: [AdminUsersController, AdminPatientsController, AdminSchoolsController],
   providers: [AdminUsersService, AdminPatientsService],
 })
 export class AdminModule {}

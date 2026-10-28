@@ -36,8 +36,8 @@ export class AdminUsersController {
 
   // ✅ Crear usuario
   @Post()
-  create(@Body() dto: CreateUserDto) {
-    return this.svc.create(dto);
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateUserDto) {
+    return this.svc.create(dto, user);
   }
 
   @Post(":id/reset-password")
