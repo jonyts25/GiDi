@@ -84,6 +84,8 @@
     ],
     "rootDir": "src",
     "moduleNameMapper": {
+      "^whatsapp-web\\.js$": "<rootDir>/../test/mocks/whatsapp-web.js.ts",
+      "^qrcode-terminal$": "<rootDir>/../test/mocks/qrcode-terminal.js.ts",
       "^src/(.*)$": "<rootDir>/$1"
     },
     "testRegex": ".*\\.spec\\.ts$",
