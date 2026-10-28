@@ -1,4 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from "@nestjs/common";
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
@@ -206,8 +212,80 @@ export class AdminUsersService {
       }
     }
 
+    const currentRoleKeys = current.roles.map((r) => r.role.key as RoleKey);
+
+    if (dto.roles !== undefined) {
+      if (!actor || !userHasFullAdminRole(actor)) {
+        throw new ForbiddenException("Solo administración puede cambiar perfiles de usuario");
+      }
+      if (dto.roles.length === 0) {
+        throw new BadRequestException("Debe conservar al menos un perfil");
+      }
+
+      const nextRoleKeys = dto.roles;
+      assertRoleSetCompatible(nextRoleKeys);
+
+      const actorIsSuperAdmin = actor.roles.includes(RoleKey.SUPERADMIN);
+      const hadSuperAdmin = currentRoleKeys.includes(RoleKey.SUPERADMIN);
+      const hasSuperAdmin = nextRoleKeys.includes(RoleKey.SUPERADMIN);
+      if (hadSuperAdmin !== hasSuperAdmin && !actorIsSuperAdmin) {
+        throw new ForbiddenException("Solo superadministración puede asignar o quitar Superadmin");
+      }
+
+      if (actor.sub === id) {
+        const hadAdminTier = currentRoleKeys.some(
+          (k) => k === RoleKey.ADMIN || k === RoleKey.SUPERADMIN,
+        );
+        const hasAdminTier = nextRoleKeys.some(
+          (k) => k === RoleKey.ADMIN || k === RoleKey.SUPERADMIN,
+        );
+        if (hadAdminTier && !hasAdminTier) {
+          throw new BadRequestException("No puede quitarse a sí mismo el perfil de administración");
+        }
+      }
+
+      const removingTherapist =
+        currentRoleKeys.includes(RoleKey.THERAPIST) && !nextRoleKeys.includes(RoleKey.THERAPIST);
+      const removingCoordinator =
+        currentRoleKeys.includes(RoleKey.COORDINATOR) && !nextRoleKeys.includes(RoleKey.COORDINATOR);
+
+      await this.prisma.$transaction(async (tx) => {
+        if (removingTherapist) {
+          const assignedActive = await tx.patientTherapist.count({
+            where: { therapistId: id, patient: { status: UserStatus.ACTIVE } },
+          });
+          if (assignedActive > 0) {
+            throw new BadRequestException(
+              `Tiene ${assignedActive} pacientes asignados; reasígnelos antes de quitar el perfil de terapeuta`,
+            );
+          }
+          await tx.user.update({
+            where: { id },
+            data: { coordinatorId: null },
+          });
+        }
+
+        if (removingCoordinator) {
+          await tx.user.updateMany({
+            where: { coordinatorId: id },
+            data: { coordinatorId: null },
+          });
+        }
+
+        const roles = await tx.role.findMany({ where: { key: { in: nextRoleKeys } } });
+        if (roles.length !== nextRoleKeys.length) {
+          throw new BadRequestException("Uno o más perfiles no existen en el sistema");
+        }
+
+        await tx.userRole.deleteMany({ where: { userId: id } });
+        await tx.userRole.createMany({
+          data: roles.map((r) => ({ userId: id, roleId: r.id })),
+        });
+      });
+    }
+
     try {
-      const updated = await this.prisma.user.update({
+      await this.prisma.user.update({
         where: { id },
         data: {
           email: dto.email?.toLowerCase(),
@@ -216,20 +294,7 @@ export class AdminUsersService {
           status: dto.status,
           ...(dto.coordinatorId !== undefined ? { coordinatorId: dto.coordinatorId } : {}),
         },
-        select: { id: true, email: true, fullName: true, phone: true, status: true, createdAt: true },
       });
-
-      if (dto.roles?.length) {
-        assertRoleSetCompatible(dto.roles);
-        const roles = await this.prisma.role.findMany({ where: { key: { in: dto.roles } } });
-
-        await this.prisma.userRole.deleteMany({ where: { userId: id } });
-        if (roles.length) {
-          await this.prisma.userRole.createMany({
-            data: roles.map((r) => ({ userId: id, roleId: r.id })),
-          });
-        }
-      }
 
       return this.get(id);
     } catch (e: any) {
