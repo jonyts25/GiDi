@@ -23,3 +23,31 @@ export function isPastOrCurrentPeriod(year: number, month: number, now = new Dat
   const nowMonth = now.getMonth() + 1;
   return periodYm(year, month) <= periodYm(nowYear, nowMonth);
 }
+
+/** Periodo anterior al mes de ingreso a terapia (sin contar cobros ni arrastre). */
+export function isBeforeTherapyStart(
+  patient: { therapyStartDate: Date | null },
+  periodYear: number,
+  periodMonth: number,
+): boolean {
+  if (!patient.therapyStartDate) return false;
+  const d = patient.therapyStartDate;
+  const startYm = periodYm(d.getUTCFullYear(), d.getUTCMonth() + 1);
+  return periodYm(periodYear, periodMonth) < startYm;
+}
+
+/** Cobro del mes: activo para el periodo y ya inició terapia. */
+export function isBillableForPeriod(
+  patient: {
+    status: string;
+    dischargedAt: Date | null;
+    therapyStartDate: Date | null;
+  },
+  periodYear: number,
+  periodMonth: number,
+): boolean {
+  return (
+    !isInactiveForPeriod(patient, periodYear, periodMonth) &&
+    !isBeforeTherapyStart(patient, periodYear, periodMonth)
+  );
+}

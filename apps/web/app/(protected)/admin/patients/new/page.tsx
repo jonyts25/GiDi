@@ -17,6 +17,21 @@ type UserLite = { id: string; fullName: string; email: string; status: string };
 
 type Rel = "MOTHER" | "FATHER" | "TUTOR" | "OTHER";
 
+const THERAPY_START_MONTHS = [
+  { value: 1, label: "Enero" },
+  { value: 2, label: "Febrero" },
+  { value: 3, label: "Marzo" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Mayo" },
+  { value: 6, label: "Junio" },
+  { value: 7, label: "Julio" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Septiembre" },
+  { value: 10, label: "Octubre" },
+  { value: 11, label: "Noviembre" },
+  { value: 12, label: "Diciembre" },
+];
+
 type GuardianRow =
   | {
       kind: "new";
@@ -47,6 +62,8 @@ export default function AdminNewPatientPage() {
   const [birthDate, setBirthDate] = useState(""); // yyyy-mm-dd
   const [notes, setNotes] = useState("");
   const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
+  const [therapyStartYear, setTherapyStartYear] = useState(String(new Date().getFullYear()));
+  const [therapyStartMonth, setTherapyStartMonth] = useState(String(new Date().getMonth() + 1));
   const [sessionsPerWeek, setSessionsPerWeek] = useState("");
   const [discountPercent, setDiscountPercent] = useState("0");
   const [agreedMonthlyAmount, setAgreedMonthlyAmount] = useState("");
@@ -90,7 +107,18 @@ export default function AdminNewPatientPage() {
     Array<{ email: string; fullName: string; role: string; temporaryPassword: string }>
   >([]);
 
-  const canSave = useMemo(() => firstName.trim() && lastName.trim(), [firstName, lastName]);
+  const canSave = useMemo(() => {
+    const y = Number(therapyStartYear);
+    const m = Number(therapyStartMonth);
+    return (
+      Boolean(firstName.trim() && lastName.trim()) &&
+      Number.isInteger(y) &&
+      y >= 2000 &&
+      Number.isInteger(m) &&
+      m >= 1 &&
+      m <= 12
+    );
+  }, [firstName, lastName, therapyStartYear, therapyStartMonth]);
 
   const assignedParentKeySet = useMemo(() => {
     const s = new Set<string>();
@@ -261,6 +289,8 @@ export default function AdminNewPatientPage() {
         birthDate: birthDate ? new Date(birthDate).toISOString() : undefined,
         notes: notes.trim() || undefined,
         center,
+        therapyStartYear: Number(therapyStartYear),
+        therapyStartMonth: Number(therapyStartMonth),
         sessionsPerWeek: sessionsPerWeek === "" ? undefined : Number(sessionsPerWeek),
         discountPercent: Number(discountPercent) || 0,
         agreedMonthlyAmount: agreedMonthlyAmount === "" ? undefined : Number(agreedMonthlyAmount),
@@ -392,6 +422,34 @@ export default function AdminNewPatientPage() {
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
+          </label>
+        </div>
+        <div className="row" style={{ flexWrap: "wrap", gap: 10, marginTop: 10 }}>
+          <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Fecha de ingreso a terapia *</span>
+            <div className="row" style={{ gap: 8 }}>
+              <select
+                className="select"
+                value={therapyStartMonth}
+                onChange={(e) => setTherapyStartMonth(e.target.value)}
+                disabled={!!createdPatientId}
+              >
+                {THERAPY_START_MONTHS.map((mo) => (
+                  <option key={mo.value} value={String(mo.value)}>
+                    {mo.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input w-24"
+                type="number"
+                min={2000}
+                placeholder="Año"
+                value={therapyStartYear}
+                onChange={(e) => setTherapyStartYear(e.target.value)}
+                disabled={!!createdPatientId}
+              />
+            </div>
           </label>
         </div>
       </section>

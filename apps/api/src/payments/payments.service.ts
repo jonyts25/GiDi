@@ -11,7 +11,11 @@ import {
 import { incomeMethodLabel } from "./income-config";
 import { IncomeService } from "./income.service";
 import { previousPeriod, resolveAmountDueFromBilling } from "./recompute-payment";
-import { isInactiveForPeriod } from "./payment-period";
+import {
+  isBeforeTherapyStart,
+  isBillableForPeriod,
+  isInactiveForPeriod,
+} from "./payment-period";
 import { SetBillingDto } from "./dto/set-billing.dto";
 import { UpsertPaymentDto } from "./dto/upsert-payment.dto";
 import { UploadReceiptDto } from "./dto/upload-receipt.dto";
@@ -61,13 +65,26 @@ export class PaymentsService {
       return { debtCarriedOver: new Map(), arrears: new Map() };
     }
 
+    const patients = await this.prisma.patient.findMany({
+      where: { id: { in: patientIds } },
+      select: { id: true, therapyStartDate: true },
+    });
+    const patientById = new Map(patients.map((p) => [p.id, p]));
+
     const rows = await this.prisma.payment.findMany({
       where: {
         patientId: { in: patientIds },
         status: { not: PaymentStatus.PAUSA_VACACIONES },
         ...priorPeriodDebtPeriodFilter(beforeYear, beforeMonth),
       },
-      select: { patientId: true, amountDue: true, amountPaid: true, status: true },
+      select: {
+        patientId: true,
+        periodYear: true,
+        periodMonth: true,
+        amountDue: true,
+        amountPaid: true,
+        status: true,
+      },
     });
 
     const debtCarriedOver = new Map<string, number>();
@@ -79,6 +96,13 @@ export class PaymentsService {
     ]);
 
     for (const row of rows) {
+      const patient = patientById.get(row.patientId);
+      if (
+        patient &&
+        isBeforeTherapyStart(patient, row.periodYear, row.periodMonth)
+      ) {
+        continue;
+      }
       const balance = Math.max(row.amountDue - row.amountPaid, 0);
       if (balance <= 0) continue;
       debtCarriedOver.set(row.patientId, (debtCarriedOver.get(row.patientId) ?? 0) + balance);
@@ -397,14 +421,19 @@ export class PaymentsService {
             status: true,
             dischargedAt: true,
             monthlyBillingStatus: true,
+            therapyStartDate: true,
           },
         },
       },
     });
 
-    let rows = allRows.filter(
-      (r) => !isInactiveForPeriod(r.patient, r.periodYear, r.periodMonth),
-    );
+    let rows = allRows.filter((r) => {
+      if (isInactiveForPeriod(r.patient, r.periodYear, r.periodMonth)) return false;
+      if (isBeforeTherapyStart(r.patient, r.periodYear, r.periodMonth) && r.amountPaid === 0) {
+        return false;
+      }
+      return true;
+    });
 
     if (filters.year != null && filters.month != null) {
       const noIntegradoRows = rows.filter(
@@ -484,6 +513,7 @@ export class PaymentsService {
             discountPercent: true,
             agreedMonthlyAmount: true,
             monthlyBillingStatus: true,
+            therapyStartDate: true,
           },
         },
       },
@@ -507,6 +537,7 @@ export class PaymentsService {
         discountPercent: true,
         agreedMonthlyAmount: true,
         monthlyBillingStatus: true,
+        therapyStartDate: true,
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
@@ -515,7 +546,7 @@ export class PaymentsService {
     const merged: typeof rows = [];
 
     for (const patient of billablePatients) {
-      if (isInactiveForPeriod(patient, year, month)) continue;
+      if (!isBillableForPeriod(patient, year, month)) continue;
       const existing = paymentByPatientId.get(patient.id);
       if (existing) {
         merged.push(existing);
@@ -544,6 +575,12 @@ export class PaymentsService {
 
     for (const leftover of paymentByPatientId.values()) {
       if (isInactiveForPeriod(leftover.patient, year, month)) continue;
+      if (
+        isBeforeTherapyStart(leftover.patient, year, month) &&
+        leftover.amountPaid === 0
+      ) {
+        continue;
+      }
       if (leftover.patient.monthlyBillingStatus === "NO_INTEGRADO") continue;
       merged.push(leftover);
     }

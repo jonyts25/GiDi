@@ -9,6 +9,9 @@ export class CreatePatientDto {
   sessionsPerWeek?: number;
   discountPercent?: number;
   agreedMonthlyAmount?: number | null;
+  /** Mes de ingreso a terapia (1–12), obligatorio en alta. */
+  therapyStartYear: number;
+  therapyStartMonth: number;
   therapistIds?: string[];
 
   /** Varios tutores: `existingParentId` o pareja `email`+`fullName` por elemento. Si se omite, se usa `parent` (compat). */

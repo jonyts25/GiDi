@@ -136,6 +136,9 @@ model Patient {
   /// Notas persistentes de cobro (visible en hoja mensual).
   billingNotes String?
 
+  /// Primer mes de terapia facturable (día 1 del mes).
+  therapyStartDate DateTime? @db.Date
+
   parents     ParentPatient[]
   assignments PatientTherapist[]
   schools     SchoolPatient[]

@@ -51,6 +51,20 @@ export class PatientsService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreatePatientBody) {
+    const therapyStartYear = Number(dto.therapyStartYear);
+    const therapyStartMonth = Number(dto.therapyStartMonth);
+    if (
+      !Number.isInteger(therapyStartYear) ||
+      !Number.isInteger(therapyStartMonth) ||
+      therapyStartMonth < 1 ||
+      therapyStartMonth > 12
+    ) {
+      throw new BadRequestException(
+        "Fecha de ingreso a terapia obligatoria (mes y año válidos)",
+      );
+    }
+    const therapyStartDate = new Date(Date.UTC(therapyStartYear, therapyStartMonth - 1, 1));
+
     return this.prisma.$transaction(async (tx) => {
       const therapistIds = [...new Set(dto.therapistIds ?? [])];
       const patient = await tx.patient.create({
@@ -63,6 +77,7 @@ export class PatientsService {
           sessionsPerWeek: dto.sessionsPerWeek ?? undefined,
           discountPercent: dto.discountPercent ?? undefined,
           agreedMonthlyAmount: dto.agreedMonthlyAmount ?? undefined,
+          therapyStartDate,
           assignments: therapistIds.length
             ? {
                 create: therapistIds.map((therapistId) => ({ therapistId })),
