@@ -18,6 +18,15 @@ type GuardianInput = {
 
 type CreatePatientBody = CreatePatientDto & { guardians?: GuardianInput[] };
 
+const patientListSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  notes: true,
+  center: true,
+  createdAt: true,
+} as const;
+
 function collectGuardians(dto: CreatePatientBody): GuardianInput[] {
   if (Array.isArray(dto.guardians) && dto.guardians.length > 0) {
     return dto.guardians;
@@ -255,47 +264,19 @@ export class PatientsService {
   }
 
   async findOne(id: string) {
-    return this.prisma.patient.findUnique({
+    const row = await this.prisma.patient.findUnique({
       where: { id },
-      include: {
-        assignments: {
-          include: {
-            therapist: {
-              select: { id: true, fullName: true, email: true },
-            },
-          },
-        },
-        parents: {
-          include: {
-            parent: {
-              select: { id: true, fullName: true, email: true },
-            },
-          },
-        },
-      },
+      select: patientListSelect,
     });
+    if (!row) throw new NotFoundException("Paciente no encontrado");
+    return row;
   }
-
 
   async findAll() {
     return this.prisma.patient.findMany({
       where: { status: "ACTIVE" },
-      include: {
-        assignments: {
-          include: {
-            therapist: {
-              select: { id: true, fullName: true, email: true },
-            },
-          },
-        },
-        parents: {
-          include: {
-            parent: {
-              select: { id: true, fullName: true, email: true },
-            },
-          },
-        },
-      },
+      select: patientListSelect,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
   }
 
@@ -315,6 +296,21 @@ export class PatientsService {
           some: { therapistId },
         },
       },
+      select: patientListSelect,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    });
+  }
+
+  async findForCoordinator(coordinatorId: string) {
+    return this.prisma.patient.findMany({
+      where: {
+        status: "ACTIVE",
+        assignments: {
+          some: { therapist: { coordinatorId } },
+        },
+      },
+      select: patientListSelect,
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
   }
 

@@ -1,36 +1,34 @@
-import { Body, Controller, Get, Post, Req } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { PatientsService } from "./patients.service";
-import { UseGuards } from "@nestjs/common";
 import { JwtGuard } from "../auth/jwt.guard";
-import { Param } from "@nestjs/common";
-import { hasOfficeStaffRole } from "../auth/role-permissions";
+import { RolesGuard } from "../auth/roles.guard";
+import { Roles } from "../auth/roles.decorator";
+import { CurrentUser } from "../auth/current-user.decorator";
+import { AuthUser } from "../auth/auth-user";
+import {
+  hasCoordinatorRole,
+  hasOfficeStaffRole,
+} from "../auth/role-permissions";
+import { FollowUpAccessService } from "../followups/followup-access.service";
+import { CreatePatientDto } from "./dto/create-patient.dto";
 
-@UseGuards(JwtGuard)
-
+@UseGuards(JwtGuard, RolesGuard)
 @Controller("patients")
 export class PatientsController {
-  constructor(private readonly service: PatientsService) {}
+  constructor(
+    private readonly service: PatientsService,
+    private readonly access: FollowUpAccessService,
+  ) {}
 
   @Post()
-  create(@Body() body) {
+  @Roles("ADMIN", "SUPERADMIN", "SECRETARY")
+  create(@Body() body: CreatePatientDto) {
     return this.service.create(body);
   }
-  @Get(":id")
-  findOne(@Param("id") id: string) {
 
-    return this.service.findOne(id);
-}
-@Post(":id/assign-therapist")
-assignTherapist(
-  @Param("id") id: string,
-  @Body() body: { therapistId: string },
-) {
-  return this.service.assignTherapist(id, body.therapistId);
-}
   @Get()
-  findAll(@Req() req: any) {
-    const user = req.user;
-    const roles: string[] = user.roles ?? [];
+  list(@CurrentUser() user: AuthUser) {
+    const roles = user.roles ?? [];
 
     if (hasOfficeStaffRole(roles)) {
       return this.service.findAll();
@@ -40,6 +38,16 @@ assignTherapist(
       return this.service.findForTherapist(user.sub);
     }
 
-    return this.service.findAll();
+    if (hasCoordinatorRole(roles)) {
+      return this.service.findForCoordinator(user.sub);
+    }
+
+    throw new ForbiddenException("No tiene acceso a la lista de pacientes");
+  }
+
+  @Get(":id")
+  async findOne(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    await this.access.assertCanViewPatient(user, id);
+    return this.service.findOne(id);
   }
 }
