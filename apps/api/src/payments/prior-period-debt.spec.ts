@@ -7,7 +7,10 @@ import { IncomeService as IncomeServiceType } from "./income.service";
 describe("priorPeriodDebtByPatient", () => {
   it("aplica corte desde agosto 2026 en el where de Prisma", async () => {
     const findMany = jest.fn().mockResolvedValue([]);
-    const prisma = { payment: { findMany } } as unknown as PrismaService;
+    const prisma = {
+      patient: { findMany: jest.fn().mockResolvedValue([{ id: "p1", therapyStartDate: null }]) },
+      payment: { findMany },
+    } as unknown as PrismaService;
     const income = new IncomeService(prisma);
 
     await (income as unknown as { priorPeriodDebtByPatient: Function }).priorPeriodDebtByPatient(
@@ -35,7 +38,13 @@ describe("priorPeriodDebtByPatient", () => {
           },
         ],
       },
-      select: { patientId: true, amountDue: true, amountPaid: true },
+      select: {
+        patientId: true,
+        periodYear: true,
+        periodMonth: true,
+        amountDue: true,
+        amountPaid: true,
+      },
     });
   });
 
@@ -43,11 +52,16 @@ describe("priorPeriodDebtByPatient", () => {
     const findMany = jest.fn().mockResolvedValue([
       {
         patientId: "p1",
+        periodYear: 2026,
+        periodMonth: 9,
         amountDue: 2000,
         amountPaid: 0,
       },
     ]);
-    const prisma = { payment: { findMany } } as unknown as PrismaService;
+    const prisma = {
+      patient: { findMany: jest.fn().mockResolvedValue([{ id: "p1", therapyStartDate: null }]) },
+      payment: { findMany },
+    } as unknown as PrismaService;
     const income = new IncomeService(prisma);
 
     const { debtCarriedOver } = await (
@@ -59,7 +73,10 @@ describe("priorPeriodDebtByPatient", () => {
 
   it("deuda solo antes de agosto → deuda arrastrada 0", async () => {
     const findMany = jest.fn().mockResolvedValue([]);
-    const prisma = { payment: { findMany } } as unknown as PrismaService;
+    const prisma = {
+      patient: { findMany: jest.fn().mockResolvedValue([{ id: "p2", therapyStartDate: null }]) },
+      payment: { findMany },
+    } as unknown as PrismaService;
     const income = new IncomeService(prisma);
 
     const { debtCarriedOver } = await (

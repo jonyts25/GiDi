@@ -25,6 +25,7 @@ type FullPatient = {
     lastRevaluationDate?: string | null;
     revaluationAlertSnoozedUntil?: string | null;
     revaluationSkipReason?: string | null;
+    therapyStartDate?: string | null;
   };
   guardians: {
     parentId: string;
@@ -78,6 +79,8 @@ export default function AdminPatientEditPage() {
   const [lastRevaluationDate, setLastRevaluationDate] = useState("");
   const [reminderDate, setReminderDate] = useState("");
   const [skipReason, setSkipReason] = useState("");
+  const [therapyStartYear, setTherapyStartYear] = useState("");
+  const [therapyStartMonth, setTherapyStartMonth] = useState("");
 
   // add guardian form
   const [guardianMode, setGuardianMode] = useState<"existing" | "new">("existing");
@@ -141,6 +144,14 @@ export default function AdminPatientEditPage() {
           setReminderDate("");
         }
         setSkipReason(full.patient.revaluationSkipReason ?? "");
+        if (full.patient.therapyStartDate) {
+          const d = new Date(String(full.patient.therapyStartDate));
+          setTherapyStartYear(String(d.getUTCFullYear()));
+          setTherapyStartMonth(String(d.getUTCMonth() + 1));
+        } else {
+          setTherapyStartYear("");
+          setTherapyStartMonth("");
+        }
 
         setAllTherapists(therapists);
         setAllSchools(schools);
@@ -175,6 +186,12 @@ export default function AdminPatientEditPage() {
           ...(birthDate ? { birthDate: new Date(birthDate).toISOString() } : {}),
           notes,
           center,
+          ...(therapyStartYear && therapyStartMonth
+            ? {
+                therapyStartYear: Number(therapyStartYear),
+                therapyStartMonth: Number(therapyStartMonth),
+              }
+            : {}),
         }),
       });
       await reload();
@@ -475,6 +492,44 @@ export default function AdminPatientEditPage() {
                 <option key={c.value} value={c.value}>{c.label}</option>
               ))}
             </select>
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Fecha de ingreso a terapia</span>
+            <div className="flex flex-wrap gap-2">
+              <select
+                className="select"
+                value={therapyStartMonth}
+                onChange={(e) => setTherapyStartMonth(e.target.value)}
+              >
+                <option value="">Mes</option>
+                {[
+                  "Enero",
+                  "Febrero",
+                  "Marzo",
+                  "Abril",
+                  "Mayo",
+                  "Junio",
+                  "Julio",
+                  "Agosto",
+                  "Septiembre",
+                  "Octubre",
+                  "Noviembre",
+                  "Diciembre",
+                ].map((name, idx) => (
+                  <option key={name} value={String(idx + 1)}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input w-28"
+                type="number"
+                min={2000}
+                placeholder="Año"
+                value={therapyStartYear}
+                onChange={(e) => setTherapyStartYear(e.target.value)}
+              />
+            </div>
           </label>
           <label className="grid gap-1 text-sm">
             <span className="font-medium">Notas</span>

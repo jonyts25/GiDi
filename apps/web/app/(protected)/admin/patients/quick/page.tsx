@@ -12,6 +12,21 @@ import { FilePickerButton, MultiFilePickerButton } from "@/components/ui/FilePic
 type DocCategory = "EVALUACION" | "REVALUACION";
 type UserLite = { id: string; fullName: string; email: string; status: string };
 
+const THERAPY_START_MONTHS = [
+  { value: 1, label: "Enero" },
+  { value: 2, label: "Febrero" },
+  { value: 3, label: "Marzo" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Mayo" },
+  { value: 6, label: "Junio" },
+  { value: 7, label: "Julio" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Septiembre" },
+  { value: 10, label: "Octubre" },
+  { value: 11, label: "Noviembre" },
+  { value: 12, label: "Diciembre" },
+];
+
 export default function AdminQuickPatientPage() {
   const router = useRouter();
 
@@ -20,6 +35,8 @@ export default function AdminQuickPatientPage() {
   const [birthDate, setBirthDate] = useState("");
   const [notes, setNotes] = useState("");
   const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
+  const [therapyStartYear, setTherapyStartYear] = useState(String(new Date().getFullYear()));
+  const [therapyStartMonth, setTherapyStartMonth] = useState(String(new Date().getMonth() + 1));
   const [therapistId, setTherapistId] = useState("");
   const [therapists, setTherapists] = useState<UserLite[]>([]);
   const [docEval, setDocEval] = useState<File | null>(null);
@@ -28,10 +45,18 @@ export default function AdminQuickPatientPage() {
   const [saving, setSaving] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
 
-  const canSave = useMemo(
-    () => Boolean(firstName.trim() && lastName.trim() && birthDate),
-    [firstName, lastName, birthDate],
-  );
+  const canSave = useMemo(() => {
+    const y = Number(therapyStartYear);
+    const m = Number(therapyStartMonth);
+    return (
+      Boolean(firstName.trim() && lastName.trim() && birthDate) &&
+      Number.isInteger(y) &&
+      y >= 2000 &&
+      Number.isInteger(m) &&
+      m >= 1 &&
+      m <= 12
+    );
+  }, [firstName, lastName, birthDate, therapyStartYear, therapyStartMonth]);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -79,6 +104,8 @@ export default function AdminQuickPatientPage() {
           birthDate: new Date(birthDate).toISOString(),
           notes: notes.trim() || undefined,
           center,
+          therapyStartYear: Number(therapyStartYear),
+          therapyStartMonth: Number(therapyStartMonth),
           therapistIds: therapistId ? [therapistId] : undefined,
         }),
       });
@@ -102,8 +129,8 @@ export default function AdminQuickPatientPage() {
       <div className="card">
         <div className="h1">Nuevo paciente, registro rápido</div>
         <p className="sub">
-          Solo lo esencial: nombre, fecha de nacimiento, centro, terapeuta y documentos iniciales.
-          Obligatorios: nombre completo y fecha de nacimiento.
+          Solo lo esencial: nombre, fecha de nacimiento, ingreso a terapia, centro, terapeuta y documentos.
+          Obligatorios: nombre completo, fecha de nacimiento e ingreso a terapia (mes y año).
         </p>
         {msg ? <p className="sub">{msg}</p> : null}
       </div>
@@ -162,6 +189,34 @@ export default function AdminQuickPatientPage() {
             onChange={(e) => setNotes(e.target.value)}
             disabled={!!createdId}
           />
+        </div>
+        <div className="row" style={{ marginTop: 10, flexWrap: "wrap", gap: 10 }}>
+          <label className="grid gap-1 text-sm">
+            <span className="text-subtle">Fecha de ingreso a terapia *</span>
+            <div className="row" style={{ gap: 8 }}>
+              <select
+                className="select"
+                value={therapyStartMonth}
+                onChange={(e) => setTherapyStartMonth(e.target.value)}
+                disabled={!!createdId}
+              >
+                {THERAPY_START_MONTHS.map((mo) => (
+                  <option key={mo.value} value={String(mo.value)}>
+                    {mo.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input w-24"
+                type="number"
+                min={2000}
+                placeholder="Año"
+                value={therapyStartYear}
+                onChange={(e) => setTherapyStartYear(e.target.value)}
+                disabled={!!createdId}
+              />
+            </div>
+          </label>
         </div>
         <div style={{ marginTop: 10 }}>
           <label className="grid gap-1 text-sm">

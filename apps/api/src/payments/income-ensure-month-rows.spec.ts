@@ -14,6 +14,7 @@ describe("IncomeService.ensureMonthRows", () => {
     agreedMonthlyAmount: null,
     status: "ACTIVE",
     dischargedAt: null,
+    therapyStartDate: new Date(Date.UTC(2020, 0, 1)),
   };
 
   it("crea octubre con 4130 cuando septiembre tenía 4130", async () => {

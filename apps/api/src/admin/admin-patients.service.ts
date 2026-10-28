@@ -106,6 +106,7 @@ export class AdminPatientsService {
         lastRevaluationDate: patient.lastRevaluationDate,
         revaluationAlertSnoozedUntil: patient.revaluationAlertSnoozedUntil,
         revaluationSkipReason: patient.revaluationSkipReason,
+        therapyStartDate: patient.therapyStartDate,
         createdAt: patient.createdAt,
         updatedAt: patient.updatedAt,
       },
@@ -208,6 +209,16 @@ export class AdminPatientsService {
   async updatePatient(patientId: string, dto: UpdatePatientDto) {
     await this.ensurePatient(patientId);
 
+    let therapyStartDate: Date | undefined;
+    if (dto.therapyStartYear != null || dto.therapyStartMonth != null) {
+      if (dto.therapyStartYear == null || dto.therapyStartMonth == null) {
+        throw new BadRequestException("Indique mes y año de ingreso a terapia");
+      }
+      therapyStartDate = new Date(
+        Date.UTC(dto.therapyStartYear, dto.therapyStartMonth - 1, 1),
+      );
+    }
+
     return this.prisma.patient.update({
       where: { id: patientId },
       data: {
@@ -216,6 +227,7 @@ export class AdminPatientsService {
         birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
         notes: dto.notes ?? undefined,
         center: dto.center ?? undefined,
+        therapyStartDate: therapyStartDate ?? undefined,
         lastRevaluationDate:
           dto.lastRevaluationDate === undefined
             ? undefined
@@ -241,6 +253,7 @@ export class AdminPatientsService {
         lastRevaluationDate: true,
         revaluationAlertSnoozedUntil: true,
         revaluationSkipReason: true,
+        therapyStartDate: true,
         createdAt: true,
         updatedAt: true,
       },

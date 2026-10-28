@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsDateString } from "class-validator";
+import { IsEnum, IsInt, IsOptional, IsString, IsDateString, Max, Min } from "class-validator";
 import { GidiCenter } from "@prisma/client";
 
 export class UpdatePatientDto {
@@ -33,4 +33,15 @@ export class UpdatePatientDto {
   @IsOptional()
   @IsString()
   revaluationSkipReason?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(2000)
+  therapyStartYear?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  therapyStartMonth?: number;
 }
