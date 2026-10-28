@@ -94,7 +94,8 @@ export class FollowUpsService {
       ...(month ? { periodMonth: month } : {}),
     };
 
-    if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user)) {
+    const coordinatorTeamView = await this.access.canViewPatientAsCoordinator(user, patientId);
+    if (user.roles.includes("THERAPIST") && !this.access.isAdmin(user) && !coordinatorTeamView) {
       where.OR = [
         { therapistId: user.sub },
         { visibleToTherapist: true, status: FollowUpStatus.CLOSED },
@@ -113,6 +114,7 @@ export class FollowUpsService {
         therapist: { select: { id: true, fullName: true, email: true, status: true } },
         patient: { select: { id: true, firstName: true, lastName: true } },
         program: { select: { id: true, therapist: { select: { fullName: true } } } },
+        lastNoteBy: { select: { fullName: true } },
       },
     });
   }

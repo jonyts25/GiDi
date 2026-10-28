@@ -14,8 +14,12 @@ type UserDetail = {
   fullName: string;
   email: string;
   status: "ACTIVE" | "INACTIVE";
+  coordinatorId?: string | null;
+  coordinator?: { id: string; fullName: string } | null;
   roles?: { role: { key: string; name: string } }[];
 };
+
+type CoordinatorOption = { id: string; fullName: string };
 
 type AssignedPatient = {
   id: string;
@@ -36,6 +40,8 @@ export default function AdminTherapistDetailPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
+  const [coordinatorId, setCoordinatorId] = useState<string>("");
+  const [coordinators, setCoordinators] = useState<CoordinatorOption[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("gidi_token");
@@ -47,14 +53,17 @@ export default function AdminTherapistDetailPage() {
 
     (async () => {
       try {
-        const [data, assigned] = await Promise.all([
+        const [data, assigned, coordList] = await Promise.all([
           apiFetch(`/admin/users/${id}`),
           apiFetch(`/admin/therapists/${id}/patients`),
+          apiFetch(`/admin/users/role/COORDINATOR?status=ACTIVE`),
         ]);
         setU(data);
         setFullName(data.fullName);
         setEmail(data.email);
         setStatus(data.status);
+        setCoordinatorId(data.coordinatorId ?? "");
+        setCoordinators(Array.isArray(coordList) ? coordList : []);
         setPatients(Array.isArray(assigned) ? assigned : []);
       } catch (e: any) {
         setMsg(e.message);
@@ -71,7 +80,12 @@ export default function AdminTherapistDetailPage() {
     try {
       const updated = await apiFetch(`/admin/users/${id}`, {
         method: "PATCH",
-        body: JSON.stringify({ fullName, email, status }),
+        body: JSON.stringify({
+          fullName,
+          email,
+          status,
+          coordinatorId: coordinatorId ? coordinatorId : null,
+        }),
       });
       setU(updated);
       setMsg("✅ Guardado");
@@ -104,6 +118,20 @@ export default function AdminTherapistDetailPage() {
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value as any)}>
             <option value="ACTIVE">{STATUS_LABELS.ACTIVE}</option>
             <option value="INACTIVE">{STATUS_LABELS.INACTIVE}</option>
+          </select>
+
+          <label className="sub">Coordinadora</label>
+          <select
+            className="input"
+            value={coordinatorId}
+            onChange={(e) => setCoordinatorId(e.target.value)}
+          >
+            <option value="">Sin coordinadora</option>
+            {coordinators.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.fullName}
+              </option>
+            ))}
           </select>
 
           <button className="btn" type="submit">Guardar</button>

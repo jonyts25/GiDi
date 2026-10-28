@@ -32,6 +32,13 @@ model User {
 
   followUpsLastInternalNote FollowUp[] @relation("FollowUpLastInternalNote")
 
+  /// Coordinadora asignada (solo usuarios con rol THERAPIST).
+  coordinatorId String? @db.Uuid
+  coordinator   User?   @relation("TherapistCoordinator", fields: [coordinatorId], references: [id], onDelete: SetNull)
+  therapistsCoordinated User[] @relation("TherapistCoordinator")
+
+  programFeedbackAuthored ProgramFeedback[] @relation("ProgramFeedbackAuthor")
+
   followUpPrograms FollowUpProgram[]
 
   objectivesCreated ObjectiveBank[]
@@ -92,6 +99,7 @@ enum RoleKey {
   SUPERADMIN
   ADMIN
   THERAPIST
+  COORDINATOR
   PARENT
   FINANCE
   SCHOOL
@@ -298,6 +306,8 @@ model FollowUpProgram {
   therapist User       @relation(fields: [therapistId], references: [id], onDelete: Restrict)
   followUps FollowUp[]
 
+  feedback ProgramFeedback[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -356,6 +366,21 @@ model FollowUp {
   @@index([areaId])
   @@index([programId])
   @@index([periodYear, periodMonth])
+}
+
+model ProgramFeedback {
+  id                String    @id @default(uuid()) @db.Uuid
+  programId         String    @db.Uuid
+  authorId          String    @db.Uuid
+  body              String    @db.Text
+  seenByTherapistAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  program FollowUpProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  author  User            @relation("ProgramFeedbackAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([programId])
 }
 
 model InternalNoteRead {

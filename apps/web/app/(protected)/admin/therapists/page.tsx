@@ -14,6 +14,7 @@ type Row = {
   email: string;
   status: "ACTIVE" | "INACTIVE";
   createdAt: string;
+  coordinator?: { fullName: string } | null;
 };
 
 export default function AdminTherapistsPage() {
@@ -173,6 +174,7 @@ export default function AdminTherapistsPage() {
                   <tr style={{ textAlign: "left" }}>
                     <th>Nombre</th>
                     <th>Email</th>
+                    <th>Coordinadora</th>
                     <th>Estatus</th>
                     <th>Creado</th>
                   </tr>
@@ -189,6 +191,7 @@ export default function AdminTherapistsPage() {
                         </div>
                       </td>
                       <td style={{ color: "var(--muted)" }}>{u.email}</td>
+                      <td style={{ color: "var(--muted)" }}>{u.coordinator?.fullName ?? "—"}</td>
                       <td style={{ color: "var(--muted)" }}>{STATUS_LABELS[u.status] ?? u.status}</td>
                       <td style={{ color: "var(--muted)" }}>{new Date(u.createdAt).toLocaleString()}</td>
                     </tr>

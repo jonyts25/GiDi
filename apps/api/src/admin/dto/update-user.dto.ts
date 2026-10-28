@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString, MaxLength, ValidateIf } from "class-validator";
+import { IsEmail, IsEnum, IsOptional, IsString, IsUUID, MaxLength, ValidateIf } from "class-validator";
 import { RoleKey, UserStatus } from "@prisma/client";
 
 export class UpdateUserDto {
@@ -24,4 +24,10 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEnum(RoleKey, { each: true })
   roles?: RoleKey[];
+
+  /** Terapeuta → coordinadora asignada (null = sin coordinadora). */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsUUID()
+  coordinatorId?: string | null;
 }

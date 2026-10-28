@@ -7,7 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { resolveTrackingMode } from "@/lib/followup-area";
 import { calendarDateToUtcIso, formatCalendarDate, localDateInputValue } from "@/lib/date-utils";
 import { areaChipClass, areaHeaderClass } from "@/lib/area-display";
-import { hasFullAdminRole, hasOfficeStaffRole } from "@/lib/role-permissions";
+import { hasCoordinatorRole, hasFullAdminRole, hasOfficeStaffRole } from "@/lib/role-permissions";
 import { useToast } from "@/components/ui/Toast";
 import { MultiDatePicker } from "@/components/ui/MultiDatePicker";
 import {
@@ -108,11 +108,21 @@ function draftGlobalNumbers(blocks: DraftAreaBlock[]): Map<string, number> {
   return map;
 }
 
+type ProgramFeedbackRow = {
+  id: string;
+  body: string;
+  authorId: string;
+  author: { id: string; fullName: string };
+  createdAt: string;
+  updatedAt: string;
+};
+
 export function ProgramEditor(props: {
   programId: string;
-  basePath: "therapist" | "admin";
+  basePath: "therapist" | "admin" | "coordinator";
+  readOnly?: boolean;
 }) {
-  const { programId, basePath } = props;
+  const { programId, basePath, readOnly = basePath === "coordinator" } = props;
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -134,6 +144,15 @@ export function ProgramEditor(props: {
   const [busy, setBusy] = useState(false);
   const [gridKey, setGridKey] = useState(0);
   const [isOfficeStaff, setIsOfficeStaff] = useState(false);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [canWriteFeedback, setCanWriteFeedback] = useState(false);
+  const [isFullAdmin, setIsFullAdmin] = useState(false);
+  const [feedbackItems, setFeedbackItems] = useState<ProgramFeedbackRow[]>([]);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [feedbackBody, setFeedbackBody] = useState("");
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [editingFeedbackId, setEditingFeedbackId] = useState<string | null>(null);
+  const [editingFeedbackBody, setEditingFeedbackBody] = useState("");
   const saveInFlightRef = useRef(false);
 
   const monthlyAreas = useMemo(
@@ -176,13 +195,35 @@ export function ProgramEditor(props: {
     const raw = localStorage.getItem("gidi_user");
     if (raw) {
       try {
-        const roles: string[] = JSON.parse(raw).roles ?? [];
+        const parsed = JSON.parse(raw) as { id?: string; roles?: string[] };
+        const roles: string[] = parsed.roles ?? [];
         setIsOfficeStaff(hasOfficeStaffRole(roles));
+        setMyUserId(parsed.id ?? null);
+        setIsFullAdmin(hasFullAdminRole(roles));
+        setCanWriteFeedback(hasFullAdminRole(roles) || hasCoordinatorRole(roles));
       } catch {
         setIsOfficeStaff(false);
+        setMyUserId(null);
+        setCanWriteFeedback(false);
+        setIsFullAdmin(false);
       }
     }
   }, []);
+
+  const loadFeedback = useCallback(async () => {
+    try {
+      const rows = (await apiFetch(`/programs/${programId}/feedback`)) as ProgramFeedbackRow[];
+      setFeedbackItems(Array.isArray(rows) ? rows : []);
+      setFeedbackVisible(true);
+    } catch {
+      setFeedbackItems([]);
+      setFeedbackVisible(false);
+    }
+  }, [programId]);
+
+  useEffect(() => {
+    void loadFeedback();
+  }, [loadFeedback]);
 
   useEffect(() => {
     (async () => {
@@ -312,12 +353,15 @@ export function ProgramEditor(props: {
     return data.areas.some((a) => followUpNotes[a.followUpId]?.status === "CLOSED");
   }, [data, followUpNotes]);
 
-  const canDeleteProgram = !isLocked || isOfficeStaff;
+  const isEditingBlocked = readOnly || isLocked;
 
-  const backHref = useMemo(
-    () => (data ? `/${basePath}/patients/${data.program.patientId}/followups` : null),
-    [basePath, data],
-  );
+  const canDeleteProgram = !readOnly && (!isLocked || isOfficeStaff);
+
+  const backHref = useMemo(() => {
+    if (!data) return null;
+    if (basePath === "coordinator") return "/coordinator";
+    return `/${basePath}/patients/${data.program.patientId}/followups`;
+  }, [basePath, data]);
 
   const globalNumbers = useMemo(() => draftGlobalNumbers(draftBlocks), [draftBlocks]);
 
@@ -565,6 +609,55 @@ export function ProgramEditor(props: {
     }
   }
 
+  async function submitFeedback() {
+    setFeedbackBusy(true);
+    try {
+      await apiFetch(`/programs/${programId}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({ body: feedbackBody }),
+      });
+      setFeedbackBody("");
+      await loadFeedback();
+      showToast("✅ Retroalimentación enviada");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Error al enviar", "error");
+    } finally {
+      setFeedbackBusy(false);
+    }
+  }
+
+  async function saveFeedbackEdit(feedbackId: string) {
+    setFeedbackBusy(true);
+    try {
+      await apiFetch(`/feedback/${feedbackId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ body: editingFeedbackBody }),
+      });
+      setEditingFeedbackId(null);
+      setEditingFeedbackBody("");
+      await loadFeedback();
+      showToast("✅ Actualizado");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Error al guardar", "error");
+    } finally {
+      setFeedbackBusy(false);
+    }
+  }
+
+  async function deleteFeedbackEntry(feedbackId: string) {
+    if (!confirm("¿Borrar esta retroalimentación?")) return;
+    setFeedbackBusy(true);
+    try {
+      await apiFetch(`/feedback/${feedbackId}`, { method: "DELETE" });
+      await loadFeedback();
+      showToast("✅ Borrado");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Error al borrar", "error");
+    } finally {
+      setFeedbackBusy(false);
+    }
+  }
+
   async function deleteProgram() {
     if (!data || !backHref) return;
     const confirmMessage = isLocked
@@ -702,7 +795,7 @@ export function ProgramEditor(props: {
       <section className="card space-y-4 border-l-4 border-l-primary">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold">Programación individual</h2>
-          {programEmpty && !isLocked ? (
+          {programEmpty && !isEditingBlocked ? (
             <button
               type="button"
               className="btn rounded-xl px-4 py-2 text-sm"
@@ -742,7 +835,7 @@ export function ProgramEditor(props: {
                 <div key={block.areaId} className="overflow-hidden rounded-xl border border-border">
                   <div className={`flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 ${headerClass}`}>
                     <span className="text-sm font-semibold">{areaName}</span>
-                    {!isLocked ? (
+                    {!isEditingBlocked ? (
                       <button
                         type="button"
                         className="text-xs text-white/90 underline hover:text-white"
@@ -761,7 +854,7 @@ export function ProgramEditor(props: {
                             <th className="w-12 px-2 py-2 font-semibold">No.</th>
                             <th className="min-w-[220px] px-2 py-2 font-semibold">Objetivo específico</th>
                             <th className="min-w-[180px] px-2 py-2 font-semibold">Actividades / Notas</th>
-                            {!isLocked ? <th className="w-10" /> : null}
+                            {!isEditingBlocked ? <th className="w-10" /> : null}
                           </tr>
                         </thead>
                         <tbody>
@@ -776,7 +869,7 @@ export function ProgramEditor(props: {
                                     <textarea
                                       className="textarea min-h-[56px] w-full text-sm"
                                       value={obj.text}
-                                      disabled={busy || isLocked}
+                                      disabled={busy || isEditingBlocked}
                                       placeholder="Objetivo específico…"
                                       onChange={(e) => updateObjective(block.areaId, objIdx, { text: e.target.value })}
                                       onFocus={() => {
@@ -789,7 +882,7 @@ export function ProgramEditor(props: {
                                         setBankOpen(null);
                                       }}
                                     />
-                                    {canLoadBank && !isLocked && bankOpen === `${block.areaId}:${objIdx}` ? (
+                                    {canLoadBank && !isEditingBlocked && bankOpen === `${block.areaId}:${objIdx}` ? (
                                       <>
                                         <div
                                           ref={bankRef}
@@ -837,7 +930,7 @@ export function ProgramEditor(props: {
                                         </div>
                                       </>
                                     ) : null}
-                                    {canLoadBank && !isLocked ? (
+                                    {canLoadBank && !isEditingBlocked ? (
                                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                                         <button
                                           type="button"
@@ -904,7 +997,7 @@ export function ProgramEditor(props: {
                                     onChange={(e) => updateObjective(block.areaId, objIdx, { activities: e.target.value })}
                                   />
                                 </td>
-                                {!isLocked ? (
+                                {!isEditingBlocked ? (
                                   <td className="px-1 py-2 align-top">
                                     <button
                                       type="button"
@@ -923,7 +1016,7 @@ export function ProgramEditor(props: {
                       </table>
                     </div>
 
-                    {!isLocked ? (
+                    {!isEditingBlocked ? (
                       <button
                         type="button"
                         className="mt-3 text-sm text-primary hover:underline"
@@ -940,7 +1033,7 @@ export function ProgramEditor(props: {
           </div>
         )}
 
-        {!isLocked ? (
+        {!isEditingBlocked ? (
           <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
             <select
               className="select max-w-xs"
@@ -977,7 +1070,7 @@ export function ProgramEditor(props: {
       <section className="card space-y-4 border-l-4 border-l-warning">
         <h2 className="text-lg font-semibold">Tabla de seguimiento</h2>
 
-        {!isLocked ? (
+        {!isEditingBlocked ? (
           <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface-elevated/40 p-4">
             <div className="flex flex-wrap gap-2">
               <button
@@ -1035,7 +1128,7 @@ export function ProgramEditor(props: {
                 className="flex items-center gap-2 rounded-lg border border-border bg-surface-elevated/60 px-3 py-1.5"
               >
                 <span>{formatCalendarDate(s.date)}</span>
-                {!isLocked ? (
+                {!isEditingBlocked ? (
                   <button
                     type="button"
                     className="text-xs text-danger hover:underline"
@@ -1060,7 +1153,7 @@ export function ProgramEditor(props: {
               void reload();
             }}
             onToast={showToast}
-            readOnly={isLocked}
+            readOnly={isEditingBlocked}
             showObjectiveNotes={false}
             programMode
             programId={programId}
@@ -1091,7 +1184,7 @@ export function ProgramEditor(props: {
                       <textarea
                         className="textarea min-h-[100px]"
                         value={draft.generalNotes}
-                        disabled={busy || areaLocked}
+                        disabled={busy || areaLocked || readOnly}
                         onChange={(e) =>
                           setNotesDraft((prev) => ({
                             ...prev,
@@ -1105,7 +1198,7 @@ export function ProgramEditor(props: {
                       <textarea
                         className="textarea min-h-[100px]"
                         value={draft.homeWork}
-                        disabled={busy || areaLocked}
+                        disabled={busy || areaLocked || readOnly}
                         onChange={(e) =>
                           setNotesDraft((prev) => ({
                             ...prev,
@@ -1120,7 +1213,7 @@ export function ProgramEditor(props: {
                     <textarea
                       className="textarea min-h-[100px]"
                       value={draft.parentComments}
-                      disabled={busy || areaLocked}
+                      disabled={busy || areaLocked || readOnly}
                       onChange={(e) =>
                         setNotesDraft((prev) => ({
                           ...prev,
@@ -1129,7 +1222,7 @@ export function ProgramEditor(props: {
                       }
                     />
                   </label>
-                  {!areaLocked ? (
+                  {!areaLocked && !readOnly ? (
                     <button
                       type="button"
                       className="btn mt-3 rounded-xl px-4 py-2 text-sm"
@@ -1148,9 +1241,113 @@ export function ProgramEditor(props: {
         )}
       </section>
 
-      {(!isLocked && data.areas.length > 0) || canDeleteProgram ? (
+      {feedbackVisible ? (
+        <section className="card space-y-4 border-l-4 border-l-teal-500">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-semibold">Retroalimentación</h2>
+            <span className="rounded-full border border-teal-500/40 bg-teal-500/10 px-2 py-0.5 text-xs font-medium text-teal-800 dark:text-teal-200">
+              🔒 Interno: no visible para papás ni escuela
+            </span>
+          </div>
+          {feedbackItems.length === 0 ? (
+            <p className="text-sm text-subtle">Aún no hay retroalimentación para este mes.</p>
+          ) : (
+            <ul className="space-y-3">
+              {feedbackItems.map((entry) => (
+                <li key={entry.id} className="rounded-xl border border-border p-3">
+                  <p className="text-xs font-semibold text-subtle">
+                    {entry.author.fullName} · {new Date(entry.createdAt).toLocaleString("es-MX")}
+                  </p>
+                  {editingFeedbackId === entry.id ? (
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        className="textarea min-h-[80px] w-full text-sm"
+                        value={editingFeedbackBody}
+                        onChange={(e) => setEditingFeedbackBody(e.target.value)}
+                        disabled={feedbackBusy}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn-primary rounded-lg px-3 py-1 text-xs"
+                          disabled={feedbackBusy || !editingFeedbackBody.trim()}
+                          onClick={() => void saveFeedbackEdit(entry.id)}
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          className="btn rounded-lg px-3 py-1 text-xs"
+                          disabled={feedbackBusy}
+                          onClick={() => {
+                            setEditingFeedbackId(null);
+                            setEditingFeedbackBody("");
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-ink">{entry.body}</p>
+                      {myUserId === entry.authorId || isFullAdmin ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {myUserId === entry.authorId || isFullAdmin ? (
+                            <button
+                              type="button"
+                              className="text-xs text-primary hover:underline"
+                              onClick={() => {
+                                setEditingFeedbackId(entry.id);
+                                setEditingFeedbackBody(entry.body);
+                              }}
+                            >
+                              Editar
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="text-xs text-danger hover:underline"
+                            onClick={() => void deleteFeedbackEntry(entry.id)}
+                          >
+                            Borrar
+                          </button>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {canWriteFeedback ? (
+            <div className="space-y-2 border-t border-border pt-4">
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium text-subtle">Nueva retroalimentación</span>
+                <textarea
+                  className="textarea min-h-[100px]"
+                  value={feedbackBody}
+                  onChange={(e) => setFeedbackBody(e.target.value)}
+                  disabled={feedbackBusy}
+                  placeholder="Comentarios para la terapeuta sobre este mes…"
+                />
+              </label>
+              <button
+                type="button"
+                className="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                disabled={feedbackBusy || !feedbackBody.trim()}
+                onClick={() => void submitFeedback()}
+              >
+                {feedbackBusy ? "Enviando…" : "Agregar retroalimentación"}
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {(!isEditingBlocked && data.areas.length > 0) || canDeleteProgram ? (
         <section className="card space-y-4 border-l-4 border-l-primary">
-          {!isLocked && data.areas.length > 0 ? (
+          {!isEditingBlocked && data.areas.length > 0 ? (
             <>
               <h2 className="text-lg font-semibold">Publicar programación</h2>
               <p className="text-sm text-subtle">

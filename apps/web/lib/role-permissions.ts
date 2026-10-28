@@ -3,6 +3,7 @@ export const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrativo",
   SECRETARY: "Secretaria",
   THERAPIST: "Terapeuta",
+  COORDINATOR: "Coordinadora/o",
   PARENT: "Papá/Mamá",
   SCHOOL: "Escuela",
   FINANCE: "Finanzas",
@@ -21,7 +22,11 @@ export function hasOfficeStaffRole(roles: string[] = []): boolean {
   return hasFullAdminRole(roles) || roles.includes("SECRETARY") || roles.includes("FINANCE");
 }
 
-const STAFF_ROLE_KEYS = ["SUPERADMIN", "ADMIN", "SECRETARY", "THERAPIST", "FINANCE"] as const;
+const STAFF_ROLE_KEYS = ["SUPERADMIN", "ADMIN", "SECRETARY", "THERAPIST", "COORDINATOR", "FINANCE"] as const;
+
+export function hasCoordinatorRole(roles: string[] = []): boolean {
+  return roles.includes("COORDINATOR");
+}
 
 export function hasStaffRole(roles: string[] = []): boolean {
   return roles.some((r) => (STAFF_ROLE_KEYS as readonly string[]).includes(r));
@@ -45,7 +50,7 @@ export function labelForRole(role: string): string {
 }
 
 export function primaryRoleLabel(roles: string[] = []): string {
-  const order = ["SUPERADMIN", "ADMIN", "SECRETARY", "THERAPIST", "PARENT", "SCHOOL", "FINANCE"];
+  const order = ["SUPERADMIN", "ADMIN", "SECRETARY", "COORDINATOR", "THERAPIST", "PARENT", "SCHOOL", "FINANCE"];
   const key = order.find((r) => roles.includes(r));
   return key ? labelForRole(key) : "Usuario";
 }

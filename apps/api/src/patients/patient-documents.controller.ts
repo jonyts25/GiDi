@@ -30,7 +30,7 @@ export class PatientDocumentsController {
     @Param("patientId") patientId: string,
     @Body() dto: UploadPatientDocumentDto,
   ) {
-    await this.access.assertCanViewPatient(user, patientId);
+    await this.access.assertCanUploadPatientDocuments(user, patientId);
     return this.svc.upload(user, patientId, dto.category, dto.fileName, dto.mimeType, dto.dataUrl);
   }
 
