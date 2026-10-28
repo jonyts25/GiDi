@@ -319,17 +319,12 @@ export class IncomeService {
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
 
-    const noIntegradoNeedsEntryCheck = payments.filter(
-      (p) =>
-        p.patient.monthlyBillingStatus === "NO_INTEGRADO" &&
-        p.amountPaid === 0,
-    );
-    const noIntegradoIds = [...new Set(noIntegradoNeedsEntryCheck.map((p) => p.patientId))];
-    const noIntegradoWithEntry = new Set<string>();
-    if (noIntegradoIds.length > 0) {
+    const paymentPatientIds = [...new Set(payments.map((p) => p.patientId))];
+    const patientsWithIncomeEntryInPeriod = new Set<string>();
+    if (paymentPatientIds.length > 0) {
       const withEntry = await this.prisma.incomeEntry.findMany({
         where: {
-          patientId: { in: noIntegradoIds },
+          patientId: { in: paymentPatientIds },
           periodYear: year,
           periodMonth: month,
         },
@@ -337,7 +332,7 @@ export class IncomeService {
         distinct: ["patientId"],
       });
       for (const row of withEntry) {
-        if (row.patientId) noIntegradoWithEntry.add(row.patientId);
+        if (row.patientId) patientsWithIncomeEntryInPeriod.add(row.patientId);
       }
     }
 
@@ -346,11 +341,18 @@ export class IncomeService {
       if (isBillableForPeriod(p, year, month)) patientIds.add(p.id);
     }
     for (const pay of payments) {
-      if (isInactiveForPeriod(pay.patient, year, month)) continue;
+      const hasIncomeEntryInPeriod = patientsWithIncomeEntryInPeriod.has(pay.patientId);
+      if (
+        isInactiveForPeriod(pay.patient, year, month) &&
+        pay.amountPaid === 0 &&
+        !hasIncomeEntryInPeriod
+      ) {
+        continue;
+      }
       if (
         isBeforeTherapyStart(pay.patient, year, month) &&
         pay.amountPaid === 0 &&
-        !noIntegradoWithEntry.has(pay.patientId)
+        !hasIncomeEntryInPeriod
       ) {
         continue;
       }
@@ -358,7 +360,7 @@ export class IncomeService {
         !includePaymentPatientInMonthSheet(
           pay.patient.monthlyBillingStatus,
           pay.amountPaid,
-          noIntegradoWithEntry.has(pay.patientId),
+          hasIncomeEntryInPeriod,
         )
       ) {
         continue;
