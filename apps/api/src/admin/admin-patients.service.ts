@@ -49,6 +49,7 @@ export class AdminPatientsService {
         lastRevaluationDate: true,
         revaluationAlertSnoozedUntil: true,
         revaluationSkipReason: true,
+        therapyStartDate: true,
         createdAt: true,
         updatedAt: true,
 
