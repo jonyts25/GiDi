@@ -37,6 +37,28 @@ function prismaMock(opts: {
   } as unknown as PrismaService;
 }
 
+describe("FollowUpAccessService assertCanViewPatient (coordinadora)", () => {
+  it("coordinadora puede ver paciente de su equipo", async () => {
+    const svc = new FollowUpAccessService(
+      prismaMock({ coordinatorLink: true, therapistAssignment: false }),
+    );
+    const user: AuthUser = { sub: "coord-1", roles: ["COORDINATOR"] };
+
+    await expect(svc.assertCanViewPatient(user, PATIENT_ID)).resolves.toBeUndefined();
+  });
+
+  it("coordinadora recibe 403 para paciente de otra coordinadora", async () => {
+    const svc = new FollowUpAccessService(
+      prismaMock({ coordinatorLink: false, therapistAssignment: false }),
+    );
+    const user: AuthUser = { sub: "coord-2", roles: ["COORDINATOR"] };
+
+    await expect(svc.assertCanViewPatient(user, PATIENT_ID)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+});
+
 describe("FollowUpAccessService assertCanUploadPatientDocuments", () => {
   it("coordinadora con vista al paciente no puede subir documentos", async () => {
     const svc = new FollowUpAccessService(

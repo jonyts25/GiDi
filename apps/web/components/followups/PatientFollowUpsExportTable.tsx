@@ -40,6 +40,7 @@ export function PatientFollowUpsExportTable(props: {
   exportable?: (row: FollowUpListRow) => boolean;
   isOfficeStaff?: boolean;
   onRowsChanged?: () => void;
+  readOnly?: boolean;
 }) {
   const {
     rows,
@@ -52,6 +53,7 @@ export function PatientFollowUpsExportTable(props: {
     exportable = (row) => !isInternalOnlyAreaKey(row.area.key ?? ""),
     isOfficeStaff = false,
     onRowsChanged,
+    readOnly = false,
   } = props;
 
   const { showToast } = useToast();
@@ -282,7 +284,7 @@ export function PatientFollowUpsExportTable(props: {
         </Link>
       );
 
-    if (item.kind !== "program" || !canDeleteProgramRow(item)) {
+    if (readOnly || item.kind !== "program" || !canDeleteProgramRow(item)) {
       return openLink;
     }
 

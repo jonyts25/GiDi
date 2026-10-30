@@ -199,7 +199,15 @@ export default function CoordinatorTeamPage() {
 
       {selectedPatient ? (
         <section className="card space-y-4">
-          <h2 className="text-lg font-semibold">Programación · {patientLabel}</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Programación · {patientLabel}</h2>
+            <Link
+              href={`/coordinator/patients/${selectedPatient.patientId}`}
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Ver ficha del paciente →
+            </Link>
+          </div>
           <div className="flex flex-wrap items-end gap-3">
             <label className="grid gap-1 text-sm">
               <span className="text-subtle">Año</span>
