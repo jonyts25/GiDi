@@ -146,14 +146,21 @@ function SlotContentEditor(props: {
 }) {
   const { slot, patients, showPatientLinks, onChange } = props;
   const [query, setQuery] = useState("");
+  const [mode, setModeState] = useState<"patient" | "text" | "free">(() =>
+    slot.isFree ? "free" : slot.patientId ? "patient" : "text",
+  );
   const filtered = useMemo(
     () => filterByQuery(patients, query, (p) => `${p.firstName} ${p.lastName}`),
     [patients, query],
   );
 
-  const mode: "patient" | "text" | "free" = slot.isFree ? "free" : slot.patientId ? "patient" : "text";
+  useEffect(() => {
+    if (slot.isFree) setModeState("free");
+    else if (slot.patientId) setModeState("patient");
+  }, [slot.isFree, slot.patientId]);
 
   function setMode(next: "patient" | "text" | "free") {
+    setModeState(next);
     if (next === "free") {
       onChange({ ...slot, isFree: true, patientId: null, patientName: null, label: "" });
       setQuery("");
@@ -225,12 +232,14 @@ function SlotContentEditor(props: {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar paciente…"
               />
-              {query.trim() ? (
+              {patients.length === 0 ? (
+                <p className="text-xs text-subtle">Esta terapeuta no tiene pacientes asignados</p>
+              ) : (
                 <ul className="max-h-24 overflow-y-auto rounded border border-border bg-surface text-xs">
                   {filtered.length === 0 ? (
                     <li className="px-2 py-1 text-subtle">Sin coincidencias</li>
                   ) : (
-                    filtered.slice(0, 8).map((p) => (
+                    filtered.map((p) => (
                       <li key={p.id}>
                         <button
                           type="button"
@@ -252,7 +261,7 @@ function SlotContentEditor(props: {
                     ))
                   )}
                 </ul>
-              ) : null}
+              )}
             </>
           )}
         </div>
