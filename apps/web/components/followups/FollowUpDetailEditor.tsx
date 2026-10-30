@@ -115,8 +115,16 @@ export function FollowUpDetailEditor(props: {
   patientFollowUpsPrefix?: string;
   loadTherapists?: boolean;
   showReportExport?: boolean;
+  readOnly?: boolean;
 }) {
-  const { followUpId, backHref, patientFollowUpsPrefix, loadTherapists = false, showReportExport = false } = props;
+  const {
+    followUpId,
+    backHref,
+    patientFollowUpsPrefix,
+    loadTherapists = false,
+    showReportExport = false,
+    readOnly = false,
+  } = props;
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -176,9 +184,9 @@ export function FollowUpDetailEditor(props: {
   const isAdmin = useMemo(() => hasFullAdminRole(loggedUser?.roles ?? []), [loggedUser]);
   const isInternalArea = useMemo(() => isInternalOnlyAreaKey(fu?.area.key ?? ""), [fu?.area.key]);
   const isOfficeStaff = useMemo(() => hasOfficeStaffRole(loggedUser?.roles ?? []), [loggedUser]);
-  const isLocked = fu?.status === "CLOSED" && !isOfficeStaff;
+  const isLocked = readOnly || (fu?.status === "CLOSED" && !isOfficeStaff);
   const canDelete =
-    !!fu && (isOfficeStaff || (fu.status === "DRAFT" && !isLocked));
+    !!fu && !readOnly && (isOfficeStaff || (fu.status === "DRAFT" && !isLocked));
   const isTextOnly = tracking === "TEXT_ONLY";
   const submitterLabel = isTextOnly
     ? fu?.observationsAuthor?.trim() || fu?.therapist?.fullName || "—"
@@ -488,7 +496,7 @@ export function FollowUpDetailEditor(props: {
           🔒 Comunicación interna: solo visible para dirección, secretaría y terapeutas. No aparece en el
           expediente ni en reportes para papás o escuela.
         </section>
-      ) : isAdmin ? (
+      ) : isAdmin && !readOnly ? (
         <section className="card space-y-3 border-l-4 border-l-accent-blue">
           <div>
             <h2 className="text-lg font-semibold">¿Quién puede ver este seguimiento?</h2>
@@ -539,7 +547,9 @@ export function FollowUpDetailEditor(props: {
 
       {isLocked ? (
         <p className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
-          Este seguimiento ya fue publicado y no se puede modificar.
+          {readOnly
+            ? "Vista de solo lectura."
+            : "Este seguimiento ya fue publicado y no se puede modificar."}
         </p>
       ) : null}
 
@@ -671,7 +681,7 @@ export function FollowUpDetailEditor(props: {
 
           <section className="card space-y-4 border-l-4 border-l-primary">
             <h2 className="text-lg font-semibold">Sesiones del mes</h2>
-            {defaultTherapistId ? (
+            {defaultTherapistId && !isLocked ? (
               <NewFollowUpSessionForm
                 followUpId={fu.id}
                 defaultTherapistId={defaultTherapistId}
@@ -686,7 +696,7 @@ export function FollowUpDetailEditor(props: {
                   <li key={s.id} className="flex items-center gap-2 rounded-lg border border-border bg-surface-elevated/60 px-3 py-1.5">
                     <span>{formatCalendarDate(s.sessionDate)}</span>
                     <span className="text-subtle">· {s.therapist?.fullName}</span>
-                    {!isLocked ? (
+                    {!readOnly && !isLocked ? (
                       <button type="button" className="text-xs text-danger hover:underline" onClick={() => void onDeleteSession(s.id)}>
                         Eliminar
                       </button>

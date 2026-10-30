@@ -114,7 +114,7 @@ export default function CoordinatorPatientFollowUpsPage() {
         <PatientFollowUpsExportTable
           rows={rows}
           allMonths={allMonths}
-          openHref={(fid) => `/therapist/followups/${fid}`}
+          openHref={(fid) => `/coordinator/followups/${fid}`}
           openProgramHref={(programId) => `/coordinator/programs/${programId}`}
           areas={areas}
           areaFilter={areaFilter}
