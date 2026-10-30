@@ -49,6 +49,7 @@ function authHeader(userId: string, email: string) {
   let therapistOtherId: string;
   let assignedPatientId: string;
   let unassignedPatientId: string;
+  let adminId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -69,8 +70,10 @@ function authHeader(userId: string, email: string) {
     const therapistOther = await ensureUser(prisma, "e2e-patients-ther-b@gidi.test", [
       RoleKey.THERAPIST,
     ]);
+    const admin = await ensureUser(prisma, "e2e-patients-admin@gidi.test", [RoleKey.ADMIN]);
 
     parentId = parent.id;
+    adminId = admin.id;
     schoolId = school.id;
     therapistAssignedId = therapistAssigned.id;
     therapistOtherId = therapistOther.id;
@@ -144,5 +147,62 @@ function authHeader(userId: string, email: string) {
       .get(`/patients/${assignedPatientId}`)
       .set("Authorization", authHeader(therapistAssignedId, "e2e-patients-ther-a@gidi.test"))
       .expect(200);
+  });
+
+  it("ADMIN POST /patients con tutores y escuela persiste datos (ValidationPipe)", async () => {
+    const suffix = Date.now();
+    const payload = {
+      firstName: "E2E",
+      lastName: "Alta",
+      birthDate: "2015-06-01T00:00:00.000Z",
+      notes: "notas e2e",
+      center: "SAN_AGUSTIN",
+      sessionsPerWeek: 2,
+      discountPercent: 0,
+      agreedMonthlyAmount: null,
+      therapistIds: [therapistAssignedId],
+      guardians: [
+        {
+          email: `e2e-guardian-${suffix}@gidi.test`,
+          fullName: "Tutor E2E",
+          relationship: "MOTHER",
+          isPrimary: true,
+        },
+      ],
+      school: {
+        email: `e2e-school-${suffix}@gidi.test`,
+        fullName: "Escuela E2E",
+        notes: "inline",
+      },
+    };
+
+    const res = await request(app.getHttpServer())
+      .post("/patients")
+      .set("Authorization", authHeader(adminId, "e2e-patients-admin@gidi.test"))
+      .send(payload)
+      .expect(201);
+
+    const patientId = res.body?.patient?.id ?? res.body?.id;
+    expect(patientId).toBeTruthy();
+
+    const stored = await prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { firstName: true },
+    });
+    expect(stored?.firstName).toBe("E2E");
+
+    const guardianLinks = await prisma.parentPatient.findMany({
+      where: { patientId },
+      include: { parent: { select: { email: true } } },
+    });
+    expect(guardianLinks.some((l) => l.parent.email === `e2e-guardian-${suffix}@gidi.test`)).toBe(
+      true,
+    );
+
+    const schoolLink = await prisma.schoolPatient.findFirst({
+      where: { patientId },
+      include: { school: { select: { email: true } } },
+    });
+    expect(schoolLink?.school.email).toBe(`e2e-school-${suffix}@gidi.test`);
   });
 });
