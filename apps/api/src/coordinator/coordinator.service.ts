@@ -2,10 +2,16 @@ import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma.service";
 import { AuthUser } from "../auth/auth-user";
 import { hasCoordinatorRole } from "../auth/role-permissions";
+import { PatientProfileService } from "../patients/patient-profile.service";
+import { FollowUpAccessService } from "../followups/followup-access.service";
 
 @Injectable()
 export class CoordinatorService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private profiles: PatientProfileService,
+    private access: FollowUpAccessService,
+  ) {}
 
   private assertCoordinator(user: AuthUser) {
     if (!hasCoordinatorRole(user.roles)) {
@@ -45,5 +51,11 @@ export class CoordinatorService {
       email: t.email,
       patients: t.therapistAssignments.map((a) => a.patient),
     }));
+  }
+
+  async getPatient(user: AuthUser, patientId: string) {
+    this.assertCoordinator(user);
+    await this.access.assertCanViewPatient(user, patientId);
+    return this.profiles.build(patientId);
   }
 }
