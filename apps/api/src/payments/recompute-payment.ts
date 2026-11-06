@@ -1,6 +1,7 @@
 import { IncomeConcept, IncomeMethod, PaymentStatus } from "@prisma/client";
 import { incomeMethodLabel } from "./income-config";
 import { PatientBillingProfile, suggestedMonthly } from "./payment-config";
+import { isPeriodOnOrAfterTherapyStart } from "./payment-period";
 
 export type PaymentCountingEntry = {
   receivedAt: Date;
@@ -109,12 +110,22 @@ export function resolveInheritedAmountDue(
   year: number,
   month: number,
 ): number {
+  const therapyStart = patient.fechaInicioTerapia ?? null;
+  if (therapyStart && !isPeriodOnOrAfterTherapyStart(therapyStart, year, month)) {
+    return 0;
+  }
+
   if (patient.agreedMonthlyAmount != null && patient.agreedMonthlyAmount > 0) {
     return patient.agreedMonthlyAmount;
   }
 
+  const periodAllowed = (py: number, pm: number) =>
+    !therapyStart || isPeriodOnOrAfterTherapyStart(therapyStart, py, pm);
+
   const prev = previousPeriod(year, month);
-  const prevEntry = historyByPeriod.get(periodKey(prev.year, prev.month));
+  const prevEntry = periodAllowed(prev.year, prev.month)
+    ? historyByPeriod.get(periodKey(prev.year, prev.month))
+    : undefined;
 
   if (
     prevEntry &&
@@ -127,9 +138,11 @@ export function resolveInheritedAmountDue(
   let y = prev.year;
   let m = prev.month;
   for (let i = 0; i < 6; i++) {
-    const entry = historyByPeriod.get(periodKey(y, m));
-    if (entry && entry.status !== PaymentStatus.PAUSA_VACACIONES && entry.amountDue > 0) {
-      return entry.amountDue;
+    if (periodAllowed(y, m)) {
+      const entry = historyByPeriod.get(periodKey(y, m));
+      if (entry && entry.status !== PaymentStatus.PAUSA_VACACIONES && entry.amountDue > 0) {
+        return entry.amountDue;
+      }
     }
     ({ year: y, month: m } = previousPeriod(y, m));
   }

@@ -60,6 +60,7 @@ export class PatientsService {
           birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
           notes: dto.notes,
           center: dto.center ?? undefined,
+          fechaInicioTerapia: dto.fechaInicioTerapia ? new Date(dto.fechaInicioTerapia) : undefined,
           sessionsPerWeek: dto.sessionsPerWeek ?? undefined,
           discountPercent: dto.discountPercent ?? undefined,
           agreedMonthlyAmount: dto.agreedMonthlyAmount ?? undefined,

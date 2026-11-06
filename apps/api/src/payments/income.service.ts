@@ -20,7 +20,11 @@ import {
   resolveAmountDueFromBilling,
   resolveInheritedAmountDue,
 } from "./recompute-payment";
-import { isInactiveForPeriod, isPastOrCurrentPeriod } from "./payment-period";
+import {
+  isInactiveForPeriod,
+  isPastOrCurrentPeriod,
+  isPeriodOnOrAfterTherapyStart,
+} from "./payment-period";
 import { CreateIncomeEntryDto, UpdateIncomeEntryDto } from "./dto/income-entry.dto";
 import { includePaymentPatientInMonthSheet } from "./billing-month-patient.util";
 
@@ -198,10 +202,15 @@ export class IncomeService {
         agreedMonthlyAmount: true,
         status: true,
         dischargedAt: true,
+        fechaInicioTerapia: true,
       },
     });
 
-    const billablePatients = patients.filter((p) => !isInactiveForPeriod(p, year, month));
+    const billablePatients = patients.filter(
+      (p) =>
+        !isInactiveForPeriod(p, year, month) &&
+        isPeriodOnOrAfterTherapyStart(p.fechaInicioTerapia, year, month),
+    );
     if (billablePatients.length === 0) return;
 
     const patientIds = billablePatients.map((p) => p.id);
@@ -287,6 +296,7 @@ export class IncomeService {
             status: true,
             billingNotes: true,
             monthlyBillingStatus: true,
+            fechaInicioTerapia: true,
           },
         },
       },
@@ -304,6 +314,7 @@ export class IncomeService {
         lastName: true,
         center: true,
         billingNotes: true,
+        fechaInicioTerapia: true,
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
@@ -331,8 +342,14 @@ export class IncomeService {
     }
 
     const patientIds = new Set<string>();
-    for (const p of activePatients) patientIds.add(p.id);
+    for (const p of activePatients) {
+      if (!isPeriodOnOrAfterTherapyStart(p.fechaInicioTerapia, year, month)) continue;
+      patientIds.add(p.id);
+    }
     for (const pay of payments) {
+      if (!isPeriodOnOrAfterTherapyStart(pay.patient.fechaInicioTerapia, year, month)) {
+        continue;
+      }
       if (
         !includePaymentPatientInMonthSheet(
           pay.patient.monthlyBillingStatus,
@@ -452,6 +469,7 @@ export class IncomeService {
         discountPercent: true,
         agreedMonthlyAmount: true,
         center: true,
+        fechaInicioTerapia: true,
       },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
@@ -481,15 +499,20 @@ export class IncomeService {
     let amountDue = existing?.amountDue;
     if (amountDue == null) {
       const prev = previousPeriod(year, month);
-      const prevPayment = await tx.payment.findUnique({
-        where: {
-          patientId_periodYear_periodMonth: {
-            patientId,
-            periodYear: prev.year,
-            periodMonth: prev.month,
-          },
-        },
-      });
+      const prevAllowed =
+        patient.fechaInicioTerapia == null ||
+        isPeriodOnOrAfterTherapyStart(patient.fechaInicioTerapia, prev.year, prev.month);
+      const prevPayment = prevAllowed
+        ? await tx.payment.findUnique({
+            where: {
+              patientId_periodYear_periodMonth: {
+                patientId,
+                periodYear: prev.year,
+                periodMonth: prev.month,
+              },
+            },
+          })
+        : null;
       amountDue = resolveAmountDueFromBilling(
         billingAmountFor(patient),
         prevPayment?.amountDue,
@@ -537,12 +560,14 @@ export class IncomeService {
     });
   }
 
-  private async priorPeriodDebtByPatient(
-    beforeYear: number,
-    beforeMonth: number,
-    patientIds: string[],
-  ) {
+  private async priorPeriodDebtByPatient(beforeYear: number, beforeMonth: number, patientIds: string[]) {
     if (patientIds.length === 0) return { debtCarriedOver: new Map<string, number>() };
+
+    const patients = await this.prisma.patient.findMany({
+      where: { id: { in: patientIds } },
+      select: { id: true, fechaInicioTerapia: true },
+    });
+    const therapyMap = new Map(patients.map((p) => [p.id, p.fechaInicioTerapia]));
 
     const rows = await this.prisma.payment.findMany({
       where: {
@@ -550,11 +575,24 @@ export class IncomeService {
         status: { not: PaymentStatus.PAUSA_VACACIONES },
         ...priorPeriodDebtPeriodFilter(beforeYear, beforeMonth),
       },
-      select: { patientId: true, amountDue: true, amountPaid: true },
+      select: {
+        patientId: true,
+        periodYear: true,
+        periodMonth: true,
+        amountDue: true,
+        amountPaid: true,
+      },
     });
 
     const debtCarriedOver = new Map<string, number>();
     for (const row of rows) {
+      const start = therapyMap.get(row.patientId);
+      if (
+        start &&
+        !isPeriodOnOrAfterTherapyStart(start, row.periodYear, row.periodMonth)
+      ) {
+        continue;
+      }
       const balance = Math.max(row.amountDue - row.amountPaid, 0);
       if (balance <= 0) continue;
       debtCarriedOver.set(row.patientId, (debtCarriedOver.get(row.patientId) ?? 0) + balance);

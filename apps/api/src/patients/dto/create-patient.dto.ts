@@ -147,4 +147,8 @@ export class CreatePatientDto {
   @ValidateNested()
   @Type(() => SchoolInputDto)
   school?: SchoolInputDto;
+
+  @IsOptional()
+  @IsDateString()
+  fechaInicioTerapia?: string;
 }

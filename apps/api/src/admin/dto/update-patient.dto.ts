@@ -33,4 +33,8 @@ export class UpdatePatientDto {
   @IsOptional()
   @IsString()
   revaluationSkipReason?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  fechaInicioTerapia?: string;
 }

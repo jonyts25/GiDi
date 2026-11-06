@@ -84,6 +84,21 @@ describe("resolveInheritedAmountDue", () => {
     expect(resolveInheritedAmountDue(patient2Sessions, new Map(), 2026, 10)).toBe(4130);
   });
 
+  it("primer mes de cobro en noviembre: mes de octubre no hereda monto previo", () => {
+    const therapyStart = new Date("2026-11-01T00:00:00.000Z");
+    const history = new Map([
+      ["2026-10", { amountDue: 4130, status: PaymentStatus.DEUDA }],
+    ]);
+    expect(
+      resolveInheritedAmountDue(
+        { ...patient2Sessions, fechaInicioTerapia: therapyStart },
+        history,
+        2026,
+        11,
+      ),
+    ).toBe(4130);
+  });
+
   it("prioriza mensualidad acordada sobre historial", () => {
     const history = new Map([
       ["2026-9", { amountDue: 2150, status: PaymentStatus.PAGADO }],

@@ -11,7 +11,7 @@ import {
 import { incomeMethodLabel } from "./income-config";
 import { IncomeService } from "./income.service";
 import { previousPeriod, resolveAmountDueFromBilling } from "./recompute-payment";
-import { isInactiveForPeriod } from "./payment-period";
+import { isInactiveForPeriod, isPeriodOnOrAfterTherapyStart } from "./payment-period";
 import { SetBillingDto } from "./dto/set-billing.dto";
 import { UpsertPaymentDto } from "./dto/upsert-payment.dto";
 import { UploadReceiptDto } from "./dto/upload-receipt.dto";
@@ -61,13 +61,26 @@ export class PaymentsService {
       return { debtCarriedOver: new Map(), arrears: new Map() };
     }
 
+    const patients = await this.prisma.patient.findMany({
+      where: { id: { in: patientIds } },
+      select: { id: true, fechaInicioTerapia: true },
+    });
+    const therapyMap = new Map(patients.map((p) => [p.id, p.fechaInicioTerapia]));
+
     const rows = await this.prisma.payment.findMany({
       where: {
         patientId: { in: patientIds },
         status: { not: PaymentStatus.PAUSA_VACACIONES },
         ...priorPeriodDebtPeriodFilter(beforeYear, beforeMonth),
       },
-      select: { patientId: true, amountDue: true, amountPaid: true, status: true },
+      select: {
+        patientId: true,
+        periodYear: true,
+        periodMonth: true,
+        amountDue: true,
+        amountPaid: true,
+        status: true,
+      },
     });
 
     const debtCarriedOver = new Map<string, number>();
@@ -79,6 +92,13 @@ export class PaymentsService {
     ]);
 
     for (const row of rows) {
+      const start = therapyMap.get(row.patientId);
+      if (
+        start &&
+        !isPeriodOnOrAfterTherapyStart(start, row.periodYear, row.periodMonth)
+      ) {
+        continue;
+      }
       const balance = Math.max(row.amountDue - row.amountPaid, 0);
       if (balance <= 0) continue;
       debtCarriedOver.set(row.patientId, (debtCarriedOver.get(row.patientId) ?? 0) + balance);
@@ -120,6 +140,7 @@ export class PaymentsService {
         discountPercent: true,
         agreedMonthlyAmount: true,
         monthlyBillingStatus: true,
+        fechaInicioTerapia: true,
       },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
@@ -168,6 +189,12 @@ export class PaymentsService {
 
     const outstanding = payments.reduce((acc, p) => {
       if (!isOnOrAfterDebtStart(p.periodYear, p.periodMonth)) return acc;
+      if (
+        patient.fechaInicioTerapia &&
+        !isPeriodOnOrAfterTherapyStart(patient.fechaInicioTerapia, p.periodYear, p.periodMonth)
+      ) {
+        return acc;
+      }
       return acc + Math.max(p.amountDue - p.amountPaid, 0);
     }, 0);
 
@@ -232,6 +259,7 @@ export class PaymentsService {
         sessionsPerWeek: true,
         discountPercent: true,
         agreedMonthlyAmount: true,
+        fechaInicioTerapia: true,
       },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
@@ -252,15 +280,20 @@ export class PaymentsService {
       amountDue = dto.amountDue;
     } else if (previousStatus === PaymentStatus.PAUSA_VACACIONES) {
       const prev = previousPeriod(year, month);
-      const prevPayment = await this.prisma.payment.findUnique({
-        where: {
-          patientId_periodYear_periodMonth: {
-            patientId,
-            periodYear: prev.year,
-            periodMonth: prev.month,
-          },
-        },
-      });
+      const prevAllowed =
+        patient.fechaInicioTerapia == null ||
+        isPeriodOnOrAfterTherapyStart(patient.fechaInicioTerapia, prev.year, prev.month);
+      const prevPayment = prevAllowed
+        ? await this.prisma.payment.findUnique({
+            where: {
+              patientId_periodYear_periodMonth: {
+                patientId,
+                periodYear: prev.year,
+                periodMonth: prev.month,
+              },
+            },
+          })
+        : null;
       amountDue = resolveAmountDueFromBilling(suggested, prevPayment?.amountDue);
     } else {
       amountDue = existing?.amountDue ?? defaultDue;
@@ -324,6 +357,7 @@ export class PaymentsService {
         sessionsPerWeek: true,
         discountPercent: true,
         agreedMonthlyAmount: true,
+        fechaInicioTerapia: true,
       },
     });
     if (!patient) throw new NotFoundException("Paciente no encontrado");
@@ -484,6 +518,7 @@ export class PaymentsService {
             discountPercent: true,
             agreedMonthlyAmount: true,
             monthlyBillingStatus: true,
+            fechaInicioTerapia: true,
           },
         },
       },
@@ -507,6 +542,7 @@ export class PaymentsService {
         discountPercent: true,
         agreedMonthlyAmount: true,
         monthlyBillingStatus: true,
+        fechaInicioTerapia: true,
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
@@ -516,6 +552,7 @@ export class PaymentsService {
 
     for (const patient of billablePatients) {
       if (isInactiveForPeriod(patient, year, month)) continue;
+      if (!isPeriodOnOrAfterTherapyStart(patient.fechaInicioTerapia, year, month)) continue;
       const existing = paymentByPatientId.get(patient.id);
       if (existing) {
         merged.push(existing);
@@ -544,6 +581,7 @@ export class PaymentsService {
 
     for (const leftover of paymentByPatientId.values()) {
       if (isInactiveForPeriod(leftover.patient, year, month)) continue;
+      if (!isPeriodOnOrAfterTherapyStart(leftover.patient.fechaInicioTerapia, year, month)) continue;
       if (leftover.patient.monthlyBillingStatus === "NO_INTEGRADO") continue;
       merged.push(leftover);
     }

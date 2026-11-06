@@ -14,4 +14,8 @@ export class CreatePatientDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsDateString()
+  fechaInicioTerapia?: string;
 }
