@@ -25,6 +25,7 @@ type FullPatient = {
     lastRevaluationDate?: string | null;
     revaluationAlertSnoozedUntil?: string | null;
     revaluationSkipReason?: string | null;
+    fechaInicioTerapia?: string | null;
   };
   guardians: {
     parentId: string;
@@ -74,6 +75,7 @@ export default function AdminPatientEditPage() {
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [therapyStartDate, setTherapyStartDate] = useState("");
   const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
   const [lastRevaluationDate, setLastRevaluationDate] = useState("");
   const [reminderDate, setReminderDate] = useState("");
@@ -123,6 +125,9 @@ export default function AdminPatientEditPage() {
         setLastName(full.patient.lastName ?? "");
         setBirthDate(full.patient.birthDate ? String(full.patient.birthDate).slice(0, 10) : "");
         setNotes(full.patient.notes ?? "");
+        setTherapyStartDate(
+          full.patient.fechaInicioTerapia ? String(full.patient.fechaInicioTerapia).slice(0, 10) : "",
+        );
         setCenter(full.patient.center ?? "SAN_AGUSTIN");
         setLastRevaluationDate(
           full.patient.lastRevaluationDate ? String(full.patient.lastRevaluationDate).slice(0, 10) : "",
@@ -175,6 +180,9 @@ export default function AdminPatientEditPage() {
           ...(birthDate ? { birthDate: new Date(birthDate).toISOString() } : {}),
           notes,
           center,
+          ...(therapyStartDate
+            ? { fechaInicioTerapia: new Date(`${therapyStartDate}T12:00:00.000Z`).toISOString() }
+            : {}),
         }),
       });
       await reload();
@@ -467,6 +475,19 @@ export default function AdminPatientEditPage() {
           <label className="grid gap-1 text-sm">
             <span className="font-medium">Fecha de nacimiento</span>
             <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm">
+            <span className="font-medium">Inicio de terapia (mensualidades)</span>
+            <input
+              className="input"
+              type="date"
+              value={therapyStartDate}
+              onChange={(e) => setTherapyStartDate(e.target.value)}
+            />
+            <span className="text-xs text-subtle">
+              Primer mes en que aplica cobro y arrastre de adeudo (mes calendario UTC según la fecha). Deje vacío para no
+              cambiar el valor guardado.
+            </span>
           </label>
           <label className="grid gap-1 text-sm">
             <span className="font-medium">Centro GiDi</span>

@@ -49,6 +49,7 @@ export class AdminPatientsService {
         lastRevaluationDate: true,
         revaluationAlertSnoozedUntil: true,
         revaluationSkipReason: true,
+        fechaInicioTerapia: true,
         createdAt: true,
         updatedAt: true,
 
@@ -106,6 +107,7 @@ export class AdminPatientsService {
         lastRevaluationDate: patient.lastRevaluationDate,
         revaluationAlertSnoozedUntil: patient.revaluationAlertSnoozedUntil,
         revaluationSkipReason: patient.revaluationSkipReason,
+        fechaInicioTerapia: patient.fechaInicioTerapia,
         createdAt: patient.createdAt,
         updatedAt: patient.updatedAt,
       },
@@ -164,6 +166,9 @@ export class AdminPatientsService {
         lastName: dto.lastName,
         birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
         notes: dto.notes ?? null,
+        fechaInicioTerapia: dto.fechaInicioTerapia
+          ? new Date(dto.fechaInicioTerapia)
+          : undefined,
       },
       select: {
         id: true,
@@ -171,6 +176,7 @@ export class AdminPatientsService {
         lastName: true,
         birthDate: true,
         notes: true,
+        fechaInicioTerapia: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -230,6 +236,8 @@ export class AdminPatientsService {
               : null,
         revaluationSkipReason:
           dto.revaluationSkipReason === undefined ? undefined : dto.revaluationSkipReason,
+        fechaInicioTerapia:
+          dto.fechaInicioTerapia === undefined ? undefined : new Date(dto.fechaInicioTerapia),
       },
       select: {
         id: true,
@@ -241,6 +249,7 @@ export class AdminPatientsService {
         lastRevaluationDate: true,
         revaluationAlertSnoozedUntil: true,
         revaluationSkipReason: true,
+        fechaInicioTerapia: true,
         createdAt: true,
         updatedAt: true,
       },

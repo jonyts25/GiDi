@@ -82,6 +82,8 @@ export type PatientBillingProfile = {
   agreedMonthlyAmount?: number | null;
   sessionsPerWeek?: number | null;
   discountPercent?: number | null;
+  /** Primer mes con cobro (UTC); si falta, no se filtra por inicio de terapia. */
+  fechaInicioTerapia?: Date | null;
 };
 
 /** Mensualidad sugerida a partir de frecuencia y descuento (%).

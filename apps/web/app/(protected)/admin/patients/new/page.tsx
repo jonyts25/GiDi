@@ -46,6 +46,7 @@ export default function AdminNewPatientPage() {
   const [lastName, setLastName] = useState("");
   const [birthDate, setBirthDate] = useState(""); // yyyy-mm-dd
   const [notes, setNotes] = useState("");
+  const [therapyStartDate, setTherapyStartDate] = useState("");
   const [center, setCenter] = useState<GidiCenterKey>("SAN_AGUSTIN");
   const [sessionsPerWeek, setSessionsPerWeek] = useState("");
   const [discountPercent, setDiscountPercent] = useState("0");
@@ -261,6 +262,9 @@ export default function AdminNewPatientPage() {
         birthDate: birthDate ? new Date(birthDate).toISOString() : undefined,
         notes: notes.trim() || undefined,
         center,
+        fechaInicioTerapia: therapyStartDate
+          ? new Date(`${therapyStartDate}T12:00:00.000Z`).toISOString()
+          : undefined,
         sessionsPerWeek: sessionsPerWeek === "" ? undefined : Number(sessionsPerWeek),
         discountPercent: Number(discountPercent) || 0,
         agreedMonthlyAmount: agreedMonthlyAmount === "" ? undefined : Number(agreedMonthlyAmount),
@@ -383,6 +387,18 @@ export default function AdminNewPatientPage() {
         <div className="row">
           <input className="input" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} disabled={!!createdPatientId} />
           <input className="input" placeholder="Notas (opcional)" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={!!createdPatientId} />
+        </div>
+        <div className="row">
+          <label className="grid gap-1 text-sm flex-1">
+            <span className="text-subtle">Inicio de terapia (mensualidades)</span>
+            <input
+              className="input"
+              type="date"
+              value={therapyStartDate}
+              onChange={(e) => setTherapyStartDate(e.target.value)}
+              disabled={!!createdPatientId}
+            />
+          </label>
         </div>
         <div className="row">
           <label className="grid gap-1 text-sm">

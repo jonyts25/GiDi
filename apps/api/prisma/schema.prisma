@@ -136,6 +136,9 @@ model Patient {
   /// Notas persistentes de cobro (visible en hoja mensual).
   billingNotes String?
 
+  /// Primer mes en que el paciente debe cargar mensualidad / arrastre (UTC). Por defecto = alta en sistema (createdAt).
+  fechaInicioTerapia DateTime @default(now())
+
   parents     ParentPatient[]
   assignments PatientTherapist[]
   schools     SchoolPatient[]
