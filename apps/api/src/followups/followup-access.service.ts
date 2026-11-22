@@ -11,6 +11,9 @@ import {
 
 export { AuthUser };
 
+/** Única área en la que el perfil de colegio puede generar seguimientos. */
+export const SCHOOL_AREA_KEY = "SEGUIMIENTO_ESCOLAR";
+
 @Injectable()
 export class FollowUpAccessService {
   constructor(private prisma: PrismaService) {}
@@ -146,6 +149,13 @@ export class FollowUpAccessService {
       return;
     }
 
+    if (user.roles.includes("SCHOOL") && areaKey === SCHOOL_AREA_KEY) {
+      const ok = await this.prisma.schoolPatient.findFirst({
+        where: { patientId, schoolId: user.sub, patient: { status: "ACTIVE" } },
+      });
+      if (ok) return;
+    }
+
     throw new ForbiddenException("No puede editar seguimientos de este paciente");
   }
 
@@ -194,6 +204,14 @@ export class FollowUpAccessService {
       (fu.area.key === "ADMINISTRATIVO" || fu.area.key === "COMUNICACION_INTERNA")
     ) {
       return;
+    }
+
+    if (user.roles.includes("SCHOOL") && !user.roles.includes("THERAPIST")) {
+      const linked = await this.prisma.schoolPatient.findFirst({
+        where: { patientId: fu.patientId, schoolId: user.sub },
+      });
+      if (linked && fu.area.key === SCHOOL_AREA_KEY && fu.therapistId === user.sub) return;
+      throw new ForbiddenException("No puede editar este seguimiento");
     }
 
     await this.assertOwningTherapistCanEdit(user, fu.patientId, fu.therapistId);

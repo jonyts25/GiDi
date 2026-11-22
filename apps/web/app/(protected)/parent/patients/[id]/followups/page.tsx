@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { defaultFollowUpPeriod } from "@/lib/date-utils";
 import {
   ParentFollowUpSummaryCard,
   type ParentFollowUpSummaryItem,
@@ -35,8 +36,10 @@ export default function ParentPatientFollowUpsPage() {
   const patientId = params.id;
 
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+
+  const defaultPeriod = defaultFollowUpPeriod(now);
+  const [year, setYear] = useState(defaultPeriod.periodYear);
+  const [month, setMonth] = useState(defaultPeriod.periodMonth);
   const [allMonths, setAllMonths] = useState(false);
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [exportRows, setExportRows] = useState<FollowUpRow[]>([]);

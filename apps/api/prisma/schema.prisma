@@ -342,9 +342,10 @@ model FollowUp {
   lastNoteBy   User?   @relation("FollowUpLastInternalNote", fields: [lastNoteById], references: [id], onDelete: SetNull)
 
   // Audiencia: a quién se publica el seguimiento (el admin siempre ve).
+  // Por defecto visible para todos; solo un admin puede cambiarlo.
   visibleToParent    Boolean @default(true)
   visibleToTherapist Boolean @default(true)
-  visibleToSchool    Boolean @default(false)
+  visibleToSchool    Boolean @default(true)
 
   status FollowUpStatus @default(DRAFT)
 

@@ -19,6 +19,10 @@ export function filterAreasForUserRoles(roles: string[], areas: AreaLike[]): Are
     return areas.filter((a) => a.key === "ADMINISTRATIVO" || a.key === "COMUNICACION_INTERNA");
   }
 
+  if (roles.includes("SCHOOL")) {
+    return areas.filter((a) => a.key === "SEGUIMIENTO_ESCOLAR");
+  }
+
   return [];
 }
 

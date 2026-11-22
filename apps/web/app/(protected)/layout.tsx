@@ -82,7 +82,10 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             { href: "/documents", label: "Documentos" },
           ]
         : roles.includes("SCHOOL")
-          ? [{ href: "/school/patients", label: "Pacientes" }]
+          ? [
+              { href: "/school/patients", label: "Pacientes" },
+              { href: "/documents", label: "Documentos" },
+            ]
           : [{ href: "/dashboard", label: "Dashboard" }];
 
   if (!ready)

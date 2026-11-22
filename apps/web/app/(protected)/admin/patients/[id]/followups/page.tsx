@@ -8,7 +8,7 @@ import { filterAreasForUserRoles } from "@/lib/area-permissions";
 import { resolveTrackingMode } from "@/lib/followup-area";
 import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { hasOfficeStaffRole } from "@/lib/role-permissions";
-import { programPeriodOptions } from "@/lib/date-utils";
+import { programPeriodOptions, defaultFollowUpPeriod } from "@/lib/date-utils";
 
 type Area = { id: string; key: string; name: string; trackingMode?: string | null };
 type Therapist = { id: string; fullName: string; email: string };
@@ -30,10 +30,12 @@ export default function AdminPatientFollowUpsPage() {
   const patientId = params.id;
 
   const now = new Date();
+
+  const defaultPeriod = defaultFollowUpPeriod(now);
   const programPeriods = useMemo(() => programPeriodOptions(now), []);
   const defaultProgramPeriod = programPeriods[1] ?? programPeriods[0];
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(defaultPeriod.periodYear);
+  const [month, setMonth] = useState(defaultPeriod.periodMonth);
   const [allMonths, setAllMonths] = useState(false);
   const [programMonthsBack, setProgramMonthsBack] = useState(defaultProgramPeriod.monthsBack);
 

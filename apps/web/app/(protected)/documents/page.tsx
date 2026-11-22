@@ -32,16 +32,14 @@ export default function CenterDocumentsReadPage() {
     if (!token || !userRaw) return router.replace("/");
 
     const roles: string[] = JSON.parse(userRaw).roles ?? [];
-    if (roles.includes("SCHOOL") && !roles.some((r) => ["ADMIN", "SUPERADMIN", "SECRETARY", "FINANCE", "PARENT", "THERAPIST"].includes(r))) {
-      return router.replace("/dashboard");
-    }
     if (hasFullAdminRole(roles)) return router.replace("/admin/documents");
 
     const allowed =
       hasOfficeStaffRole(roles) ||
       roles.includes("THERAPIST") ||
       hasParentPortalAccess(roles) ||
-      (roles.includes("PARENT") && !roles.includes("SCHOOL"));
+      roles.includes("PARENT") ||
+      roles.includes("SCHOOL");
 
     if (!allowed) return router.replace("/dashboard");
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { defaultFollowUpPeriod } from "@/lib/date-utils";
 import { hasCoordinatorRole } from "@/lib/role-permissions";
 
 type TeamPatient = { id: string; firstName: string; lastName: string };
@@ -32,6 +33,7 @@ const MONTH_NAMES = [
 export default function CoordinatorTeamPage() {
   const router = useRouter();
   const now = new Date();
+  const defaultPeriod = defaultFollowUpPeriod(now);
   const [team, setTeam] = useState<TeamTherapist[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
@@ -39,8 +41,8 @@ export default function CoordinatorTeamPage() {
   const [selectedPatient, setSelectedPatient] = useState<{ patientId: string; therapistId: string } | null>(
     null,
   );
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(defaultPeriod.periodYear);
+  const [month, setMonth] = useState(defaultPeriod.periodMonth);
   const [programs, setPrograms] = useState<{ id: string; periodYear: number; periodMonth: number }[]>([]);
   const [programsLoading, setProgramsLoading] = useState(false);
   const [internalNotes, setInternalNotes] = useState<

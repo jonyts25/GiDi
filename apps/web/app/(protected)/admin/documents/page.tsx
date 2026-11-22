@@ -28,6 +28,7 @@ function audienceLabel(audience: string[]): string {
   const parts: string[] = [];
   if (audience.includes("PARENT")) parts.push("Papás");
   if (audience.includes("THERAPIST")) parts.push("Terapeutas");
+  if (audience.includes("SCHOOL")) parts.push("Escuelas");
   return parts.join(", ") || "—";
 }
 
@@ -46,6 +47,7 @@ export default function AdminCenterDocumentsPage() {
   const [description, setDescription] = useState("");
   const [audienceParent, setAudienceParent] = useState(true);
   const [audienceTherapist, setAudienceTherapist] = useState(false);
+  const [audienceSchool, setAudienceSchool] = useState(false);
   const [sortOrder, setSortOrder] = useState(0);
   const [pendingFile, setPendingFile] = useState<{ fileName: string; mimeType: string; dataUrl: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,6 +57,7 @@ export default function AdminCenterDocumentsPage() {
   const [editDescription, setEditDescription] = useState("");
   const [editParent, setEditParent] = useState(false);
   const [editTherapist, setEditTherapist] = useState(false);
+  const [editSchool, setEditSchool] = useState(false);
   const [editSortOrder, setEditSortOrder] = useState(0);
 
   const load = useCallback(async () => {
@@ -82,10 +85,11 @@ export default function AdminCenterDocumentsPage() {
     void load();
   }, [router, load]);
 
-  function buildAudience(parent: boolean, therapist: boolean): string[] {
+  function buildAudience(parent: boolean, therapist: boolean, school: boolean): string[] {
     const a: string[] = [];
     if (parent) a.push("PARENT");
     if (therapist) a.push("THERAPIST");
+    if (school) a.push("SCHOOL");
     return a;
   }
 
@@ -105,13 +109,13 @@ export default function AdminCenterDocumentsPage() {
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
-    const audience = buildAudience(audienceParent, audienceTherapist);
+    const audience = buildAudience(audienceParent, audienceTherapist, audienceSchool);
     if (!title.trim()) {
       showToast("El título es obligatorio", "error");
       return;
     }
     if (audience.length === 0) {
-      showToast("Seleccione al menos Papás o Terapeutas", "error");
+      showToast("Seleccione al menos Papás, Terapeutas o Escuelas", "error");
       return;
     }
     if (!pendingFile) {
@@ -134,6 +138,7 @@ export default function AdminCenterDocumentsPage() {
       setDescription("");
       setAudienceParent(true);
       setAudienceTherapist(false);
+      setAudienceSchool(false);
       setSortOrder(0);
       setPendingFile(null);
       showToast("Documento publicado", "success");
@@ -151,12 +156,13 @@ export default function AdminCenterDocumentsPage() {
     setEditDescription(doc.description ?? "");
     setEditParent(doc.audience.includes("PARENT"));
     setEditTherapist(doc.audience.includes("THERAPIST"));
+    setEditSchool(doc.audience.includes("SCHOOL"));
     setEditSortOrder(doc.sortOrder);
   }
 
   async function saveEdit() {
     if (!editingId) return;
-    const audience = buildAudience(editParent, editTherapist);
+    const audience = buildAudience(editParent, editTherapist, editSchool);
     if (!editTitle.trim() || audience.length === 0) {
       showToast("Título y al menos un destinatario son obligatorios", "error");
       return;
@@ -320,6 +326,10 @@ export default function AdminCenterDocumentsPage() {
               <input type="checkbox" checked={audienceTherapist} onChange={(e) => setAudienceTherapist(e.target.checked)} />
               Terapeutas
             </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={audienceSchool} onChange={(e) => setAudienceSchool(e.target.checked)} />
+              Escuelas
+            </label>
           </div>
           <label className="grid max-w-[8rem] gap-1 text-sm">
             <span className="font-medium">Orden</span>
@@ -382,6 +392,10 @@ export default function AdminCenterDocumentsPage() {
                     <label className="flex items-center gap-2 text-sm">
                       <input type="checkbox" checked={editTherapist} onChange={(e) => setEditTherapist(e.target.checked)} />
                       Terapeutas
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={editSchool} onChange={(e) => setEditSchool(e.target.checked)} />
+                      Escuelas
                     </label>
                     <input
                       type="number"

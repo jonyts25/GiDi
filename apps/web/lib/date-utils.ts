@@ -77,3 +77,11 @@ export function formatDateOnly(
 export function formatCalendarDate(iso: string, opts?: Intl.DateTimeFormatOptions): string {
   return formatDateOnly(iso, opts ?? { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
 }
+
+/**
+ * Periodo predeterminado en vistas de seguimientos: el mes anterior,
+ * porque los seguimientos casi siempre se suben a mes vencido.
+ */
+export function defaultFollowUpPeriod(now = new Date()): { periodYear: number; periodMonth: number } {
+  return subtractCalendarMonths(now.getFullYear(), now.getMonth() + 1, 1);
+}

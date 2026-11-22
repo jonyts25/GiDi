@@ -34,13 +34,6 @@ function isOfficeStaff(roles: string[]): boolean {
   return roles.includes("SECRETARY") || roles.includes("FINANCE");
 }
 
-function isSchoolOnlyBlocked(roles: string[]): boolean {
-  if (!roles.includes("SCHOOL")) return false;
-  return !roles.some((r) =>
-    ["ADMIN", "SUPERADMIN", "SECRETARY", "FINANCE", "PARENT", "THERAPIST"].includes(r),
-  );
-}
-
 function audienceMatchesUser(audience: RoleKey[], roles: string[]): boolean {
   return audience.some((a) => roles.includes(a));
 }
@@ -66,12 +59,6 @@ export class CenterDocumentsService {
     return next;
   }
 
-  assertCanUseCenterDocumentsApi(user: AuthUser): void {
-    if (isSchoolOnlyBlocked(user.roles)) {
-      throw new ForbiddenException("Los usuarios de escuela no tienen acceso a estos documentos.");
-    }
-  }
-
   private async assertOfficeStaffCanView(user: AuthUser): Promise<void> {
     if (!isOfficeStaff(user.roles) || isFullAdmin(user.roles)) return;
     const settings = await this.getSettings();
@@ -94,6 +81,7 @@ export class CenterDocumentsService {
     const roleFilters: RoleKey[] = [];
     if (user.roles.includes("PARENT")) roleFilters.push(RoleKey.PARENT);
     if (user.roles.includes("THERAPIST")) roleFilters.push(RoleKey.THERAPIST);
+    if (user.roles.includes("SCHOOL")) roleFilters.push(RoleKey.SCHOOL);
 
     if (roleFilters.length === 0) {
       throw new ForbiddenException("No tiene acceso a documentos del centro.");
@@ -106,7 +94,6 @@ export class CenterDocumentsService {
   }
 
   async list(user: AuthUser) {
-    this.assertCanUseCenterDocumentsApi(user);
     const settings = await this.getSettings();
     await this.assertOfficeStaffCanView(user);
 
@@ -119,7 +106,6 @@ export class CenterDocumentsService {
   }
 
   private async findVisibleDocument(user: AuthUser, id: string) {
-    this.assertCanUseCenterDocumentsApi(user);
     const settings = await this.getSettings();
     await this.assertOfficeStaffCanView(user);
 
