@@ -78,10 +78,14 @@ describe("CenterDocumentsService visibility", () => {
     expect(rows[0]?.id).toBe(DOC_ID);
   });
 
-  it("SCHOOL recibe 403", async () => {
-    const svc = buildService([PARENT_ONLY]);
-    await expect(svc.list(user(["SCHOOL"]))).rejects.toBeInstanceOf(ForbiddenException);
+  it("SCHOOL solo ve documentos dirigidos a escuelas", async () => {
+    const schoolDoc = { ...THERAPIST_ONLY, id: "doc-school", audience: [RoleKey.SCHOOL] as RoleKey[] };
+    const svc = buildService([PARENT_ONLY, schoolDoc]);
+    const rows = await svc.list(user(["SCHOOL"]));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe("doc-school");
     await expect(svc.getFile(user(["SCHOOL"]), PARENT_ONLY.id)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(svc.getFile(user(["SCHOOL"]), "doc-school")).resolves.toMatchObject({ fileName: "reg.pdf" });
   });
 
   it("SECRETARY ve activos pero no inactivos", async () => {
@@ -105,7 +109,7 @@ describe("CenterDocumentsService visibility", () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it("rechaza audience con SCHOOL", async () => {
+  it("acepta audience con SCHOOL", async () => {
     const svc = buildService([]);
     await expect(
       svc.create(user(["ADMIN"]), {
@@ -115,6 +119,6 @@ describe("CenterDocumentsService visibility", () => {
         dataUrl: "data:application/pdf;base64,abc",
         audience: [RoleKey.SCHOOL],
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).resolves.toBeDefined();
   });
 });

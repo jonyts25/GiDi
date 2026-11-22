@@ -15,6 +15,7 @@ import { CreateFollowUpSessionDto } from "./dto/create-followup-session.dto";
 import { UpsertMarkDto } from "./dto/upsert-mark.dto";
 import { UpdateObjectiveNotesDto } from "./dto/update-objective-notes.dto";
 import { AuthUser } from "../auth/auth-user";
+import { hasOfficeStaffRole } from "../auth/role-permissions";
 import { FollowUpAccessService } from "./followup-access.service";
 import { resolveExistingFollowUpForProgramArea } from "./followup-program-area.util";
 import { INTERNAL_ONLY_AREA_KEYS, isInternalOnlyAreaKey } from "../areas/area-catalog";
@@ -106,6 +107,15 @@ export class FollowUpsService {
       Object.assign(where, NOT_INTERNAL_AREA_WHERE);
     }
 
+    const visibilityFlag = this.externalVisibilityFlag(user);
+    if (visibilityFlag) {
+      // Papás / colegio: sus propios seguimientos + los publicados visibles para su perfil.
+      where.OR = [
+        { therapistId: user.sub },
+        { status: FollowUpStatus.CLOSED, [visibilityFlag]: true },
+      ];
+    }
+
     return this.prisma.followUp.findMany({
       where,
       orderBy: [{ periodYear: "desc" }, { periodMonth: "desc" }, { createdAt: "desc" }],
@@ -158,6 +168,14 @@ export class FollowUpsService {
     });
     if (!fu) throw new NotFoundException("FollowUp not found");
     this.assertCanViewInternalFollowUp(user, fu.area.key);
+    const visibilityFlag = this.externalVisibilityFlag(user);
+    if (
+      visibilityFlag &&
+      fu.therapistId !== user.sub &&
+      !(fu.status === FollowUpStatus.CLOSED && fu[visibilityFlag])
+    ) {
+      throw new ForbiddenException("No tiene acceso a este seguimiento");
+    }
     if (fu.area.key === "COMUNICACION_INTERNA") {
       await this.markInternalNoteSeen(user.sub, id);
     }
@@ -680,7 +698,11 @@ export class FollowUpsService {
     let therapistId: string;
     if (this.access.isAdmin(user)) {
       therapistId = dto.therapistId ?? user.sub;
-    } else if (user.roles.includes("PARENT") || user.roles.includes("SECRETARY")) {
+    } else if (
+      user.roles.includes("PARENT") ||
+      user.roles.includes("SECRETARY") ||
+      user.roles.includes("SCHOOL")
+    ) {
       therapistId = user.sub;
     } else if (user.roles.includes("THERAPIST")) {
       therapistId = user.sub;
@@ -875,15 +897,29 @@ export class FollowUpsService {
         status: dto.status ?? undefined,
         ...(Object.keys(forcedVisibility).length
           ? forcedVisibility
-          : {
-              visibleToParent: dto.visibleToParent ?? undefined,
-              visibleToTherapist: dto.visibleToTherapist ?? undefined,
-              visibleToSchool: dto.visibleToSchool ?? undefined,
-            }),
+          : this.access.isAdmin(user)
+            ? {
+                visibleToParent: dto.visibleToParent ?? undefined,
+                visibleToTherapist: dto.visibleToTherapist ?? undefined,
+                visibleToSchool: dto.visibleToSchool ?? undefined,
+              }
+            : {}),
         ...noteMetadata,
       },
     });
     return this.get(user, id);
+  }
+
+  /**
+   * Bandera de visibilidad que aplica a papás o colegio (null para personal interno).
+   * Solo ven seguimientos propios o publicados con esa bandera activa.
+   */
+  private externalVisibilityFlag(user: AuthUser): "visibleToParent" | "visibleToSchool" | null {
+    if (hasOfficeStaffRole(user.roles)) return null;
+    if (user.roles.includes("THERAPIST") || user.roles.includes("COORDINATOR")) return null;
+    if (user.roles.includes("SCHOOL")) return "visibleToSchool";
+    if (user.roles.includes("PARENT")) return "visibleToParent";
+    return null;
   }
 
   private isExternalAudience(user: AuthUser): boolean {

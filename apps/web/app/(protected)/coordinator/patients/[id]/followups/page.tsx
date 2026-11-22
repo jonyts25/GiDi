@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { defaultFollowUpPeriod } from "@/lib/date-utils";
 import { PatientFollowUpsExportTable } from "@/components/followups/PatientFollowUpsExportTable";
 import { filterAreasForUserRoles } from "@/lib/area-permissions";
 import { hasCoordinatorRole } from "@/lib/role-permissions";
@@ -27,8 +28,10 @@ export default function CoordinatorPatientFollowUpsPage() {
   const patientId = params.id;
 
   const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+
+  const defaultPeriod = defaultFollowUpPeriod(now);
+  const [year, setYear] = useState(defaultPeriod.periodYear);
+  const [month, setMonth] = useState(defaultPeriod.periodMonth);
   const [allMonths, setAllMonths] = useState(false);
   const [areas, setAreas] = useState<Area[]>([]);
   const [rows, setRows] = useState<FollowUpRow[]>([]);
